@@ -120,7 +120,8 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
      */
     function balanceOf(address account, uint256 id) public view override returns (uint256) {
         require(account != address(0), "sERC1155: balance query for the zero address");
-        return id.toSERC20().balanceOf(account);
+
+        return _NFTs[id].collection != address(0) ? id.toSERC20().balanceOf(account) : 0;
     }
 
     /**
