@@ -22,8 +22,8 @@ contract SERC20 is
     AccessControlEnumerableUpgradeable,
     ERC20Upgradeable,
     ERC20CappedUpgradeable, 
-    ERC20PausableUpgradeable,
     ERC20BurnableUpgradeable,
+    ERC20PausableUpgradeable,
     ERC20SnapshotUpgradeable,
     ERC20PermitUpgradeable
 {
@@ -68,8 +68,8 @@ contract SERC20 is
         __AccessControlEnumerable_init();
         __ERC20_init(name_, symbol_);
         __ERC20Capped_init(cap_);
-        __ERC20Pausable_init();
         __ERC20Burnable_init();
+        __ERC20Pausable_init();
         __ERC20Snapshot_init();
         __ERC20Permit_init(name_);
         
@@ -89,6 +89,7 @@ contract SERC20 is
         require(hasRole(MINTER_ROLE, _msgSender()), "sERC20: must have minter role to mint");
         _mint(to, amount);
     }
+
 
     function snapshot() external returns (uint256) {
         require(hasRole(SNAPSHOT_ROLE, _msgSender()), "sERC20: must have snapshot role to snapshot");
@@ -131,10 +132,11 @@ contract SERC20 is
         uint256 amount
     )
         internal
-        override(ERC20Upgradeable, ERC20SnapshotUpgradeable, ERC20PausableUpgradeable)
+        override(ERC20Upgradeable, ERC20PausableUpgradeable, ERC20SnapshotUpgradeable)
     {
-        ERC20PausableUpgradeable._beforeTokenTransfer(from, to, amount);
-        ERC20SnapshotUpgradeable._beforeTokenTransfer(from, to, amount);
+        // ERC20PausableUpgradeable._beforeTokenTransfer(from, to, amount);
+        // ERC20SnapshotUpgradeable._beforeTokenTransfer(from, to, amount);
+        super._beforeTokenTransfer(from, to, amount);
         SERC1155(_sERC1155).onSERC20Transferred(from, to, amount);
     }
 }
