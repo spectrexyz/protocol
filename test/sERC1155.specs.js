@@ -11,30 +11,24 @@ describe.only('sERC1155', () => {
     sERC1155,
     tokenId,
     id,
+    roles,
     admin,
+    minter,
     owners = [],
     holders = [],
-    others;
+    others = [];
 
-  const UNWRAPPED_URI = 'ipfs://Qm.../unwrapped';
-  const TOKEN_URI = 'ipfs://Qm.../';
-  const NAME = 'My Awesome sERC20';
-  const SYMBOL = 'MAS';
-  const CAP = ethers.BigNumber.from('1000000000000000000000000');
-  const ROLES = [
-    ethers.constants.AddressZero,
-    ethers.constants.AddressZero,
-    ethers.constants.AddressZero,
-    ethers.constants.AddressZero,
-    ethers.constants.AddressZero,
-    ethers.constants.AddressZero,
-  ];
+  const unwrappedURI = 'ipfs://Qm.../unwrapped';
+  const tokenURI = 'ipfs://Qm.../';
+  const name = 'My Awesome sERC20';
+  const symbol = 'MAS';
+  const cap = ethers.BigNumber.from('1000000000000000000000000');
 
   const setup = async (opts = { approve: true }) => {
     sERC20Base = await deployContract(admin, SERC20);
     sERC721 = await deployContract(admin, SERC721, ['sERC721 Collection', 'sERC721']);
-    sERC1155 = await deployContract(admin, SERC1155, [sERC20Base.address, UNWRAPPED_URI]);
-    receipt = await (await sERC721.mint(owners[0].address, TOKEN_URI)).wait();
+    sERC1155 = await deployContract(admin, SERC1155, [sERC20Base.address, unwrappedURI]);
+    receipt = await (await sERC721.mint(owners[0].address, tokenURI)).wait();
 
     tokenId = receipt.events[0].args.tokenId.toString();
 
@@ -61,7 +55,15 @@ describe.only('sERC1155', () => {
   };
 
   before(async () => {
-    [admin, owners[0], owners[1], owners[2], holders[0], holders[1], ...others] = await ethers.getSigners();
+    [admin, minter, owners[0], owners[1], owners[2], holders[0], holders[1], ...others] = await ethers.getSigners();
+    roles = [
+      minter.address,
+      ethers.constants.AddressZero,
+      ethers.constants.AddressZero,
+      ethers.constants.AddressZero,
+      ethers.constants.AddressZero,
+      ethers.constants.AddressZero,
+    ];
   });
 
   describe('# balanceOf', () => {
@@ -82,7 +84,7 @@ describe.only('sERC1155', () => {
         describe('» and sERC1155 has been approved to transfer NFT', () => {
           before(async () => {
             await setup();
-            tx = await sERC1155.wrap(sERC721.address, tokenId, NAME, SYMBOL, CAP, ROLES, owners[1].address);
+            tx = await sERC1155.wrap(sERC721.address, tokenId, name, symbol, cap, roles, owners[1].address);
             receipt = await tx.wait();
             id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
           });
@@ -93,7 +95,7 @@ describe.only('sERC1155', () => {
             await setup({ approve: false });
           });
           it('it reverts', async () => {
-            await expect(sERC1155.wrap(sERC721.address, tokenId, NAME, SYMBOL, CAP, ROLES, owners[1].address)).to.be.revertedWith(
+            await expect(sERC1155.wrap(sERC721.address, tokenId, name, symbol, cap, roles, owners[1].address)).to.be.revertedWith(
               'ERC721: transfer caller is not owner nor approved'
             );
           });
@@ -104,7 +106,7 @@ describe.only('sERC1155', () => {
           await setup();
         });
         it('it reverts', async () => {
-          await expect(sERC1155.wrap(others[0].address, tokenId, NAME, SYMBOL, CAP, ROLES, owners[1].address)).to.be.revertedWith(
+          await expect(sERC1155.wrap(others[0].address, tokenId, name, symbol, cap, roles, owners[1].address)).to.be.revertedWith(
             'sERC1155: NFT is not ERC721-compliant'
           );
         });
@@ -115,7 +117,7 @@ describe.only('sERC1155', () => {
         before(async () => {
           await setup();
 
-          tx = await sERC1155.wrap(sERC721.address, tokenId, NAME, SYMBOL, CAP, ROLES, owners[1].address);
+          tx = await sERC1155.wrap(sERC721.address, tokenId, name, symbol, cap, roles, owners[1].address);
           receipt = await tx.wait();
           id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
           sERC1155 = sERC1155.connect(owners[1]);
@@ -123,7 +125,7 @@ describe.only('sERC1155', () => {
           receipt = await tx.wait();
           sERC721 = sERC721.connect(owners[0]);
           await (await sERC721.approve(sERC1155.address, tokenId)).wait();
-          tx = await sERC1155.wrap(sERC721.address, tokenId, NAME, SYMBOL, CAP, ROLES, owners[1].address);
+          tx = await sERC1155.wrap(sERC721.address, tokenId, name, symbol, cap, roles, owners[1].address);
           receipt = await tx.wait();
           id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
         });
@@ -133,13 +135,13 @@ describe.only('sERC1155', () => {
         before(async () => {
           await setup();
 
-          tx = await sERC1155.wrap(sERC721.address, tokenId, NAME, SYMBOL, CAP, ROLES, owners[1].address);
+          tx = await sERC1155.wrap(sERC721.address, tokenId, name, symbol, cap, roles, owners[1].address);
           receipt = await tx.wait();
           id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
           sERC1155 = sERC1155.connect(owners[1]);
         });
         it('it reverts', async () => {
-          await expect(sERC1155.wrap(sERC721.address, tokenId, NAME, SYMBOL, CAP, ROLES, owners[1].address)).to.be.revertedWith(
+          await expect(sERC1155.wrap(sERC721.address, tokenId, name, symbol, cap, roles, owners[1].address)).to.be.revertedWith(
             'sERC1155: NFT is already wrapped'
           );
         });
