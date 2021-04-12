@@ -64,6 +64,18 @@ describe.only('sERC1155', () => {
     [admin, owners[0], owners[1], owners[2], holders[0], holders[1], ...others] = await ethers.getSigners();
   });
 
+  describe('# balanceOf', () => {
+    describe('» token type exists', () => {});
+    describe('# token type does not exist', () => {
+      before(async () => {
+        await setup();
+      });
+      it('it returns 0', async () => {
+        expect(await sERC1155.balanceOf(others[0].address, 123456789)).to.equal(0);
+      });
+    });
+  });
+
   describe('# wrap', () => {
     describe('» NFT has never been wrapped', () => {
       describe('» and NTF is ERC721-compliant', () => {
