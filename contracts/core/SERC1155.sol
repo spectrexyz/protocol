@@ -280,7 +280,7 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
         external
     {
         require(_currentTokenTypes[collection][tokenId] == 0, "sERC1155: NFT is already wrapped");
-        require(collection.supportsInterface(0x80ac58cd), "sERC1155: NFT is not ERC721 compliant");
+        require(collection.supportsInterface(0x80ac58cd), "sERC1155: NFT is not ERC721-compliant");
 
         address sERC20 = _sERC20Base.clone();
         uint256 id = sERC20.toId();
