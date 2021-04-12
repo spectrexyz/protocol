@@ -1,0 +1,114 @@
+const { expect } = require('chai');
+const { deployContract, loadFixture } = require('ethereum-waffle');
+const { ERC721, Channeler, Ledger, Spectre, ChannelState, approve } = require('./helpers');
+
+describe('Channeler', () => {
+  let channeler, spectre, tx, receipt, admin, opener, closer, guardian, user, others;
+
+  const CAP = 1000000,
+    PRICE = ethers.BigNumber.from('1500000000000000000'),
+    eFEE = ethers.BigNumber.from('20000000000000000'),
+    sFEE = ethers.BigNumber.from('30000000000000000');
+
+  const setup = async () => {
+    channeler = await deployContract(admin, Channeler);
+    spectre = await deployContract(admin, Spectre, ['Spectre Token', '$SPCRT', CAP]);
+
+    await channeler.grantRole(await channeler.OPENER_ROLE(), opener.address);
+    await channeler.grantRole(await channeler.CLOSER_ROLE(), closer.address);
+
+    // const _tx = await ctx.collection.mint(owner.address);
+    // const _receipt = await _tx.wait();
+    // ctx.tokenId = _receipt.events[0].args.tokenId.toString();
+  };
+
+  before(async () => {
+    [admin, opener, closer, guardian, spectre, user, ...others] = await ethers.getSigners();
+  });
+
+  describe('# open', () => {
+    describe('» sender has OPENER_ROLE', () => {
+      describe('» channel is void', () => {
+        describe('» spectre is valid', () => {
+          describe('» price is valid', () => {
+            before(async () => {
+              await setup();
+              channeler = channeler.connect(opener);
+              tx = await channeler.open(spectre.address, guardian.address, PRICE, eFEE, sFEE);
+              receipt = await tx.wait();
+            });
+
+            it('it opens the channel', async () => {
+              const channel = await channeler.channels(spectre.address);
+
+              expect(channel.state).to.equal(ChannelState.Opened);
+              expect(channel.guardian).to.equal(guardian.address);
+              expect(channel.price).to.equal(PRICE);
+              expect(channel.eFee).to.equal(eFEE);
+              expect(channel.sFee).to.equal(sFEE);
+              expect(channel.counter).to.equal(0);
+            });
+
+            it('it emits an Open event', async () => {
+              await expect(tx)
+                .to.emit(channeler, 'Open')
+                .withArgs(spectre.address, guardian.address, PRICE, eFEE, sFEE);
+            });
+          });
+
+          describe('» price is invalid', () => {
+            before(async () => {
+              await setup();
+              channeler = channeler.connect(opener);
+            });
+
+            it('it reverts', async () => {
+              await expect(channeler.open(spectre.address, guardian.address, 0, eFEE, sFEE)).to.be.revertedWith('Spectre: price cannot be zero');
+            });
+          });
+        });
+
+        describe('» spectre is invalid', () => {
+          before(async () => {
+            await setup();
+            channeler = channeler.connect(opener);
+          });
+
+          it('it reverts', async () => {
+            await expect(channeler.open(ethers.constants.AddressZero, guardian.address, PRICE, eFEE, sFEE)).to.be.revertedWith(
+              'Spectre: spectre address cannot be zero'
+            );
+          });
+        });
+      });
+
+      describe('» channel is not void', () => {
+        before(async () => {
+          await setup();
+          channeler = channeler.connect(opener);
+          const _tx = await channeler.open(spectre.address, guardian.address, PRICE, eFEE, sFEE);
+          await _tx.wait();
+        });
+
+        it('it reverts', async () => {
+          await expect(channeler.open(spectre.address, guardian.address, PRICE, eFEE, sFEE)).to.be.revertedWith('Spectre: invalid channel state');
+        });
+      });
+    });
+
+    describe('» sender does not have OPENER_ROLE', () => {
+      before(async () => {
+        await setup();
+        channeler = channeler.connect(others[0]);
+      });
+
+      it('it reverts', async () => {
+        await expect(channeler.open(spectre.address, guardian.address, PRICE, eFEE, sFEE)).to.be.revertedWith('Spectre: protected operation');
+      });
+    });
+  });
+
+  describe('# open', () => {
+    describe('» sender has OPENER_ROLE', () => {});
+  });
+});

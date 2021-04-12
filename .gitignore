@@ -1,0 +1,12 @@
+# npm
+node_modules
+
+# hardhat
+cache
+artifacts
+
+# doc
+docs
+
+# macOS
+.DS_Store
