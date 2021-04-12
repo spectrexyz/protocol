@@ -234,9 +234,9 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
   /* #region sERC1155 */
     /**
      * @notice Mirrors sERC20s transfers.
-     * @dev This function is called by sERC20s whenever a transfer occurs on the sERC20 layer. This enable the sERC1155
+     * @dev This function is called by sERC20s whenever a transfer occurs at the sERC20 layer. This enable the sERC1155
      * contract to emit a `TransferSingle` event, as required per the ERC1155 standard, each time a transfer occurs - 
-     * even when this transfer occurs on the sERC20 layer.
+     * even when this transfer occurs at the sERC20 layer.
      * @param from The address the tokens have been transferred from.
      * @param to The address the tokens have been transferred to.
      * @param amount The amount of tokens which have been transferred.

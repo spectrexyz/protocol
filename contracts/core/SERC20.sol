@@ -46,7 +46,7 @@ contract SERC20 is
     }
 
     /**
-     * @notice sERC20 initializer.
+     * @notice Initializes sERC20.
      * @dev Remarks:
      *        - `name_` is left unchecked as per the ERC20 standard.
      *        - `symbol_` is left unchecked as per the ERC20 standard.
@@ -85,33 +85,60 @@ contract SERC20 is
         _setRoleAdmin(SNAPSHOT_ROLE, SNAPSHOT_ADMIN_ROLE);
     }
 
-    function mint(address to, uint256 amount) external {
-        require(hasRole(MINTER_ROLE, _msgSender()), "sERC20: must have minter role to mint");
-        _mint(to, amount);
-    }
-
-
-    function snapshot() external returns (uint256) {
-        require(hasRole(SNAPSHOT_ROLE, _msgSender()), "sERC20: must have snapshot role to snapshot");
-        return _snapshot();
-    }
-
+    /**
+     * @notice Pauses token transfers.
+     */
     function pause() external {
         require(hasRole(PAUSER_ROLE, _msgSender()), "sERC20: must have pauser role to pause");
         _pause();
     }
 
+    /**
+     * @notice Unpauses token transfers.
+     */
     function unpause() external {
         require(hasRole(PAUSER_ROLE, _msgSender()), "sERC20: must have pauser role to unpause");
         _unpause();
     }
 
-    function onSERC1155Transferred(address sender, address recipient, uint256 amount) external {
-        require(_msgSender() == _sERC1155, "sERC20: must be sERC1155 to use transfer hook");
-        
-        _transfer(sender, recipient, amount);
+    /**
+     * @notice Mint `amount` new tokens for `to`.
+     * @param to The recipient of the tokens to mint.
+     * @param amount The amount of tokens to mint.
+     */
+    function mint(address to, uint256 amount) external {
+        require(hasRole(MINTER_ROLE, _msgSender()), "sERC20: must have minter role to mint");
+        _mint(to, amount);
     }
 
+    /**
+     * @notice Creates a new snapshot and returns its snapshot id.
+     * @dev This function can potentially be used by attackers in two ways. First, it can be used to increase the cost
+     * of retrieval of values from snapshots, although it will grow logarithmically thus rendering this attack
+     * ineffective in the long term. Second, it can be used to target specific accounts and increase the cost of sERC20
+     * transfers for them. That's the reason why this function is protected by the SNAPSHOT_ROLE.
+     */
+    function snapshot() external returns (uint256) {
+        require(hasRole(SNAPSHOT_ROLE, _msgSender()), "sERC20: must have snapshot role to snapshot");
+        return _snapshot();
+    }
+
+    /**
+     * @notice Handles sERC1155 transfers.
+     * @dev This function is called by sERC1155 whenever a transfer is triggered at the sERC1155 layer.
+     * @param from The address the tokens have been transferred from.
+     * @param to The address the tokens have been transferred to.
+     * @param amount The amount of tokens which have been transferred.
+     */
+    function onSERC1155Transferred(address from, address to, uint256 amount) external {
+        require(_msgSender() == _sERC1155, "sERC20: must be sERC1155 to use transfer hook");
+        
+        _transfer(from, to, amount);
+    }
+
+    /**
+     * @notice Returns the `sERC1155` address.
+     */
     function sERC1155() public view returns (address) {
         return _sERC1155;
     }
