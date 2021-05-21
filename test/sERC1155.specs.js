@@ -39,6 +39,12 @@ describe.only('sERC1155', () => {
   };
 
   const itWrapsLikeExpected = () => {
+    it('it locks NFT', async () => {
+      const owner = await sERC721.ownerOf(tokenId);
+
+      expect(owner).to.equal(sERC1155.address);
+    });
+
     it('it wraps NFT', async () => {
       const NFT = await sERC1155['NFTOf(uint256)'](id);
 
@@ -46,6 +52,7 @@ describe.only('sERC1155', () => {
       expect(NFT.tokenId).to.equal(tokenId);
       expect(NFT.owner).to.equal(owners[1].address);
     });
+
     it('it emits a Wrap event', async () => {
       const sERC20 = await sERC1155.sERC20Of(id);
       await expect(tx)
@@ -76,6 +83,34 @@ describe.only('sERC1155', () => {
         expect(await sERC1155.balanceOf(others[0].address, 123456789)).to.equal(0);
       });
     });
+  });
+
+  describe.only('# onERC721Received', () => {
+    before(async () => {
+      await setup();
+      const name = ethers.utils.formatBytes32String('$Spectre');
+      const symbol = ethers.utils.formatBytes32String('SPCTR');
+      const cap = ethers.utils.defaultAbiCoder.encode(['uint256'], ['987654321']);
+      const roles = [
+        ethers.utils.defaultAbiCoder.encode(['address'], [minter.address]),
+        ethers.utils.defaultAbiCoder.encode(['address'], [others[0].address]),
+        ethers.utils.defaultAbiCoder.encode(['address'], [others[1].address]),
+        ethers.utils.defaultAbiCoder.encode(['address'], [others[2].address]),
+        ethers.utils.defaultAbiCoder.encode(['address'], [others[3].address]),
+        ethers.utils.defaultAbiCoder.encode(['address'], [others[4].address]),
+      ];
+      const owner = ethers.utils.defaultAbiCoder.encode(['address'], [owners[1].address]);
+      tx = await sERC721['safeTransferFrom(address,address,uint256,bytes)'](
+        owners[0].address,
+        sERC1155.address,
+        tokenId,
+        ethers.utils.concat([name, symbol, cap, ethers.utils.concat(roles), owner])
+      );
+      receipt = await tx.wait();
+      const events = await sERC1155.queryFilter(sERC1155.filters.Wrap());
+      id = events.filter((event) => event.event === 'Wrap')[0].args.id;
+    });
+    itWrapsLikeExpected();
   });
 
   describe('# wrap', () => {
@@ -112,6 +147,7 @@ describe.only('sERC1155', () => {
         });
       });
     });
+
     describe('» NFT has already been wrapped', () => {
       describe('» and NFT has been unwrapped since', () => {
         before(async () => {

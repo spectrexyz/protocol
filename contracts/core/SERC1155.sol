@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
-
+import "hardhat/console.sol";
 /**
  * @title sERC1155
  * @notice sERC1155 token wrapping sERC20s of spectralized ERC721s.
@@ -27,6 +27,7 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
     using Address for address;
     using Cast for address;
     using Cast for uint256;
+    using Cast for bytes32;
     using Clones for address;
     using ERC165Checker for address;
 
@@ -213,20 +214,56 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
     function onERC721Received(
         address /* operator */,
         address /* from */,
-        uint256 /* tokenId */,
-        bytes calldata /* data */
+        uint256 tokenId,
+        bytes calldata data
     )
         external
         override
         returns (bytes4)
     {
-        // TODO
-        // address collection = _msgSender();
+        address collection = _msgSender();
+        /* data = [
+          bytes32(name)   | 32 bytes
+          bytes32(symbol) | 32 bytes
+          uint256(cap)    | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(owner)  | 32 bytes
+        ]*/
+        require(_currentTokenTypes[collection][tokenId] == 0, "sERC1155: NFT is already wrapped");
+        require(collection.supportsInterface(0x80ac58cd), "sERC1155: NFT is not ERC721-compliant");
+        require(IERC721(collection).ownerOf(tokenId) == address(this), "sERC1155: NFT has not been transferred");
+        require(data.length == 320, "sERC1155: invalid data");
 
-        // see https://gist.github.com/ageyev/779797061490f5be64fb02e978feb6ac
-        // to see whether we can parse strings out of bytes or not
+        // one cannot mload data located in calldata
+        // so we copy it in memory first
+        bytes memory _data = data;
+        bytes32 name;
+        bytes32 symbol;
+        uint256 cap;
+        address[6] memory roles;
+        address owner;
+        
+        assembly {
+            name := mload(add(_data, 32))
+            symbol := mload(add(_data, 64))
+            cap := mload(add(_data, 96))
+            mstore(roles, mload(add(_data, 128)))
+            mstore(add(roles, 32), mload(add(_data, 160)))
+            mstore(add(roles, 64), mload(add(_data, 196)))
+            mstore(add(roles, 96), mload(add(_data, 224)))
+            mstore(add(roles, 128), mload(add(_data, 256)))
+            mstore(add(roles, 160), mload(add(_data, 288)))
+            owner:= mload(add(_data, 320))
+        }
 
-        // if we can't: delete the IERC721Receiver inheritance and the related ERC165 interface support
+ 
+        _wrap(_msgSender(), tokenId, name.toString(), symbol.toString(), cap, roles, owner, false);
+        
         return IERC721Receiver.onERC721Received.selector;
     }
   /* #endregion */
@@ -283,16 +320,7 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
         require(_currentTokenTypes[collection][tokenId] == 0, "sERC1155: NFT is already wrapped");
         require(collection.supportsInterface(0x80ac58cd), "sERC1155: NFT is not ERC721-compliant");
 
-        address sERC20 = _sERC20Base.clone();
-        uint256 id = sERC20.toId();
-        
-        _currentTokenTypes[collection][tokenId] = id;
-        _NFTs[id] = NFT({ collection: collection, tokenId: tokenId, owner: owner });
-
-        IERC721(collection).transferFrom(IERC721(collection).ownerOf(tokenId), address(this), tokenId);
-        SERC20(sERC20).initialize(name, symbol, cap, roles);
-
-        emit Wrap(collection, tokenId, id, sERC20, owner);
+        _wrap(collection, tokenId, name, symbol, cap, roles, owner, true);
     }
 
     function unwrap(uint256 id, address recipient, bytes memory data) external {
@@ -359,6 +387,28 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
   /* #endregion*/
 
   /* #region private */
+    function _wrap(
+        address collection,
+        uint256 tokenId,
+        string memory name,
+        string memory symbol,
+        uint256 cap,
+        address[6] memory roles,
+        address owner,
+        bool transfer
+    ) private {
+        address sERC20 = _sERC20Base.clone();
+        uint256 id = sERC20.toId();
+        
+        _currentTokenTypes[collection][tokenId] = id;
+        _NFTs[id] = NFT({ collection: collection, tokenId: tokenId, owner: owner });
+
+        SERC20(sERC20).initialize(name, symbol, cap, roles);
+        if (transfer) IERC721(collection).transferFrom(IERC721(collection).ownerOf(tokenId), address(this), tokenId);
+
+        emit Wrap(collection, tokenId, id, sERC20, owner);
+    }
+
     function _unwrap(address collection, uint256 tokenId, uint256 id, address recipient, bytes memory data) private {
         delete _currentTokenTypes[collection][tokenId];
 
