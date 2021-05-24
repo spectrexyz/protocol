@@ -31,18 +31,20 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     using Clones for address;
     using ERC165Checker for address;
 
-    enum WrappingState {
+    enum LockState {
         Void,
-        Wrapped,
-        Unwrapped
+        Locked,
+        Unlocked
     }
 
     struct Wrapping {
-        WrappingState state;
+        LockState state;
         address collection;
         uint256 tokenId;
         address owner;
     }
+
+    // LockState state
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
@@ -51,8 +53,8 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
 
     mapping (address => mapping(address => bool)) private _operatorApprovals;
     mapping (uint256 => Wrapping) private _wrappings; // token type => Wrapping [immutable]
-    mapping (address => mapping (uint256 => uint256)) private _currentTokenTypes; // ERC721 => token type [re-initialized when unwrapped]
-
+    mapping (address => mapping (uint256 => bool)) private _isLocked; // ERC721 => token type [re-initialized when unwrapped]
+    // renommer en isLocked
     event Wrap(address indexed collection, uint256 indexed tokenId, uint256 indexed id, address sERC20, address owner);
     event Unwrap(
         address indexed collection,
@@ -106,7 +108,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     function balanceOf(address account, uint256 id) public view override returns (uint256) {
         require(account != address(0), "sERC1155: balance query for the zero address");
 
-        return _wrappings[id].state != WrappingState.Void ? id.toSERC20().balanceOf(account) : 0;
+        return _wrappings[id].state != LockState.Void ? id.toSERC20().balanceOf(account) : 0;
     }
 
     /**
@@ -207,10 +209,12 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     function uri(uint256 id) public view override returns (string memory) {
         Wrapping storage wrapping = _wrappings[id];
 
-        if (wrapping.state == WrappingState.Wrapped)
+
+
+        if (wrapping.state == LockState.Locked)
           return IERC721Metadata(wrapping.collection).tokenURI(wrapping.tokenId);
 
-        if (wrapping.state == WrappingState.Unwrapped)
+        if (wrapping.state == LockState.Unlocked)
             return _unwrappedURI;
 
         return "";
@@ -218,6 +222,20 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
   /* #endregion */
 
   /* #region IERC721Receiver */
+    /**
+     * data looks like this
+        data = [
+          bytes32(name)   | 32 bytes
+          bytes32(symbol) | 32 bytes
+          uint256(cap)    | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(role)   | 32 bytes
+          address(owner)  | 32 bytes 
+     */
     function onERC721Received(
         address /* operator */,
         address /* from */,
@@ -229,22 +247,12 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         returns (bytes4)
     {
         address collection = _msgSender();
-        /* data = [
-          bytes32(name)   | 32 bytes
-          bytes32(symbol) | 32 bytes
-          uint256(cap)    | 32 bytes
-          address(role)   | 32 bytes
-          address(role)   | 32 bytes
-          address(role)   | 32 bytes
-          address(role)   | 32 bytes
-          address(role)   | 32 bytes
-          address(role)   | 32 bytes
-          address(owner)  | 32 bytes
-        ]*/
         require(collection.supportsInterface(0x80ac58cd), "sERC1155: ERC72 is not standard-compliant");
         require(IERC721(collection).ownerOf(tokenId) == address(this), "sERC1155: ERC721 has not been transferred");
-        require(_currentTokenTypes[collection][tokenId] == 0, "sERC1155: ERC721 is already wrapped");
+        require(!_isLocked[collection][tokenId], "sERC1155: ERC721 is already wrapped");
         require(data.length == 320, "sERC1155: invalid spectralization data");
+
+        // il faut vérifier que le token recu n'est pas déjà lock.
 
         // one cannot mload data located in calldata
         // so we copy it in memory first
@@ -307,7 +315,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         address operator = _msgSender();
         uint256 id = operator.toId();
 
-        require(_wrappings[id].state != WrappingState.Void, "sERC1155: must be sERC20 to use transfer hook");
+        require(_wrappings[id].state != LockState.Void, "sERC1155: must be sERC20 to use transfer hook");
 
         emit TransferSingle(operator, from, to, id, amount);
     }
@@ -319,7 +327,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      *  - sERC20-related parameters are checked in SERC20.initialize().
      * @param collection The address of the ERC721 contract the NFT to wrap belongs to.
      * @param tokenId The tokenId of the NFT to wrap.
-     * @param name The name of the sERC20 to clone.
+     * @param name The name of the sERC20 to wrap the ERC721 into.
      * @param symbol The symbol of the sERC20 to clone.
      * @param cap The supply cap of the sERC20 to clone.
      * @param roles The addresses to which to assign the sERC20 to clone roles.
@@ -336,10 +344,15 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     )
         external
     {
-        require(_currentTokenTypes[collection][tokenId] == 0, "sERC1155: NFT is already wrapped");
-        require(collection.supportsInterface(0x80ac58cd), "sERC1155: NFT is not ERC721-compliant");
+        require(collection.supportsInterface(0x80ac58cd), "sERC1155: ERC721 is not standard compliant");
+        require(!_isLocked[collection][tokenId], "sERC1155: ERC721 is already locked");
 
         _wrap(collection, tokenId, name, symbol, cap, roles, owner, true);
+        // _lock(collection, tokenId);
+    }
+
+    function isLocked(address collection, uint256 tokenId) public view returns (bool) {
+        return _isLocked[collection][tokenId];
     }
 
     function unwrap(uint256 id, address recipient, bytes memory data) external {
@@ -347,7 +360,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         // address collection = nft.collection;
         // uint256 tokenId = nft.tokenId;
 
-        require(wrapping.state == WrappingState.Wrapped, "sERC1155: NFT is not wrapped");
+        require(wrapping.state == LockState.Locked, "sERC1155: NFT is not wrapped");
         require(_msgSender() == wrapping.owner, "sERC1155: must be owner to unwrap");
 
         _unwrap(wrapping.collection, wrapping.tokenId, id, recipient, data);
@@ -359,7 +372,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         // address collection = nft.collection;
         // uint256 tokenId = nft.tokenId;
 
-        require(wrapping.state == WrappingState.Wrapped, "sERC1155: NFT is not wrapped");
+        require(wrapping.state == LockState.Locked, "sERC1155: NFT is not wrapped");
         require(_msgSender() == wrapping.owner, "sERC1155: must be owner to unwrap");
 
         _unwrap(wrapping.collection, wrapping.tokenId, id, recipient, data);
@@ -417,8 +430,8 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         address sERC20 = _sERC20Base.clone();
         uint256 id = sERC20.toId();
         
-        _currentTokenTypes[collection][tokenId] = id;
-        _wrappings[id] = Wrapping({ state: WrappingState.Wrapped, collection: collection, tokenId: tokenId, owner: owner });
+        _isLocked[collection][tokenId] = true;
+        _wrappings[id] = Wrapping({ state: LockState.Locked, collection: collection, tokenId: tokenId, owner: owner });
 
         SERC20(sERC20).initialize(name, symbol, cap, roles);
         if (transfer) IERC721(collection).transferFrom(IERC721(collection).ownerOf(tokenId), address(this), tokenId);
@@ -427,8 +440,8 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     }
 
     function _unwrap(address collection, uint256 tokenId, uint256 id, address recipient, bytes memory data) private {
-        delete _currentTokenTypes[collection][tokenId];
-        _wrappings[id].state = WrappingState.Unwrapped;
+        delete _isLocked[collection][tokenId];
+        _wrappings[id].state = LockState.Unlocked;
         IERC721(collection).safeTransferFrom(address(this), recipient, tokenId, data);
 
         emit Unwrap(collection, tokenId, id, tokenId.toAddress(), recipient);
