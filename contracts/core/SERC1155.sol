@@ -14,16 +14,16 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import "hardhat/console.sol";
+
 /**
  * @title sERC1155
- * @notice sERC1155 token wrapping sERC20s of spectralized ERC721s.
+ * @notice sERC1155 token wrapping ERC721s into sERC20s.
  * @dev Remarks:
- *        - AccessControleEnumerable already inherits ERC165.
  *        - sERC1155 does not implement mint nor burn in an effort to maintain some separation of concerns between
  * financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
  * sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
  */
-contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IERC1155MetadataURI, IERC721Receiver {
+contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155MetadataURI, IERC721Receiver {
     using Address for address;
     using Cast for address;
     using Cast for uint256;
@@ -31,7 +31,14 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
     using Clones for address;
     using ERC165Checker for address;
 
-    struct NFT {
+    enum WrappingState {
+        Void,
+        Wrapped,
+        Unwrapped
+    }
+
+    struct Wrapping {
+        WrappingState state;
         address collection;
         uint256 tokenId;
         address owner;
@@ -39,13 +46,12 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    mapping (address => mapping(address => bool)) private _operatorApprovals;
-    // token type => NFT [immutable]
-    mapping (uint256 => NFT) private _NFTs;
-    // NFT => token type [re-initialized to zero when unwrapped]
-    mapping (address => mapping (uint256 => uint256)) private _currentTokenTypes;
     address private _sERC20Base;
-    string  private _unwrappedURI;
+    string private _unwrappedURI;
+
+    mapping (address => mapping(address => bool)) private _operatorApprovals;
+    mapping (uint256 => Wrapping) private _wrappings; // token type => Wrapping [immutable]
+    mapping (address => mapping (uint256 => uint256)) private _currentTokenTypes; // ERC721 => token type [re-initialized when unwrapped]
 
     event Wrap(address indexed collection, uint256 indexed tokenId, uint256 indexed id, address sERC20, address owner);
     event Unwrap(
@@ -56,26 +62,30 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
         address recipient
     );
 
+    /**
+     * @notice sERC1155 constructor.
+     * @dev Context, ERC165 and AccessControlEnumerable have no constructor.
+     */
     constructor(address sERC20Base_, string memory unwrappedURI_) {
         require(sERC20Base_ != address(0), "sERC1155: sERC20 base cannot be the zero address");
 
         _sERC20Base = sERC20Base_;
         _unwrappedURI = unwrappedURI_;
 
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(ADMIN_ROLE,_msgSender());
+        _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
     }
 
   /* #region ERC165 */
     /**
-     * @dev AccessControlEnumerable and ERC165 interfaces are supported through super.supportsInterface().
+     * @dev ERC165 and AccessControlEnumerable interfaces are supported through super.supportsInterface().
      */
     function supportsInterface(
         bytes4 interfaceId
     )
         public
         view
-        override(AccessControlEnumerable, IERC165)
+        override(IERC165, ERC165, AccessControlEnumerable)
         returns (bool)
     {
         return interfaceId == type(IERC1155).interfaceId
@@ -87,42 +97,16 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
 
   /* #region ERC1155 */
     /**
-     * @notice Returns the URI for token type `id`.
-     * @dev The ERC1155 standard requires this function to return the same value as the latest `URI` event for an `_id`
-     * if such events are emitted. Because we cannot control the original NFT's uri updates, we do NOT emit such `URI`
-     * event at token type creation. See https://eips.ethereum.org/EIPS/eip-1155#metadata.
-     * @param id The ERC1155 id of the token type.
-     * @return "" if the token type does not exist, `_unwrappedURI` if the token type exists but its underlying NFT has
-     * been unwrapped, the original ERC721's URI otherwise.
-     */
-    function uri(uint256 id) public view override returns (string memory) {
-        NFT storage nft = _NFTs[id];
-        address collection = nft.collection;
-        uint256 tokenId = nft.tokenId;
-
-        if (collection == address(0))
-            // NFT has never been wrapped
-            return "";
-
-        if (_currentTokenTypes[collection][tokenId] != id)
-            // NFT has been wrapped, then unwrapped - and eventually re-wrapped
-            return _unwrappedURI;
-
-        // NFT is indeed wrapped within `id` token type
-        return IERC721Metadata(collection).tokenURI(tokenId);
-    }
-
-    /**
      * @notice Returns the amount of tokens of token type `id` owned by `account`.
      * @dev `account` cannot be the zero address.
-     * @param account The address of the account whose balance is queried.
+     * @param account The account whose balance is queried.
      * @param id The token type whose balance is queried.
      * @return The amount of tokens of token type `id` owned by `account`.
      */
     function balanceOf(address account, uint256 id) public view override returns (uint256) {
         require(account != address(0), "sERC1155: balance query for the zero address");
 
-        return _NFTs[id].collection != address(0) ? id.toSERC20().balanceOf(account) : 0;
+        return _wrappings[id].state != WrappingState.Void ? id.toSERC20().balanceOf(account) : 0;
     }
 
     /**
@@ -210,6 +194,29 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
     }
   /* #endregion */
 
+  /* #region ERC1155MetadataURI */
+    /**
+     * @notice Returns the URI for token type `id`.
+     * @dev The ERC1155 standard requires this function to return the same value as the latest `URI` event for an `_id`
+     * if such events are emitted. Because we cannot control the original NFT's uri updates, we do NOT emit such `URI`
+     * event at token type creation. See https://eips.ethereum.org/EIPS/eip-1155#metadata.
+     * @param id The ERC1155 id of the token type.
+     * @return "" if the token type does not exist, `_unwrappedURI` if the token type exists but its underlying ERC721 has
+     * been unwrapped, the original ERC721's URI otherwise.
+     */
+    function uri(uint256 id) public view override returns (string memory) {
+        Wrapping storage wrapping = _wrappings[id];
+
+        if (wrapping.state == WrappingState.Wrapped)
+          return IERC721Metadata(wrapping.collection).tokenURI(wrapping.tokenId);
+
+        if (wrapping.state == WrappingState.Unwrapped)
+            return _unwrappedURI;
+
+        return "";
+    }
+  /* #endregion */
+
   /* #region IERC721Receiver */
     function onERC721Received(
         address /* operator */,
@@ -234,10 +241,10 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
           address(role)   | 32 bytes
           address(owner)  | 32 bytes
         ]*/
-        require(_currentTokenTypes[collection][tokenId] == 0, "sERC1155: NFT is already wrapped");
-        require(collection.supportsInterface(0x80ac58cd), "sERC1155: NFT is not ERC721-compliant");
-        require(IERC721(collection).ownerOf(tokenId) == address(this), "sERC1155: NFT has not been transferred");
-        require(data.length == 320, "sERC1155: invalid data");
+        require(collection.supportsInterface(0x80ac58cd), "sERC1155: ERC72 is not standard-compliant");
+        require(IERC721(collection).ownerOf(tokenId) == address(this), "sERC1155: ERC721 has not been transferred");
+        require(_currentTokenTypes[collection][tokenId] == 0, "sERC1155: ERC721 is already wrapped");
+        require(data.length == 320, "sERC1155: invalid spectralization data");
 
         // one cannot mload data located in calldata
         // so we copy it in memory first
@@ -254,14 +261,22 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
             cap := mload(add(_data, 96))
             mstore(roles, mload(add(_data, 128)))
             mstore(add(roles, 32), mload(add(_data, 160)))
-            mstore(add(roles, 64), mload(add(_data, 196)))
+            mstore(add(roles, 64), mload(add(_data, 192)))
             mstore(add(roles, 96), mload(add(_data, 224)))
             mstore(add(roles, 128), mload(add(_data, 256)))
             mstore(add(roles, 160), mload(add(_data, 288)))
             owner:= mload(add(_data, 320))
         }
+        // console.log("name %s", name.toString());
+        // console.log("symbol %s", symbol.toString());
+        // console.log("cap %s", cap);
+        // console.log("role 0 %s", roles[0]);
+        // console.log("role 1 %s", roles[1]);
+        // console.log("role 2 %s", roles[2]);
+        // console.log("role 3 %s", roles[3]);
+        // console.log("role 4 %s", roles[4]);
+        // console.log("role 5 %s", roles[5]);
 
- 
         _wrap(_msgSender(), tokenId, name.toString(), symbol.toString(), cap, roles, owner, false);
         
         return IERC721Receiver.onERC721Received.selector;
@@ -269,6 +284,10 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
   /* #endregion */
 
   /* #region sERC1155 */
+    function sERC20Base() public view returns (address) {
+        return _sERC20Base;
+    }
+
     /**
      * @notice Mirrors sERC20s transfers.
      * @dev This function is called by sERC20s whenever a transfer occurs at the sERC20 layer. This enable the sERC1155
@@ -288,7 +307,7 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
         address operator = _msgSender();
         uint256 id = operator.toId();
 
-        require(_NFTs[id].collection != address(0), "sERC1155: must be sERC20 to use transfer hook");
+        require(_wrappings[id].state != WrappingState.Void, "sERC1155: must be sERC20 to use transfer hook");
 
         emit TransferSingle(operator, from, to, id, amount);
     }
@@ -324,28 +343,26 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
     }
 
     function unwrap(uint256 id, address recipient, bytes memory data) external {
-        NFT storage nft = _NFTs[id];
-        address collection = nft.collection;
-        uint256 tokenId = nft.tokenId;
+        Wrapping storage wrapping = _wrappings[id];
+        // address collection = nft.collection;
+        // uint256 tokenId = nft.tokenId;
 
-        require(collection != address(0), "sERC1155: NFT is not wrapped");
-        require(_currentTokenTypes[collection][tokenId] == id, "sERC1155: NFT already unwrapped");
-        require(_msgSender() == nft.owner, "sERC1155: must be owner to unwrap");
+        require(wrapping.state == WrappingState.Wrapped, "sERC1155: NFT is not wrapped");
+        require(_msgSender() == wrapping.owner, "sERC1155: must be owner to unwrap");
 
-        _unwrap(collection, tokenId, id, recipient, data);
+        _unwrap(wrapping.collection, wrapping.tokenId, id, recipient, data);
     }
 
     function unwrap(address sERC20, address recipient, bytes memory data) external {
         uint256 id = sERC20.toId();
-        NFT storage nft = _NFTs[id];
-        address collection = nft.collection;
-        uint256 tokenId = nft.tokenId;
+        Wrapping storage wrapping = _wrappings[id];
+        // address collection = nft.collection;
+        // uint256 tokenId = nft.tokenId;
 
-        require(collection != address(0), "sERC1155: NFT is not wrapped");
-        require(_currentTokenTypes[collection][tokenId] == id, "sERC1155: NFT already unwrapped");
-        require(_msgSender() == nft.owner, "sERC1155: must be owner to unwrap");
+        require(wrapping.state == WrappingState.Wrapped, "sERC1155: NFT is not wrapped");
+        require(_msgSender() == wrapping.owner, "sERC1155: must be owner to unwrap");
 
-        _unwrap(collection, tokenId, id, recipient, data);
+        _unwrap(wrapping.collection, wrapping.tokenId, id, recipient, data);
     }
 
     function updateUnwrappedURI(string memory unwrappedURI_) external {
@@ -363,8 +380,8 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
      * @param id The id of the token type whose NFT is queried.
      * @return The NFT associated to the `id` token type.
      */
-    function NFTOf(uint256 id) public view returns (NFT memory) {
-        return _NFTs[id];
+    function wrappingOf(uint256 id) public view returns (Wrapping memory) {
+        return _wrappings[id];
     }
 
     /**
@@ -372,8 +389,8 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
      * @param sERC20 The address of the sERC20 whose NFT is queried.
      * @return The NFT associated to the `sERC20` token.
      */
-    function NFTOf(address sERC20) public view returns (NFT memory) {
-        return _NFTs[sERC20.toId()];
+    function wrappingOf(address sERC20) public view returns (Wrapping memory) {
+        return _wrappings[sERC20.toId()];
     }
 
     /**
@@ -401,7 +418,7 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
         uint256 id = sERC20.toId();
         
         _currentTokenTypes[collection][tokenId] = id;
-        _NFTs[id] = NFT({ collection: collection, tokenId: tokenId, owner: owner });
+        _wrappings[id] = Wrapping({ state: WrappingState.Wrapped, collection: collection, tokenId: tokenId, owner: owner });
 
         SERC20(sERC20).initialize(name, symbol, cap, roles);
         if (transfer) IERC721(collection).transferFrom(IERC721(collection).ownerOf(tokenId), address(this), tokenId);
@@ -411,7 +428,7 @@ contract SERC1155 is Context, AccessControlEnumerable, /*ERC165,*/ IERC1155, IER
 
     function _unwrap(address collection, uint256 tokenId, uint256 id, address recipient, bytes memory data) private {
         delete _currentTokenTypes[collection][tokenId];
-
+        _wrappings[id].state = WrappingState.Unwrapped;
         IERC721(collection).safeTransferFrom(address(this), recipient, tokenId, data);
 
         emit Unwrap(collection, tokenId, id, tokenId.toAddress(), recipient);
