@@ -118,9 +118,12 @@ describe.only('sERC1155', () => {
     });
 
     it('it emits a Wrap event', async () => {
+      const wrapping = await sERC1155['wrappingOf(uint256)'](id);
+      const sERC20Address = await sERC1155.sERC20Of(id);
+
       await expect(tx)
         .to.emit(sERC1155, 'Wrap')
-        .withArgs(sERC721.address, tokenId, id, sERC20.address, owners[1].address);
+        .withArgs(wrapping.collection, tokenId, id, sERC20Address, owners[1].address);
     });
   };
 
