@@ -8,6 +8,7 @@
     "lint": "npx hardhat check",
     "docgen": "npx hardhat docgen",
     "test": "npx hardhat test",
+    "coverage": "npx hardhat coverage",
     "test:gas": "REPORT_GAS=true npx hardhat test"
   },
   "devDependencies": {
@@ -19,7 +20,8 @@
     "ethers": "^5.0.30",
     "hardhat": "^2.0.8",
     "hardhat-docgen": "^1.0.3",
-    "hardhat-gas-reporter": "^1.0.4"
+    "hardhat-gas-reporter": "^1.0.4",
+    "solidity-coverage": "^0.7.16"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.0.0",
