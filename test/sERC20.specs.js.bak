@@ -1,0 +1,83 @@
+const { expect } = require('chai');
+const { deployContract } = require('ethereum-waffle');
+const { SERC20, SERC721, SERC1155 } = require('./helpers');
+
+describe.only('sERC20', () => {
+  let tx,
+    receipt,
+    sERC20,
+    admin,
+    holders = [],
+    roles = [],
+    others = [];
+
+  const WrappingState = {
+    Void: 0,
+    Wrapped: 1,
+    Unwrapped: 2,
+  };
+  const unwrappedURI = 'ipfs://Qm.../unwrapped';
+  const tokenURI = 'ipfs://Qm.../';
+  const name = 'My Awesome sERC20';
+  const symbol = 'MAS';
+  const cap = ethers.BigNumber.from('1000000000000000000000000');
+  const balance = ethers.BigNumber.from('1000000000000000000');
+
+  const setup = async (opts = { mint: true }) => {
+    sERC20 = await deployContract(admin, SERC20);
+    tx = await sERC20.initialize(name, symbol, cap, roles);
+    receipt = await tx.wait();
+
+    // needs to be deployed from sERC1155 ...
+    // so we need to use sERC1155 setup again ...
+
+    if (opts.mint) {
+      await mint(holders[0].address, balance);
+      await mint(holders[1].address, balance);
+    }
+  };
+
+  const mint = async (to, amount) => {
+    sERC20 = sERC20.connect(roles[0]);
+
+    await sERC20.mint(to, amount);
+  };
+
+  before(async () => {
+    [admin, holders[0], holders[1], holders[2], roles[0], roles[1], roles[2], roles[3], roles[4], roles[5], ...others] = await ethers.getSigners();
+  });
+
+  describe('# constructor', () => {
+    describe('» sERC20 base address is not the zero address', () => {
+      before(async () => {
+        await setup();
+      });
+
+      it('# it initializes sERC1155', async () => {
+        expect(await sERC1155.sERC20Base()).to.equal(sERC20Base.address);
+        expect(await sERC1155.unwrappedURI()).to.equal(unwrappedURI);
+      });
+
+      it('# it sets up admin permissions', async () => {
+        expect(await sERC1155.hasRole(await sERC1155.ADMIN_ROLE(), admin.address)).to.equal(true);
+        expect(await sERC1155.getRoleAdmin(await sERC1155.ADMIN_ROLE())).to.equal(await sERC1155.ADMIN_ROLE());
+      });
+    });
+
+    describe('» sERC20 base address is the zero address', () => {
+      it('it reverts', async () => {
+        await expect(deployContract(admin, SERC1155, [ethers.constants.AddressZero, unwrappedURI])).to.be.revertedWith(
+          'sERC1155: sERC20 base cannot be the zero address'
+        );
+      });
+    });
+  });
+
+  describe('# transfer', () => {
+    before(async () => {
+      await setup();
+      tx = await sERC20.transfer(holders[2].address, '5000');
+      receipt = await tx.wait();
+    });
+  });
+});

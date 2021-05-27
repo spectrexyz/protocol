@@ -3,6 +3,8 @@ pragma solidity >=0.8.0;
 
 import "./SERC1155.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20CappedUpgradeable.sol";
@@ -19,7 +21,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 contract SERC20 is
     Initializable,
     ContextUpgradeable,
-    AccessControlEnumerableUpgradeable,
+    AccessControlUpgradeable,
     ERC20Upgradeable,
     ERC20CappedUpgradeable, 
     ERC20BurnableUpgradeable,
@@ -51,38 +53,30 @@ contract SERC20 is
      *        - `name_` is left unchecked as per the ERC20 standard.
      *        - `symbol_` is left unchecked as per the ERC20 standard.
      *        - `cap_` > 0 is checked in __ERC20Capped_init().
-     *        - `sERC115_` can be set to the zero address to neutralize its privilege.
-     *        - `roles` can be set to the zero address to neutralize their privileges.
+     *        - `admin` can be set to the zero address to neutralize its privileges.
      * @param name_ The name of the sERC20.
      * @param symbol_ The symbol of the sERC20.
      * @param cap_ The supply cap of the sERC20.
-     * @param roles The addresses to which to assign sERC20 roles.
+     * @param admin The admin of the sERC20 [allowed to manage its permissions].
      */
     function initialize(
         string memory name_,
         string memory symbol_,
         uint256 cap_,
-        address[6] memory roles
+        address admin
     ) external initializer {
-        __Context_init();
-        __AccessControlEnumerable_init();
+        // __Context_init();
+        // __AccessControl_init();
         __ERC20_init(name_, symbol_);
         __ERC20Capped_init(cap_);
-        __ERC20Burnable_init();
-        __ERC20Pausable_init();
-        __ERC20Snapshot_init();
+        // __ERC20Burnable_init();
+        // __ERC20Pausable_init();
+        // __ERC20Snapshot_init();
         __ERC20Permit_init(name_);
         
         _sERC1155 = _msgSender();
-        _setupRole(MINTER_ROLE, roles[0]);
-        _setupRole(PAUSER_ROLE, roles[1]);
-        _setupRole(SNAPSHOT_ROLE, roles[2]);
-        _setupRole(MINTER_ADMIN_ROLE, roles[3]);
-        _setupRole(PAUSER_ADMIN_ROLE, roles[4]);
-        _setupRole(SNAPSHOT_ADMIN_ROLE, roles[5]);
-        _setRoleAdmin(MINTER_ROLE, MINTER_ADMIN_ROLE);
-        _setRoleAdmin(PAUSER_ROLE, PAUSER_ADMIN_ROLE);
-        _setRoleAdmin(SNAPSHOT_ROLE, SNAPSHOT_ADMIN_ROLE);
+
+        _setupRole(DEFAULT_ADMIN_ROLE, admin);
     }
 
     /**
@@ -99,6 +93,11 @@ contract SERC20 is
     function unpause() external {
         require(hasRole(PAUSER_ROLE, _msgSender()), "sERC20: must have pauser role to unpause");
         _unpause();
+    }
+
+    function setRoleAdmin(bytes32 role, bytes32 adminRole) external {
+        require(hasRole(getRoleAdmin(role), _msgSender()), "sERC20: must be admin to set role admin");
+        _setRoleAdmin(role, adminRole);
     }
 
     /**

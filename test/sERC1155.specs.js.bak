@@ -1,0 +1,453 @@
+const { expect } = require('chai');
+const { waffle } = require('hardhat');
+const { deployContract } = require('ethereum-waffle');
+const { SERC20, SERC721, SERC1155 } = require('./helpers');
+
+describe('sERC1155', () => {
+  let tx,
+    receipt,
+    sERC20Base,
+    sERC20,
+    sERC721,
+    sERC1155,
+    tokenId,
+    id,
+    root,
+    admin,
+    owners = [],
+    holders = [],
+    roles = [],
+    others = [];
+
+  const SpectreState = {
+    Null: 0,
+    ERC721Locked: 1,
+    ERC721Unlocked: 2,
+  };
+  const unwrappedURI = 'ipfs://Qm.../unwrapped';
+  const tokenURI = 'ipfs://Qm.../';
+  const name = 'My Awesome sERC20';
+  const symbol = 'MAS';
+  const cap = ethers.BigNumber.from('1000000000000000000000000');
+  const balance = ethers.BigNumber.from('1000000000000000000');
+
+  const setup = async (opts = { approve: true }) => {
+    sERC20Base = await deployContract(root, SERC20);
+    sERC721 = await deployContract(root, SERC721, ['sERC721 Collection', 'sERC721']);
+    sERC1155 = await deployContract(root, SERC1155, [sERC20Base.address, unwrappedURI]);
+    receipt = await (await sERC721.mint(owners[0].address, tokenURI)).wait();
+
+    tokenId = receipt.events[0].args.tokenId.toString();
+
+    if (opts.approve) {
+      sERC721 = sERC721.connect(owners[0]);
+      await (await sERC721.approve(sERC1155.address, tokenId)).wait();
+    }
+  };
+
+  const spectralize = async (opts = { transfer: false }) => {
+    if (opts.transfer) {
+      tx = await sERC721['safeTransferFrom(address,address,uint256,bytes)'](
+        owners[0].address,
+        sERC1155.address,
+        tokenId,
+        ethers.utils.concat([
+          ethers.utils.formatBytes32String(name),
+          ethers.utils.formatBytes32String(symbol),
+          ethers.utils.defaultAbiCoder.encode(['uint256'], [cap]),
+          ethers.utils.defaultAbiCoder.encode(['address'], [admin.address]),
+          ethers.utils.defaultAbiCoder.encode(['address'], [owners[1].address]),
+        ])
+      );
+      receipt = await tx.wait();
+      id = (await sERC1155.queryFilter(sERC1155.filters.Spectralize())).filter((event) => event.event === 'Spectralize')[0].args.id;
+      sERC20 = new ethers.Contract(await sERC1155.sERC20Of(id), SERC20.abi, root);
+    } else {
+      tx = await sERC1155.spectralize(sERC721.address, tokenId, name, symbol, cap, admin.address, owners[1].address);
+      receipt = await tx.wait();
+      id = receipt.events.filter((event) => event.event === 'Spectralize')[0].args.id;
+      sERC20 = new ethers.Contract(await sERC1155.sERC20Of(id), SERC20.abi, root);
+    }
+    sERC20 = sERC20.connect(admin);
+    await await sERC20.grantRole(await sERC20.MINTER_ROLE(), admin.address);
+  };
+
+  const mint = async (addresses, amounts) => {
+    sERC20 = sERC20.connect(admin);
+
+    for (let i = 0; i < addresses.length; i++) {
+      await sERC20.mint(addresses[i], amounts[i]);
+    }
+  };
+
+  const mintNFT = async (opts = { approve: true }) => {
+    receipt = await (await sERC721.mint(owners[0].address, tokenURI)).wait();
+    tokenId = receipt.events[0].args.tokenId.toString();
+
+    if (opts.approve) {
+      sERC721 = sERC721.connect(owners[0]);
+      await (await sERC721.approve(sERC1155.address, tokenId)).wait();
+    }
+  };
+
+  const unlock = async () => {
+    sERC1155 = sERC1155.connect(owners[1]);
+    tx = await sERC1155['unlock(uint256,address,bytes)'](id, owners[2].address, ethers.constants.HashZero);
+    receipt = await tx.wait();
+  };
+
+  const itWrapsLikeExpected = () => {
+    it('it locks ERC721', async () => {
+      expect(await sERC1155.isLocked(sERC721.address, tokenId)).to.equal(true);
+      expect(await sERC1155.lockOf(sERC721.address, tokenId)).to.equal(id);
+      expect(await sERC721.ownerOf(tokenId)).to.equal(sERC1155.address);
+    });
+
+    it('it emits a Lock event', async () => {
+      await expect(tx)
+        .to.emit(sERC1155, 'Lock')
+        .withArgs(id);
+    });
+
+    it('it clones and initializes sERC20', async () => {
+      expect(await sERC20.name()).to.equal(name);
+      expect(await sERC20.symbol()).to.equal(symbol);
+      expect(await sERC20.cap()).to.equal(cap);
+      expect(await sERC20.hasRole(await sERC20.DEFAULT_ADMIN_ROLE(), admin.address)).to.equal(true);
+    });
+
+    it('it registers spectre', async () => {
+      const spectre = await sERC1155['spectreOf(uint256)'](id);
+
+      expect(spectre.state).to.equal(SpectreState.ERC721Locked);
+      expect(spectre.collection).to.equal(sERC721.address);
+      expect(spectre.tokenId).to.equal(tokenId);
+      expect(spectre.guardian).to.equal(owners[1].address);
+    });
+
+    it('it emits a Spectralize event', async () => {
+      await expect(tx)
+        .to.emit(sERC1155, 'Spectralize')
+        .withArgs(sERC721.address, tokenId, id, sERC20.address, owners[1].address);
+    });
+  };
+
+  before(async () => {
+    [root, admin, owners[0], owners[1], owners[2], holders[0], holders[1], holders[2], ...others] = await ethers.getSigners();
+  });
+
+  describe('# constructor', () => {
+    describe('» sERC20 base address is not the zero address', () => {
+      before(async () => {
+        await setup();
+      });
+
+      it('# it initializes sERC1155', async () => {
+        expect(await sERC1155.sERC20Base()).to.equal(sERC20Base.address);
+        expect(await sERC1155.unwrappedURI()).to.equal(unwrappedURI);
+      });
+
+      it('# it sets up admin permissions', async () => {
+        expect(await sERC1155.hasRole(await sERC1155.ADMIN_ROLE(), root.address)).to.equal(true);
+        expect(await sERC1155.getRoleAdmin(await sERC1155.ADMIN_ROLE())).to.equal(await sERC1155.ADMIN_ROLE());
+      });
+    });
+
+    describe('» sERC20 base address is the zero address', () => {
+      it('it reverts', async () => {
+        await expect(deployContract(root, SERC1155, [ethers.constants.AddressZero, unwrappedURI])).to.be.revertedWith(
+          'sERC1155: sERC20 base cannot be the zero address'
+        );
+      });
+    });
+  });
+
+  describe('ERC165', () => {
+    before(async () => {
+      await setup();
+    });
+
+    it('it supports ERC165 interface', async () => {
+      expect(await sERC1155.supportsInterface(0x01ffc9a7)).to.equal(true);
+    });
+
+    it('it supports AccessControlEnumerable interface', async () => {
+      expect(await sERC1155.supportsInterface(0x5a05180f)).to.equal(true);
+    });
+
+    it('it supports ERC1155 interface', async () => {
+      expect(await sERC1155.supportsInterface(0xd9b67a26)).to.equal(true);
+    });
+
+    it('it supports ERC1155MetadataURI interface', async () => {
+      expect(await sERC1155.supportsInterface(0x0e89341c)).to.equal(true);
+    });
+
+    it('it supports ERC721TokenReceiver interface', async () => {
+      expect(await sERC1155.supportsInterface(0x150b7a02)).to.equal(true);
+    });
+
+    it('it does not support ERC1155TokenReceiver interface', async () => {
+      expect(await sERC1155.supportsInterface(0x4e2312e0)).to.equal(false);
+    });
+  });
+
+  describe('ERC1155', () => {
+    describe('# balanceOf', () => {
+      describe('» the queried address is the zero address', () => {
+        before(async () => {
+          await setup();
+          await spectralize();
+        });
+
+        it('it reverts', async () => {
+          await expect(sERC1155.balanceOf(ethers.constants.AddressZero, id)).to.be.revertedWith('sERC1155: balance query for the zero address');
+        });
+      });
+
+      describe('» the queried address is not the zero address', () => {
+        describe('» and the queried token type exists', () => {
+          describe('» and its associated ERC721 is still wrapped', () => {
+            before(async () => {
+              await setup();
+              await spectralize();
+              await mint([holders[0].address, holders[1].address], ['1000', '1500']);
+            });
+
+            it('it returns the amount of tokens owned by the queried address', async () => {
+              expect(await sERC1155.balanceOf(holders[0].address, id)).to.equal(1000);
+              expect(await sERC1155.balanceOf(holders[1].address, id)).to.equal(1500);
+              expect(await sERC1155.balanceOf(holders[2].address, id)).to.equal(0);
+            });
+          });
+
+          describe('» but its associated ERC721 is not wrapped anymore', () => {
+            before(async () => {
+              await setup();
+              await spectralize();
+              await mint([holders[0].address, holders[1].address], ['1000', '1500']);
+              await unlock();
+            });
+
+            it('it returns the amount of tokens owned by the queried address', async () => {
+              expect(await sERC1155.balanceOf(holders[0].address, id)).to.equal(1000);
+              expect(await sERC1155.balanceOf(holders[1].address, id)).to.equal(1500);
+              expect(await sERC1155.balanceOf(holders[2].address, id)).to.equal(0);
+            });
+          });
+        });
+
+        describe('# but the queried token type does not exist', () => {
+          before(async () => {
+            await setup();
+          });
+
+          it('it returns zero', async () => {
+            expect(await sERC1155.balanceOf(holders[0].address, 123456789)).to.equal(0);
+          });
+        });
+      });
+    });
+
+    describe('# balanceOfBatch', () => {
+      let ids = [];
+      describe('» input arrays match', () => {
+        describe('» and no queried address is the zero address', () => {
+          describe('» and the queried token type exists', () => {
+            describe('» and its associated ERC721 is still wrapped', () => {
+              before(async () => {
+                await setup();
+                await spectralize();
+                ids[0] = id;
+                await mint([holders[0].address, holders[1].address], ['1000', '1500']);
+                sERC721 = sERC721.connect(root);
+                await mintNFT();
+                await spectralize();
+                ids[1] = id;
+                await mint([holders[0].address, holders[2].address], ['700', '2000']);
+              });
+
+              it('it returns the amount of tokens owned by the queried addresses', async () => {
+                const balances = await sERC1155.balanceOfBatch([holders[0].address, holders[1].address, holders[2].address], [ids[0], ids[1], ids[1]]);
+                // mettre un locked, un unlocked et un qui n'existe pas
+                expect(balances[0]).to.equal(1000);
+                expect(balances[1]).to.equal(0);
+                expect(balances[2]).to.equal(2000);
+              });
+            });
+          });
+        });
+
+        describe('» but one of the queried address is the zero address', () => {
+          before(async () => {
+            await setup();
+            await spectralize();
+            await mint([holders[0].address], [10000]);
+          });
+
+          it('it reverts', async () => {
+            await expect(sERC1155.balanceOfBatch([holders[0].address, ethers.constants.AddressZero], [id, id])).to.be.revertedWith(
+              'sERC1155: balance query for the zero address'
+            );
+          });
+        });
+      });
+
+      describe('» input arrays do not match', () => {
+        before(async () => {
+          await setup();
+          await spectralize();
+          await mint([holders[0].address], [10000]);
+        });
+
+        it('it reverts', async () => {
+          await expect(sERC1155.balanceOfBatch([holders[0].address, holders[1].address], [id, id, id])).to.be.revertedWith(
+            'sERC1155: accounts and ids length mismatch'
+          );
+        });
+      });
+    });
+  });
+
+  describe('ERC1155MetadataURI', () => {
+    describe('# uri', () => {
+      describe('» token type exists', () => {
+        describe('» and its associated ERC721 is still wrapped', () => {
+          before(async () => {
+            await setup();
+            await spectralize();
+          });
+
+          it('it returns the wrapped ERC721 URI', async () => {
+            expect(await sERC1155.uri(id)).to.equal(tokenURI);
+          });
+        });
+
+        describe('» but its associated ERC721 is not wrapped anymore', () => {
+          before(async () => {
+            await setup();
+            await spectralize();
+            await unlock();
+          });
+
+          it('it returns the default unwrapped URI', async () => {
+            expect(await sERC1155.uri(id)).to.equal(unwrappedURI);
+          });
+        });
+      });
+
+      describe('» token type exists', () => {
+        before(async () => {
+          await setup();
+        });
+
+        it('it returns a blank string', async () => {
+          expect(await sERC1155.uri(id)).to.equal('');
+        });
+      });
+    });
+  });
+
+  describe('ERC721Receiver', () => {
+    describe('# onERC721Received', () => {
+      before(async () => {
+        await setup();
+        await spectralize({ transfer: true });
+      });
+
+      itWrapsLikeExpected();
+    });
+  });
+
+  describe('# wrap', () => {
+    describe('» NFT has never been wrapped', () => {
+      describe('» and NTF is ERC721-compliant', () => {
+        describe('» and sERC1155 has been approved to transfer NFT', () => {
+          before(async () => {
+            await setup();
+            await spectralize();
+          });
+
+          itWrapsLikeExpected();
+        });
+        describe('» but sERC1155 has not been approved to transfer NFT', () => {
+          before(async () => {
+            await setup({ approve: false });
+          });
+          it('it reverts', async () => {
+            await expect(sERC1155.spectralize(sERC721.address, tokenId, name, symbol, cap, admin.address, owners[1].address)).to.be.revertedWith(
+              'ERC721: transfer caller is not owner nor approved'
+            );
+          });
+        });
+      });
+
+      describe('» but NFT is not ERC721-compliant', () => {
+        before(async () => {
+          await setup();
+        });
+
+        it('it reverts', async () => {
+          await expect(sERC1155.spectralize(others[0].address, tokenId, name, symbol, cap, admin.address, owners[1].address)).to.be.revertedWith(
+            'sERC1155: ERC721 is not standard'
+          );
+        });
+      });
+    });
+
+    describe('» NFT has already been wrapped', () => {
+      describe('» and NFT has been unwrapped since', () => {
+        before(async () => {
+          await setup();
+          await spectralize();
+          await unlock();
+          sERC721 = sERC721.connect(owners[2]);
+          await (await sERC721.approve(sERC1155.address, tokenId)).wait();
+          await spectralize();
+
+          // tx = await sERC1155.spectralize(
+          //   sERC721.address,
+          //   tokenId,
+          //   name,
+          //   symbol,
+          //   cap,
+          //   roles.map((role) => role.address),
+          //   owners[1].address
+          // );
+          // receipt = await tx.wait();
+          // id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
+          // sERC1155 = sERC1155.connect(owners[1]);
+          // tx = await sERC1155['unwrap(uint256,address,bytes)'](id, owners[0].address, ethers.constants.HashZero);
+          // receipt = await tx.wait();
+          // sERC721 = sERC721.connect(owners[0]);
+          //
+          // tx = await sERC1155.spectralize(
+          //   sERC721.address,
+          //   tokenId,
+          //   name,
+          //   symbol,
+          //   cap,
+          //   roles.map((role) => role.address),
+          //   owners[1].address
+          // );
+          // receipt = await tx.wait();
+          // id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
+        });
+        itWrapsLikeExpected();
+      });
+
+      describe('» but NFT still is wrapped', () => {
+        before(async () => {
+          await setup();
+          await spectralize();
+          sERC1155 = sERC1155.connect(owners[1]);
+        });
+        it('it reverts', async () => {
+          await expect(sERC1155.spectralize(sERC721.address, tokenId, name, symbol, cap, admin.address, owners[1].address)).to.be.revertedWith(
+            'sERC1155: ERC721 is already locked'
+          );
+        });
+      });
+    });
+  });
+});
