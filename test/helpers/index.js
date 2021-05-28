@@ -1,8 +1,12 @@
 const SERC20 = require('../../artifacts/contracts/core/SERC20.sol/sERC20.json');
 const SERC721 = require('../../artifacts/contracts/core/SERC721.sol/sERC721.json');
 const SERC1155 = require('../../artifacts/contracts/core/SERC1155.sol/sERC1155.json');
+const ERC1155Receiver = require('../../artifacts/contracts/test/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json');
 const { deployContract } = require('ethereum-waffle');
 const { expect } = require('chai');
+
+const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
+const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
 
 const initialize = async (ctx) => {
   ctx.artifacts = {
@@ -21,7 +25,9 @@ const initialize = async (ctx) => {
     tokenURI: 'ipfs://Qm.../',
     name: 'My Awesome sERC20',
     symbol: 'MAS',
-    cap: ethers.BigNumber.from('1000000000000000000000000'),
+    cap: ethers.BigNumber.from('1000000000000000'),
+    balance: ethers.BigNumber.from('5000'),
+    amount: ethers.BigNumber.from('1000'),
   };
 
   ctx.contracts = {};
@@ -37,6 +43,7 @@ const initialize = async (ctx) => {
   [
     ctx.signers.root,
     ctx.signers.admin,
+    ctx.signers.operator,
     ctx.signers.owners[0],
     ctx.signers.owners[1],
     ctx.signers.owners[2],
@@ -45,6 +52,27 @@ const initialize = async (ctx) => {
     ctx.signers.holders[2],
     ...ctx.signers.others
   ] = await ethers.getSigners();
+};
+
+const mock = {
+  deploy: {
+    ERC1155Receiver: async (
+      ctx,
+      opts = { singleValue: RECEIVER_SINGLE_MAGIC_VALUE, singleReverts: false, batchValue: RECEIVER_BATCH_MAGIC_VALUE, batchReverts: false }
+    ) => {
+      opts.singleValue = opts.singleValue ? opts.singleValue : RECEIVER_SINGLE_MAGIC_VALUE;
+      opts.singleReverts = opts.singleReverts ? opts.singleReverts : false;
+      opts.batchValue = opts.batchValue ? opts.batchValue : RECEIVER_BATCH_MAGIC_VALUE;
+      opts.batchReverts = opts.batchReverts ? opts.batchReverts : false;
+
+      ctx.contracts.ERC1155Receiver = await deployContract(ctx.signers.root, ERC1155Receiver, [
+        opts.singleValue,
+        opts.singleReverts,
+        opts.batchValue,
+        opts.batchReverts,
+      ]);
+    },
+  },
 };
 
 const mint = {
@@ -63,6 +91,29 @@ const mint = {
 
     await ctx.contracts.sERC20.mint(address, amount);
   },
+};
+
+const setApprovalForAll = async (ctx, opts = {}) => {
+  opts.from = opts.from ? opts.from : ctx.signers.holders[0];
+  opts.operator = opts.operator ? opts.operator : ctx.signers.operator;
+  opts.approve = typeof opts.approve !== 'undefined' ? opts.approve : true;
+
+  ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(opts.from);
+  ctx.data.tx = await ctx.contracts.sERC1155.setApprovalForAll(opts.operator.address, opts.approve);
+  ctx.data.receipt = await ctx.data.tx.wait();
+};
+
+const safeTransferFrom = async (ctx, opts = {}) => {
+  opts.from = opts.from ? opts.from : ctx.signers.holders[0];
+  opts.operator = opts.operator ? opts.operator : opts.from;
+  opts.to = opts.to ? opts.to : ctx.signers.others[0];
+  opts.id = opts.id ? opts.id : ctx.data.id;
+  opts.amount = opts.amount ? opts.amount : ctx.constants.amount;
+  opts.data = opts.data ? opts.data : ethers.constants.HashZero;
+
+  ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(opts.operator);
+  ctx.data.tx = await ctx.contracts.sERC1155.safeTransferFrom(opts.from.address, opts.to.address, opts.id, opts.amount, opts.data);
+  ctx.data.receipt = await ctx.data.tx.wait();
 };
 
 const setup = async (ctx, opts = { approve: true }) => {
@@ -122,6 +173,27 @@ const unlock = async (ctx) => {
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
+const itSafeTransfersFromLikeExpected = (ctx, opts = { operator: undefined }) => {
+  it("it debits sender's balance", async () => {
+    expect(await ctx.contracts.sERC20.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount));
+    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.holders[0].address, ctx.data.id)).to.equal(ctx.constants.balance.sub(ctx.constants.amount));
+  });
+
+  it("it credits receiver's balance", async () => {
+    expect(await ctx.contracts.sERC20.balanceOf(ctx.signers.others[0].address)).to.equal(ctx.constants.amount);
+    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.others[0].address, ctx.data.id)).to.equal(ctx.constants.amount);
+  });
+
+  it('it emits one TransferSingle event', async () => {
+    opts.operator = opts.operator ? ctx.signers.operator.address : ctx.signers.holders[0].address;
+
+    expect(ctx.data.receipt.events.filter((event) => event.event === 'TransferSingle').length).to.equal(1);
+    await expect(ctx.data.tx)
+      .to.emit(ctx.contracts.sERC1155, 'TransferSingle')
+      .withArgs(opts.operator, ctx.signers.holders[0].address, ctx.signers.others[0].address, ctx.data.id, ctx.constants.amount);
+  });
+};
+
 const itWrapsLikeExpected = (ctx) => {
   it('it locks ERC721', async () => {
     expect(await ctx.contracts.sERC1155.isLocked(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(true);
@@ -161,9 +233,13 @@ const itWrapsLikeExpected = (ctx) => {
 module.exports = {
   initialize,
   mint,
+  mock,
+  setApprovalForAll,
+  safeTransferFrom,
   setup,
   spectralize,
   unlock,
+  itSafeTransfersFromLikeExpected,
   itWrapsLikeExpected,
   SERC20,
   SERC721,

@@ -159,7 +159,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         address operator = _msgSender();
         id.toSERC20().onSERC1155Transferred(from, to, amount);
 
-        emit TransferSingle(operator, from, to, id, amount);
+        emit TransferSingle(operator, from, to, id, amount);  // déjà emis dans le hook on SERC20 transferred ?
 
         _doSafeTransferAcceptanceCheck(operator, from, to, id, amount, data);
     }
@@ -183,7 +183,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
             ids[i].toSERC20().onSERC1155Transferred(from, to, amounts[i]);
         }
 
-        emit TransferBatch(operator, from, to, ids, amounts);
+        emit TransferBatch(operator, from, to, ids, amounts);  // déjà emis dans le hook on SERC20 transferred ?
 
         _doSafeBatchTransferAcceptanceCheck(operator, from, to, ids, amounts, data);
     }

@@ -1,36 +1,19 @@
 const { expect } = require('chai');
-const { waffle } = require('hardhat');
-const { deployContract, createFixtureLoader } = require('ethereum-waffle');
-const { initialize, mint, setup, spectralize, unlock, itWrapsLikeExpected, SERC20, SERC721, SERC1155 } = require('./helpers');
+const { deployContract } = require('ethereum-waffle');
+const {
+  initialize,
+  mint,
+  mock,
+  safeTransferFrom,
+  setApprovalForAll,
+  setup,
+  spectralize,
+  unlock,
+  itSafeTransfersFromLikeExpected,
+  itWrapsLikeExpected,
+} = require('./helpers');
 
 describe('sERC1155', () => {
-  let tx,
-    receipt,
-    sERC20Base,
-    sERC20,
-    sERC721,
-    sERC1155,
-    tokenId,
-    id,
-    root,
-    admin,
-    owners = [],
-    holders = [],
-    roles = [],
-    others = [];
-
-  const SpectreState = {
-    Null: 0,
-    ERC721Locked: 1,
-    ERC721Unlocked: 2,
-  };
-  const unwrappedURI = 'ipfs://Qm.../unwrapped';
-  const tokenURI = 'ipfs://Qm.../';
-  const name = 'My Awesome sERC20';
-  const symbol = 'MAS';
-  const cap = ethers.BigNumber.from('1000000000000000000000000');
-  const balance = ethers.BigNumber.from('1000000000000000000');
-
   before(async () => {
     await initialize(this);
   });
@@ -54,9 +37,9 @@ describe('sERC1155', () => {
 
     describe('» sERC20 base address is the zero address', () => {
       it('it reverts', async () => {
-        await expect(deployContract(this.signers.root, this.artifacts.SERC1155, [ethers.constants.AddressZero, unwrappedURI])).to.be.revertedWith(
-          'sERC1155: sERC20 base cannot be the zero address'
-        );
+        await expect(
+          deployContract(this.signers.root, this.artifacts.SERC1155, [ethers.constants.AddressZero, this.constants.unwrappedURI])
+        ).to.be.revertedWith('sERC1155: sERC20 base cannot be the zero address');
       });
     });
   });
@@ -191,6 +174,202 @@ describe('sERC1155', () => {
               [this.data.id, this.data.id, this.data.id]
             )
           ).to.be.revertedWith('sERC1155: accounts and ids length mismatch');
+        });
+      });
+    });
+
+    describe('# setApprovalForAll', () => {
+      describe('» operator is not setting approval status for self', () => {
+        before(async () => {
+          await setup(this);
+          await setApprovalForAll(this);
+        });
+
+        it('it registers approval status', async () => {
+          expect(await this.contracts.sERC1155.isApprovedForAll(this.signers.owners[0].address, this.signers.operator.address)).to.equal(true);
+        });
+
+        it('it emits an ApprovalForAll event', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.contracts.sERC1155, 'ApprovalForAll')
+            .withArgs(this.signers.owners[0].address, this.signers.operator.address, true);
+        });
+      });
+
+      describe('» operator is setting approval status for self', () => {
+        before(async () => {
+          await setup(this);
+          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.owners[0]);
+        });
+
+        it('it reverts', async () => {
+          await expect(this.contracts.sERC1155.setApprovalForAll(this.signers.owners[0].address, true)).to.be.revertedWith(
+            'sERC1155: setting approval status for self'
+          );
+        });
+      });
+    });
+
+    describe.only('# safeTransferFrom', () => {
+      describe.only('» transfer acceptance', () => {
+        describe('» the receiver implements onERC1155Received', () => {
+          describe('» and the receiver returns a valid value', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this, this.signers.holders[0].address, this.constants.balance);
+              await mock.deploy.ERC1155Receiver(this);
+              await setApprovalForAll(this);
+              await safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' });
+            });
+
+            it('it calls onERC1155Received', async () => {
+              await expect(this.data.tx)
+                .to.emit(this.contracts.ERC1155Receiver, 'Received')
+                .withArgs(this.signers.operator.address, this.signers.holders[0].address, this.data.id, this.constants.amount, '0x12345678');
+            });
+          });
+
+          describe('» but the receiver returns an invalid value', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this, this.signers.holders[0].address, this.constants.balance);
+              await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
+              await setApprovalForAll(this);
+            });
+
+            it('it reverts', async () => {
+              await expect(
+                safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' })
+              ).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
+            });
+          });
+
+          describe('» but the receiver reverts', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this, this.signers.holders[0].address, this.constants.balance);
+              await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
+              await setApprovalForAll(this);
+            });
+
+            it('it reverts', async () => {
+              await expect(
+                safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' })
+              ).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
+            });
+          });
+        });
+
+        describe('» the receiver does not implement onERC1155Received', () => {});
+      });
+
+      describe('» recipient is not the zero address', () => {
+        describe("» and transferred amount is inferior to sender's balance", () => {
+          describe('» and transfer is triggered by sender', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this, this.signers.holders[0].address, this.constants.balance);
+              this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.holders[0]);
+              this.data.tx = await this.contracts.sERC1155.safeTransferFrom(
+                this.signers.holders[0].address,
+                this.signers.others[0].address,
+                this.data.id,
+                this.constants.amount,
+                ethers.constants.HashZero
+              );
+              this.data.receipt = await this.data.tx.wait();
+            });
+
+            itSafeTransfersFromLikeExpected(this);
+          });
+
+          describe('» and transfer is triggered by an approved operator', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this, this.signers.holders[0].address, this.constants.balance);
+              this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.holders[0]);
+              await setApprovalForAll(this);
+              this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.operator);
+              this.data.tx = await this.contracts.sERC1155.safeTransferFrom(
+                this.signers.holders[0].address,
+                this.signers.others[0].address,
+                this.data.id,
+                this.constants.amount,
+                ethers.constants.HashZero
+              );
+              this.data.receipt = await this.data.tx.wait();
+            });
+
+            itSafeTransfersFromLikeExpected(this, { operator: true });
+          });
+
+          describe('» but transfer is triggered by an unapproved operator', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this, this.signers.holders[0].address, this.constants.balance);
+              this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.operator);
+            });
+
+            it('it reverts', async () => {
+              await expect(
+                this.contracts.sERC1155.safeTransferFrom(
+                  this.signers.holders[0].address,
+                  this.signers.others[0].address,
+                  this.data.id,
+                  this.constants.amount,
+                  ethers.constants.HashZero
+                )
+              ).to.be.revertedWith('sERC1155: must be owner or approved to transfer');
+            });
+          });
+        });
+
+        describe("» but transferred amount is superior to sender's balance", () => {
+          before(async () => {
+            await setup(this);
+            await spectralize(this);
+            await mint.sERC20(this, this.signers.holders[0].address, this.constants.balance);
+            this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.holders[0]);
+          });
+
+          it('it reverts', async () => {
+            await expect(
+              this.contracts.sERC1155.safeTransferFrom(
+                this.signers.holders[0].address,
+                this.signers.others[0].address,
+                this.data.id,
+                this.constants.balance.add(1),
+                ethers.constants.HashZero
+              )
+            ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+          });
+        });
+      });
+
+      describe('» recipient is the zero address', () => {
+        before(async () => {
+          await setup(this);
+          await spectralize(this);
+          await mint.sERC20(this, this.signers.holders[0].address, '1000');
+          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.holders[0]);
+        });
+
+        it('it reverts', async () => {
+          await expect(
+            this.contracts.sERC1155.safeTransferFrom(
+              this.signers.holders[0].address,
+              ethers.constants.AddressZero,
+              this.data.id,
+              '1000',
+              ethers.constants.HashZero
+            )
+          ).to.be.revertedWith('sERC1155: transfer to the zero address');
         });
       });
     });

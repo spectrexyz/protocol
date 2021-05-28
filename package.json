@@ -8,7 +8,7 @@
     "lint": "npx hardhat check",
     "docgen": "npx hardhat docgen",
     "test": "npx hardhat test",
-    "coverage": "npx hardhat coverage",
+    "test:coverage": "npx hardhat coverage",
     "test:gas": "REPORT_GAS=true npx hardhat test"
   },
   "devDependencies": {

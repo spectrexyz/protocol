@@ -37,6 +37,7 @@ contract SERC20 is
     bytes32 public constant SNAPSHOT_ADMIN_ROLE = keccak256("SNAPSHOT_ADMIN_ROLE");
 
     address private _sERC1155;
+    bool private _hook;
 
     /**
      * @notice sERC20 constructor.
@@ -132,7 +133,9 @@ contract SERC20 is
     function onSERC1155Transferred(address from, address to, uint256 amount) external {
         require(_msgSender() == _sERC1155, "sERC20: must be sERC1155 to use transfer hook");
         
+        _hook = true;
         _transfer(from, to, amount);
+        _hook = false;
     }
 
     /**
@@ -163,6 +166,8 @@ contract SERC20 is
         // ERC20PausableUpgradeable._beforeTokenTransfer(from, to, amount);
         // ERC20SnapshotUpgradeable._beforeTokenTransfer(from, to, amount);
         super._beforeTokenTransfer(from, to, amount);
-        SERC1155(_sERC1155).onSERC20Transferred(from, to, amount);
+
+        if(!_hook)
+            SERC1155(_sERC1155).onSERC20Transferred(from, to, amount);
     }
 }
