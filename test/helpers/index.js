@@ -56,14 +56,11 @@ const initialize = async (ctx) => {
 
 const mock = {
   deploy: {
-    ERC1155Receiver: async (
-      ctx,
-      opts = { singleValue: RECEIVER_SINGLE_MAGIC_VALUE, singleReverts: false, batchValue: RECEIVER_BATCH_MAGIC_VALUE, batchReverts: false }
-    ) => {
-      opts.singleValue = opts.singleValue ? opts.singleValue : RECEIVER_SINGLE_MAGIC_VALUE;
-      opts.singleReverts = opts.singleReverts ? opts.singleReverts : false;
-      opts.batchValue = opts.batchValue ? opts.batchValue : RECEIVER_BATCH_MAGIC_VALUE;
-      opts.batchReverts = opts.batchReverts ? opts.batchReverts : false;
+    ERC1155Receiver: async (ctx, opts = {}) => {
+      opts.singleValue ??= RECEIVER_SINGLE_MAGIC_VALUE;
+      opts.singleReverts ??= false;
+      opts.batchValue ??= RECEIVER_BATCH_MAGIC_VALUE;
+      opts.batchReverts ??= false;
 
       ctx.contracts.ERC1155Receiver = await deployContract(ctx.signers.root, ERC1155Receiver, [
         opts.singleValue,
@@ -86,10 +83,12 @@ const mint = {
       await (await ctx.contracts.sERC721.approve(ctx.contracts.sERC1155.address, ctx.data.tokenId)).wait();
     }
   },
-  sERC20: async (ctx, address, amount) => {
-    ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(ctx.signers.admin);
+  sERC20: async (ctx, opts = {}) => {
+    opts.to ??= ctx.signers.holders[0];
+    opts.amount ??= ctx.constants.balance;
 
-    await ctx.contracts.sERC20.mint(address, amount);
+    ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(ctx.signers.admin);
+    await ctx.contracts.sERC20.mint(opts.to.address, opts.amount);
   },
 };
 
