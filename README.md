@@ -1,4 +1,21 @@
-# spectre.xyz | protocol
+<h1 align="center">
+  <br>
+  <a href="http://www.amitmerchant.com/electron-markdownify"><img src=".github/logo.png" alt="Spectre Protocol" width="
+  300"></a>
+  <br>
+  spectre ⇌ protocol
+  <br>
+  <br>
+</h1>
+
+<pre>
+  » where the one becomes multitudes
+  » built by punks on <a href="http://ethereum.org" target="_blank">Ethereum</a>
+</pre>
+
+## Introduction
+
+For a deeper documentation of spectre ⇌ protocol see here.
 
 ## Usage
 
