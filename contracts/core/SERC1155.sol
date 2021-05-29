@@ -33,8 +33,8 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
 
     enum SpectreState {
         Null,
-        ERC721Locked,
-        ERC721Unlocked
+        Locked,
+        Unlocked
     }
 
     struct Spectre {
@@ -45,7 +45,10 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     }
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-
+    // keccak256("Le spectral, ce sont ces autres, jamais présents comme tels, ni vivants ni morts, avec lesquels je m'entretiens");
+    bytes32 public constant DERRIDA = 0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce;
+    bytes4 private constant ERC721_ID = 0x80ac58cd;
+    
     address private _sERC20Base;
     string private _unwrappedURI;
 
@@ -202,10 +205,11 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     function uri(uint256 id) public view override returns (string memory) {
         Spectre storage spectre = _spectres[id];
 
-        if (spectre.state == SpectreState.ERC721Locked)
-          return IERC721Metadata(spectre.collection).tokenURI(spectre.tokenId);
+        if (spectre.state == SpectreState.Locked)
+            // what if the contract does not implement tokenURI ? To check
+            return IERC721Metadata(spectre.collection).tokenURI(spectre.tokenId);
 
-        if (spectre.state == SpectreState.ERC721Unlocked)
+        if (spectre.state == SpectreState.Unlocked)
             return _unwrappedURI;
 
         return "";
@@ -214,13 +218,18 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
 
   /* #region IERC721Receiver */
     /**
-     * data looks like this
-        data = [
-          bytes32(name)     | 32 bytes
-          bytes32(symbol)   | 32 bytes
-          uint256(cap)      | 32 bytes
-          address(admin)    | 32 bytes
-          address(guardian) | 32 bytes 
+     * @notice Called whenever an NFT is transferred to this contract through IERC721.safeTransferFrom().
+     * @dev - This function extract the spectralization parameters out of the data bytes.
+     *      - See `spectralize` natspec for more details on those parameters.
+     *      - The data bytes are expected to look like this:
+     *        [
+     *          bytes32(name)     | 32 bytes
+     *          bytes32(symbol)   | 32 bytes
+     *          uint256(cap)      | 32 bytes
+     *          address(admin)    | 32 bytes
+     *          address(guardian) | 32 bytes 
+     *          bytes32(DERRIDA)  | 32 bytes 
+     *        ]
      */
     function onERC721Received(
         address /* operator */,
@@ -233,22 +242,22 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         returns (bytes4)
     {
         address collection = _msgSender();
-  
-        require(collection.supportsInterface(0x80ac58cd), "sERC1155: ERC721 is not standard-compliant");
-        require(!isLocked(collection, tokenId), "sERC1155: ERC721 is already locked");
-        require(IERC721(collection).ownerOf(tokenId) == address(this), "sERC1155: ERC721 has not been transferred");
-        require(data.length == 160, "sERC1155: invalid spectralization data");
-
-        // il faut vérifier que le token recu n'est pas déjà lock.
-
-        // one cannot mload data located in calldata
-        bytes memory _data = data;
-        // declare variable to populate in assembly
+        require(collection.supportsInterface(ERC721_ID), "sERC1155: NFT is not ERC721-compliant");
+        require(data.length == 192, "sERC1155: invalid spectralization data length");
+        // useless as a locked ERC721 transfer should be triggered by this contract, which is not possible unless the
+        // ERC721 contract is malicious [in which case there is nothing we can do]
+        // require(_locks[collection][tokenId] == 0, "sERC1155: NFT is already locked"); 
+        // useless as we know this function is only called after the transfer is effective, unless the ERC721 contract
+        // is malicious [in which case there is nothing we can do]
+        // require(IERC721(collection).ownerOf(tokenId) == address(this), "sERC1155: NFT has not been transferred");
+        
+        bytes memory _data = data; // one cannot mload data located in calldata
         bytes32 name;
         bytes32 symbol;
         uint256 cap;
         address admin;
         address guardian;
+        bytes32 derrida;
         
         assembly {
             name := mload(add(_data, 32))
@@ -256,27 +265,30 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
             cap := mload(add(_data, 96))
             admin := mload(add(_data, 128))
             guardian:= mload(add(_data, 160))
+            derrida := mload(add(_data, 192))
         }
+
+        require(derrida == DERRIDA, "sERC1155: invalid spectralization data");
 
         emit Lock(_spectralize(collection, tokenId, name.toString(), symbol.toString(), cap, admin, guardian));
         
-        return 0x150b7a02; // IERC721Receiver.onERC721Received.selector
+        return IERC721Receiver.onERC721Received.selector; // 0x150b7a02
     }
   /* #endregion */
 
   /* #region sERC1155 */
     /**
-     * @notice Wraps the ERC721-compliant NFT belonging to `collection` and identified by `tokenId` into an sERC20.
-     * Remarks:
-     *  - This contract must be approved to transfer the NFT before this function is called.
-     *  - sERC20-related parameters are checked in SERC20.initialize().
+     * @notice Spectralize the ERC721-compliant NFT belonging to `collection` and identified by `tokenId` into an sERC20.
+     * @dev - This contract must be approved to transfer the NFT before this function is called.
+     *      - sERC20-related parameters are checked in SERC20.initialize().
+     *      - This contract is open to re-entrancy for it would be harmless.
      * @param collection The address of the ERC721 contract the NFT to spectralize belongs to.
      * @param tokenId The tokenId of the NFT to spectralize.
-     * @param name The name of the sERC20 to spectralize the ERC721 into.
-     * @param symbol The symbol of the sERC20 to clone.
-     * @param cap The supply cap of the sERC20 to clone.
-     * @param admin The addresses to which to assign the sERC20 to clone roles.
-     * @param guardian The address which is gonna be allowed to unlock the NFT to spectralize.
+     * @param name The name of the sERC20 to spectralize the NFT into.
+     * @param symbol The symbol of the sERC20 to spectralize the NFT into.
+     * @param cap The supply cap of the sERC20 to spectralize the NFT into.
+     * @param admin The admin of the sERC20 to spectralize the NFT into [can manage its roles and permissions].
+     * @param guardian The guardian of the spectre to create [can unlock it and release its NFT].
      */
     function spectralize(
         address collection,
@@ -288,35 +300,35 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         address guardian
     )
         external
+        returns (uint256 id)
     {
-        require(collection.supportsInterface(0x80ac58cd), "sERC1155: ERC721 is not standard");
-        require(_locks[collection][tokenId] == 0, "sERC1155: ERC721 is already locked");
+        require(collection.supportsInterface(ERC721_ID), "sERC1155: NFT is not ERC721-compliant");
+        require(_locks[collection][tokenId] == 0, "sERC1155: NFT is already locked");
 
-        _lock(
-            collection,
-            tokenId,
-            _spectralize(collection, tokenId, name, symbol, cap, admin, guardian)
-        );
+        address owner = IERC721(collection).ownerOf(tokenId);
+        // check that this contract does not already own the NFT beforehand to guarantee that such an NFT cannot be
+        // stolen if it accidentally ends up owned by this contract while un-spectralized.
+        require(owner != address(this), "sERC1155: NFT is already owned by sERC1155");
+        id = _spectralize(collection, tokenId, name, symbol, cap, admin, guardian);
+
+        IERC721(collection).transferFrom(owner, address(this), tokenId);
+        emit Lock(id);
     }
 
     function unlock(uint256 id, address recipient, bytes memory data) external {
         Spectre storage spectre = _spectres[id];
-        address collection = spectre.collection;
-        uint256 tokenId = spectre.tokenId;
 
-        require(spectre.state == SpectreState.ERC721Locked, "sERC1155: NFT is not wrapped");
-        require(_msgSender() == spectre.guardian, "sERC1155: must be guardian to unlock");
+        require(spectre.state == SpectreState.Locked, "sERC1155: NFT is not locked");
+        require(spectre.guardian == _msgSender(), "sERC1155: must be guardian to unlock");
 
-        _unlock(collection, tokenId, id, recipient, data);
+        _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
 
     function unlock(address sERC20, address recipient, bytes memory data) external {
         uint256 id = sERC20.toId();
         Spectre storage spectre = _spectres[id];
-        // address collection = nft.collection;
-        // uint256 tokenId = nft.tokenId;
 
-        require(spectre.state == SpectreState.ERC721Locked, "sERC1155: NFT is not wrapped");
+        require(spectre.state == SpectreState.Locked, "sERC1155: spectre does not locked");
         require(_msgSender() == spectre.guardian, "sERC1155: must be guardian to unlock");
 
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
@@ -397,10 +409,8 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
   /* #endregion*/
 
   /* #region private */
-    function _lock(address collection, uint256 tokenId, uint256 id) private {
-        IERC721(collection).transferFrom(IERC721(collection).ownerOf(tokenId), address(this), tokenId);
-
-        emit Lock(id);
+    function _canTransfer(address from) private view returns (bool) {
+        return from == _msgSender() || isApprovedForAll(from, _msgSender());
     }
 
     function _spectralize(
@@ -411,21 +421,16 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         uint256 cap,
         address admin,
         address guardian
-    ) private 
-      returns(uint256)
+    )
+        private 
+        returns (uint256)
     {
-        // clone + initialize = 867 741 gas
         address sERC20 = _sERC20Base.clone();
         uint256 id = sERC20.toId();
         
         _locks[collection][tokenId] = id;
-        _spectres[id] = Spectre({ state: SpectreState.ERC721Locked, collection: collection, tokenId: tokenId, guardian: guardian });
-
+        _spectres[id] = Spectre({ state: SpectreState.Locked, collection: collection, tokenId: tokenId, guardian: guardian });
         SERC20(sERC20).initialize(name, symbol, cap, admin);
-        // SERC20(sERC20).grantRole(SERC20(sERC20).MINTER_ROLE(), admin);
-        // SERC20(sERC20).renounceRole(SERC20(sERC20).DEFAULT_ADMIN_ROLE(), address(this));
-
-
 
         emit Spectralize(collection, tokenId, id, sERC20, guardian);
 
@@ -433,15 +438,12 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     }
 
     function _unlock(address collection, uint256 tokenId, uint256 id, address recipient, bytes memory data) private {
+        _spectres[id].state = SpectreState.Unlocked;
         delete _locks[collection][tokenId];
-        _spectres[id].state = SpectreState.ERC721Unlocked;
+
         IERC721(collection).safeTransferFrom(address(this), recipient, tokenId, data);
 
         emit Unlock(id, recipient);
-    }
-
-    function _canTransfer(address from) private view returns (bool) {
-        return from == _msgSender() || isApprovedForAll(from, _msgSender());
     }
 
     function _doSafeTransferAcceptanceCheck(

@@ -7,6 +7,7 @@ const { expect } = require('chai');
 
 const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
 const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
+const DERRIDA = '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce';
 
 const initialize = async (ctx) => {
   ctx.artifacts = {
@@ -28,6 +29,8 @@ const initialize = async (ctx) => {
     cap: ethers.BigNumber.from('1000000000000000'),
     balance: ethers.BigNumber.from('5000'),
     amount: ethers.BigNumber.from('1000'),
+    amount1: ethers.BigNumber.from('700'),
+    amount2: ethers.BigNumber.from('1250'),
   };
 
   ctx.contracts = {};
@@ -93,9 +96,9 @@ const mint = {
 };
 
 const setApprovalForAll = async (ctx, opts = {}) => {
-  opts.from = opts.from ? opts.from : ctx.signers.holders[0];
-  opts.operator = opts.operator ? opts.operator : ctx.signers.operator;
-  opts.approve = typeof opts.approve !== 'undefined' ? opts.approve : true;
+  opts.from ??= ctx.signers.holders[0];
+  opts.operator ??= ctx.signers.operator;
+  opts.approve ??= true;
 
   ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(opts.from);
   ctx.data.tx = await ctx.contracts.sERC1155.setApprovalForAll(opts.operator.address, opts.approve);
@@ -115,6 +118,19 @@ const safeTransferFrom = async (ctx, opts = {}) => {
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
+const safeBatchTransferFrom = async (ctx, opts = {}) => {
+  opts.from ??= ctx.signers.holders[0];
+  opts.operator ??= opts.from;
+  opts.to ??= ctx.signers.others[0];
+  opts.ids ??= [ctx.data.id1, ctx.data.id2];
+  opts.amounts ??= [ctx.constants.amount1, ctx.constants.amount2];
+  opts.data ??= ethers.constants.HashZero;
+
+  ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(opts.operator);
+  ctx.data.tx = await ctx.contracts.sERC1155.safeBatchTransferFrom(opts.from.address, opts.to.address, opts.ids, opts.amounts, opts.data);
+  ctx.data.receipt = await ctx.data.tx.wait();
+};
+
 const setup = async (ctx, opts = { approve: true }) => {
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
   ctx.contracts.sERC721 = await deployContract(ctx.signers.root, SERC721, ['sERC721 Collection', 'sERC721']);
@@ -129,19 +145,35 @@ const setup = async (ctx, opts = { approve: true }) => {
   }
 };
 
-const spectralize = async (ctx, opts = { transfer: false }) => {
+const spectralize = async (ctx, opts = {}) => {
+  opts.transfer ??= false;
+  opts.derrida ??= DERRIDA;
+  opts.short ??= false;
+
   if (opts.transfer) {
+    const data = opts.short
+      ? ethers.utils.concat([
+          ethers.utils.formatBytes32String(ctx.constants.name),
+          ethers.utils.formatBytes32String(ctx.constants.symbol),
+          ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
+          ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
+          ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
+        ])
+      : ethers.utils.concat([
+          ethers.utils.formatBytes32String(ctx.constants.name),
+          ethers.utils.formatBytes32String(ctx.constants.symbol),
+          ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
+          ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
+          ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
+          ethers.utils.defaultAbiCoder.encode(['bytes32'], [opts.derrida]),
+        ]);
+
+    ctx.contracts.sERC721 = ctx.contracts.sERC721.connect(ctx.signers.owners[0]);
     ctx.data.tx = await ctx.contracts.sERC721['safeTransferFrom(address,address,uint256,bytes)'](
       ctx.signers.owners[0].address,
       ctx.contracts.sERC1155.address,
       ctx.data.tokenId,
-      ethers.utils.concat([
-        ethers.utils.formatBytes32String(ctx.constants.name),
-        ethers.utils.formatBytes32String(ctx.constants.symbol),
-        ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
-        ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
-        ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
-      ])
+      data
     );
     ctx.data.receipt = await ctx.data.tx.wait();
     ctx.data.id = (await ctx.contracts.sERC1155.queryFilter(ctx.contracts.sERC1155.filters.Spectralize())).filter(
@@ -193,7 +225,38 @@ const itSafeTransfersFromLikeExpected = (ctx, opts = { operator: undefined }) =>
   });
 };
 
-const itWrapsLikeExpected = (ctx) => {
+const itSafeBatchTransfersFromLikeExpected = (ctx, opts = { operator: undefined }) => {
+  it("it debits sender's balance", async () => {
+    expect(await ctx.data.sERC201.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount1));
+    expect(await ctx.data.sERC202.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount2));
+    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.holders[0].address, ctx.data.id1)).to.equal(ctx.constants.balance.sub(ctx.constants.amount1));
+    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.holders[0].address, ctx.data.id2)).to.equal(ctx.constants.balance.sub(ctx.constants.amount2));
+  });
+
+  it("it credits receiver's balance", async () => {
+    expect(await ctx.data.sERC201.balanceOf(ctx.signers.others[0].address)).to.equal(ctx.constants.amount1);
+    expect(await ctx.data.sERC202.balanceOf(ctx.signers.others[0].address)).to.equal(ctx.constants.amount2);
+    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.others[0].address, ctx.data.id1)).to.equal(ctx.constants.amount1);
+    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.others[0].address, ctx.data.id2)).to.equal(ctx.constants.amount2);
+  });
+
+  it('it emits one TransferSBatch event', async () => {
+    opts.operator = opts.operator ? ctx.signers.operator.address : ctx.signers.holders[0].address;
+
+    expect(ctx.data.receipt.events.filter((event) => event.event === 'TransferBatch').length).to.equal(1);
+    await expect(ctx.data.tx)
+      .to.emit(ctx.contracts.sERC1155, 'TransferBatch')
+      .withArgs(
+        opts.operator,
+        ctx.signers.holders[0].address,
+        ctx.signers.others[0].address,
+        [ctx.data.id1, ctx.data.id2],
+        [ctx.constants.amount1, ctx.constants.amount2]
+      );
+  });
+};
+
+const itSpectralizesLikeExpected = (ctx) => {
   it('it locks ERC721', async () => {
     expect(await ctx.contracts.sERC1155.isLocked(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(true);
     expect(await ctx.contracts.sERC1155.lockOf(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(ctx.data.id);
@@ -234,12 +297,14 @@ module.exports = {
   mint,
   mock,
   setApprovalForAll,
+  safeBatchTransferFrom,
   safeTransferFrom,
   setup,
   spectralize,
   unlock,
+  itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
-  itWrapsLikeExpected,
+  itSpectralizesLikeExpected,
   SERC20,
   SERC721,
   SERC1155,

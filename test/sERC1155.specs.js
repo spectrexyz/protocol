@@ -1,16 +1,19 @@
 const { expect } = require('chai');
-const { deployContract } = require('ethereum-waffle');
+const { deployContract, createFixtureLoader } = require('ethereum-waffle');
+const { ethers } = require('ethers');
 const {
   initialize,
   mint,
   mock,
+  safeBatchTransferFrom,
   safeTransferFrom,
   setApprovalForAll,
   setup,
   spectralize,
   unlock,
+  itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
-  itWrapsLikeExpected,
+  itSpectralizesLikeExpected,
 } = require('./helpers');
 
 describe('sERC1155', () => {
@@ -263,7 +266,9 @@ describe('sERC1155', () => {
           });
         });
 
-        describe('» the receiver does not implement onERC1155Received', () => {});
+        describe('» the receiver does not implement onERC1155Received', () => {
+          // sERC1155: transfer to non ERC1155Receiver implementer
+        });
       });
 
       describe('» recipient is not the zero address', () => {
@@ -373,6 +378,177 @@ describe('sERC1155', () => {
         });
       });
     });
+
+    describe('# safeBatchTransferFrom', () => {
+      describe.skip('» transfer acceptance', () => {
+        describe('» the receiver implements onERC1155Received', () => {
+          describe('» and the receiver returns a valid value', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this);
+              await mock.deploy.ERC1155Receiver(this);
+              await setApprovalForAll(this);
+              await safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' });
+            });
+
+            it('it calls onERC1155Received', async () => {
+              await expect(this.data.tx)
+                .to.emit(this.contracts.ERC1155Receiver, 'Received')
+                .withArgs(this.signers.operator.address, this.signers.holders[0].address, this.data.id, this.constants.amount, '0x12345678');
+            });
+          });
+
+          describe('» but the receiver returns an invalid value', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this);
+              await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
+              await setApprovalForAll(this);
+            });
+
+            it('it reverts', async () => {
+              await expect(
+                safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' })
+              ).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
+            });
+          });
+
+          describe('» but the receiver reverts', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this);
+              await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
+              await setApprovalForAll(this);
+            });
+
+            it('it reverts', async () => {
+              await expect(
+                safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' })
+              ).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
+            });
+          });
+        });
+
+        describe('» the receiver does not implement onERC1155Received', () => {});
+      });
+
+      describe('» input arrays match', () => {
+        describe('» and no recipient is the zero address', () => {
+          describe("» and no transferred amount is inferior to sender's balance", () => {
+            describe('» and transfer is triggered by sender', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+                await mint.sERC20(this);
+                this.data.sERC201 = this.contracts.sERC20;
+                this.data.id1 = this.data.id;
+
+                await mint.sERC721(this);
+                await spectralize(this);
+                await mint.sERC20(this);
+                this.data.sERC202 = this.contracts.sERC20;
+                this.data.id2 = this.data.id;
+
+                await safeBatchTransferFrom(this);
+              });
+
+              itSafeBatchTransfersFromLikeExpected(this);
+            });
+
+            describe('» and transfer is triggered by an approved operator', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+                await mint.sERC20(this);
+                this.data.sERC201 = this.contracts.sERC20;
+                this.data.id1 = this.data.id;
+
+                await mint.sERC721(this);
+                await spectralize(this);
+                await mint.sERC20(this);
+                this.data.sERC202 = this.contracts.sERC20;
+                this.data.id2 = this.data.id;
+
+                await setApprovalForAll(this);
+
+                await safeBatchTransferFrom(this, { operator: this.signers.operator });
+              });
+
+              itSafeBatchTransfersFromLikeExpected(this, { operator: true });
+            });
+
+            describe('» but transfer is triggered by an unapproved operator', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+                await mint.sERC20(this);
+                this.data.sERC201 = this.contracts.sERC20;
+                this.data.id1 = this.data.id;
+
+                await mint.sERC721(this);
+                await spectralize(this);
+                await mint.sERC20(this);
+                this.data.sERC202 = this.contracts.sERC20;
+                this.data.id2 = this.data.id;
+              });
+
+              it('it reverts', async () => {
+                await expect(safeBatchTransferFrom(this, { operator: this.signers.operator })).to.be.revertedWith(
+                  'sERC1155: must be owner or approved to transfer'
+                );
+              });
+            });
+          });
+
+          describe("» but one transferred amount is superior to sender's balance", () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this);
+              this.data.sERC201 = this.contracts.sERC20;
+              this.data.id1 = this.data.id;
+
+              await mint.sERC721(this);
+              await spectralize(this);
+              await mint.sERC20(this);
+              this.data.sERC202 = this.contracts.sERC20;
+              this.data.id2 = this.data.id;
+            });
+
+            it('it reverts', async () => {
+              await expect(safeBatchTransferFrom(this, { amounts: [this.constants.balance.add(1), this.constants.amount2] })).to.be.revertedWith(
+                'ERC20: transfer amount exceeds balance'
+              );
+            });
+          });
+        });
+
+        describe.skip('» but one recipient is the zero address', () => {
+          before(async () => {
+            await setup(this);
+            await spectralize(this);
+            await mint.sERC20(this);
+            this.data.sERC201 = this.contracts.sERC20;
+            this.data.id1 = this.data.id;
+
+            await mint.sERC721(this);
+            await spectralize(this);
+            await mint.sERC20(this);
+            this.data.sERC202 = this.contracts.sERC20;
+            this.data.id2 = this.data.id;
+          });
+
+          it('it reverts', async () => {
+            await expect(safeBatchTransferFrom(this, { to: ethers.constants.AddressZero })).to.be.revertedWith('sERC1155: transfer to the zero address');
+          });
+        });
+      });
+
+      describe.skip('» input arrays do not match', () => {});
+    });
   });
 
   describe('⇛ ERC1155MetadataURI', () => {
@@ -414,31 +590,156 @@ describe('sERC1155', () => {
     });
   });
 
-  describe('⇛ ERC721Receiver', () => {
+  describe.only('⇛ ERC721Receiver', () => {
     describe('# onERC721Received', () => {
-      before(async () => {
-        await setup(this);
-        await spectralize(this, { transfer: true });
+      describe('» is called by a standard-compliant ERC721', () => {
+        describe('» and spectralization data have a valid length', () => {
+          describe('» and spectralization data ends up with Derrida magic value', () => {
+            before(async () => {
+              await setup(this, { approve: false });
+              await spectralize(this, { transfer: true });
+            });
+
+            itSpectralizesLikeExpected(this);
+          });
+
+          describe('» but spectralization data does not end up with Derrida magic value', () => {
+            before(async () => {
+              await setup(this, { approve: false });
+            });
+
+            it('it reverts', async () => {
+              await expect(spectralize(this, { transfer: true, derrida: ethers.constants.HashZero })).to.be.revertedWith(
+                'sERC1155: invalid spectralization data'
+              );
+            });
+          });
+        });
+
+        describe('» but spectralization data does not have a valid length', () => {
+          before(async () => {
+            await setup(this, { approve: false });
+          });
+
+          it('it reverts', async () => {
+            await expect(spectralize(this, { transfer: true, short: true })).to.be.revertedWith('sERC1155: invalid spectralization data length');
+          });
+        });
       });
 
-      itWrapsLikeExpected(this);
+      describe('» is called by a non-compliant ERC721', () => {
+        before(async () => {
+          await setup(this, { approve: false });
+        });
+
+        it('it reverts', async () => {
+          await expect(
+            this.contracts.sERC1155.onERC721Received(ethers.constants.AddressZero, ethers.constants.AddressZero, 0, ethers.constants.HashZero)
+          ).to.be.revertedWith('sERC1155: NFT is not ERC721-compliant');
+        });
+      });
     });
   });
 
-  describe('# wrap', () => {
-    describe('» ERC721 has never been spectralized', () => {
-      describe('» and ERC721 is standard-compliant', () => {
-        describe('» and sERC1155 has been approved to transfer NFT', () => {
+  describe('⇛ sERC1155', () => {
+    describe('# wrap', () => {
+      describe('» ERC721 has never been spectralized', () => {
+        describe('» and ERC721 is standard-compliant', () => {
+          describe('» and sERC1155 has been approved to transfer NFT', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+            });
+
+            itSpectralizesLikeExpected(this);
+          });
+          describe('» but sERC1155 has not been approved to transfer NFT', () => {
+            before(async () => {
+              await setup(this, { approve: false });
+            });
+            it('it reverts', async () => {
+              await expect(
+                this.contracts.sERC1155.spectralize(
+                  this.contracts.sERC721.address,
+                  this.data.tokenId,
+                  this.constants.name,
+                  this.constants.symbol,
+                  this.constants.cap,
+                  this.signers.admin.address,
+                  this.signers.owners[1].address
+                )
+              ).to.be.revertedWith('ERC721: transfer caller is not owner nor approved');
+            });
+          });
+        });
+
+        describe('» but NFT is not ERC721-compliant', () => {
+          before(async () => {
+            await setup(this);
+          });
+
+          it('it reverts', async () => {
+            await expect(
+              this.contracts.sERC1155.spectralize(
+                this.signers.others[0].address,
+                this.data.tokenId,
+                this.constants.name,
+                this.constants.symbol,
+                this.constants.cap,
+                this.signers.admin.address,
+                this.signers.owners[1].address
+              )
+            ).to.be.revertedWith('sERC1155: ERC721 is not standard');
+          });
+        });
+      });
+
+      describe('» NFT has already been wrapped', () => {
+        describe('» and NFT has been unwrapped since', () => {
           before(async () => {
             await setup(this);
             await spectralize(this);
-          });
+            await unlock(this);
+            this.contracts.sERC721 = this.contracts.sERC721.connect(this.signers.owners[2]);
+            await (await this.contracts.sERC721.approve(this.contracts.sERC1155.address, this.data.tokenId)).wait();
+            await spectralize(this);
 
-          itWrapsLikeExpected(this);
+            // tx = await sERC1155.spectralize(
+            //   sERC721.address,
+            //   tokenId,
+            //   name,
+            //   symbol,
+            //   cap,
+            //   roles.map((role) => role.address),
+            //   owners[1].address
+            // );
+            // receipt = await tx.wait();
+            // id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
+            // sERC1155 = sERC1155.connect(owners[1]);
+            // tx = await sERC1155['unwrap(uint256,address,bytes)'](id, owners[0].address, ethers.constants.HashZero);
+            // receipt = await tx.wait();
+            // sERC721 = sERC721.connect(owners[0]);
+            //
+            // tx = await sERC1155.spectralize(
+            //   sERC721.address,
+            //   tokenId,
+            //   name,
+            //   symbol,
+            //   cap,
+            //   roles.map((role) => role.address),
+            //   owners[1].address
+            // );
+            // receipt = await tx.wait();
+            // id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
+          });
+          itSpectralizesLikeExpected(this);
         });
-        describe('» but sERC1155 has not been approved to transfer NFT', () => {
+
+        describe('» but NFT still is wrapped', () => {
           before(async () => {
-            await setup(this, { approve: false });
+            await setup(this);
+            await spectralize(this);
+            this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.owners[1]);
           });
           it('it reverts', async () => {
             await expect(
@@ -451,91 +752,8 @@ describe('sERC1155', () => {
                 this.signers.admin.address,
                 this.signers.owners[1].address
               )
-            ).to.be.revertedWith('ERC721: transfer caller is not owner nor approved');
+            ).to.be.revertedWith('sERC1155: ERC721 is already locked');
           });
-        });
-      });
-
-      describe('» but NFT is not ERC721-compliant', () => {
-        before(async () => {
-          await setup(this);
-        });
-
-        it('it reverts', async () => {
-          await expect(
-            this.contracts.sERC1155.spectralize(
-              this.signers.others[0].address,
-              this.data.tokenId,
-              this.constants.name,
-              this.constants.symbol,
-              this.constants.cap,
-              this.signers.admin.address,
-              this.signers.owners[1].address
-            )
-          ).to.be.revertedWith('sERC1155: ERC721 is not standard');
-        });
-      });
-    });
-
-    describe('» NFT has already been wrapped', () => {
-      describe('» and NFT has been unwrapped since', () => {
-        before(async () => {
-          await setup(this);
-          await spectralize(this);
-          await unlock(this);
-          this.contracts.sERC721 = this.contracts.sERC721.connect(this.signers.owners[2]);
-          await (await this.contracts.sERC721.approve(this.contracts.sERC1155.address, this.data.tokenId)).wait();
-          await spectralize(this);
-
-          // tx = await sERC1155.spectralize(
-          //   sERC721.address,
-          //   tokenId,
-          //   name,
-          //   symbol,
-          //   cap,
-          //   roles.map((role) => role.address),
-          //   owners[1].address
-          // );
-          // receipt = await tx.wait();
-          // id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
-          // sERC1155 = sERC1155.connect(owners[1]);
-          // tx = await sERC1155['unwrap(uint256,address,bytes)'](id, owners[0].address, ethers.constants.HashZero);
-          // receipt = await tx.wait();
-          // sERC721 = sERC721.connect(owners[0]);
-          //
-          // tx = await sERC1155.spectralize(
-          //   sERC721.address,
-          //   tokenId,
-          //   name,
-          //   symbol,
-          //   cap,
-          //   roles.map((role) => role.address),
-          //   owners[1].address
-          // );
-          // receipt = await tx.wait();
-          // id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
-        });
-        itWrapsLikeExpected(this);
-      });
-
-      describe('» but NFT still is wrapped', () => {
-        before(async () => {
-          await setup(this);
-          await spectralize(this);
-          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.owners[1]);
-        });
-        it('it reverts', async () => {
-          await expect(
-            this.contracts.sERC1155.spectralize(
-              this.contracts.sERC721.address,
-              this.data.tokenId,
-              this.constants.name,
-              this.constants.symbol,
-              this.constants.cap,
-              this.signers.admin.address,
-              this.signers.owners[1].address
-            )
-          ).to.be.revertedWith('sERC1155: ERC721 is already locked');
         });
       });
     });
