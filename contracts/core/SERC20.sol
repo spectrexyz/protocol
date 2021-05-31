@@ -12,6 +12,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20Pausable
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20SnapshotUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "hardhat/console.sol";
 
 /**
  * @title sERC20
@@ -66,13 +67,13 @@ contract SERC20 is
         uint256 cap_,
         address admin
     ) external initializer {
-        // __Context_init();
-        // __AccessControl_init();
+        __Context_init();
+        __AccessControl_init();
         __ERC20_init(name_, symbol_);
         __ERC20Capped_init(cap_);
-        // __ERC20Burnable_init();
-        // __ERC20Pausable_init();
-        // __ERC20Snapshot_init();
+        __ERC20Burnable_init();
+        __ERC20Pausable_init();
+        __ERC20Snapshot_init();
         __ERC20Permit_init(name_);
         
         _sERC1155 = _msgSender();

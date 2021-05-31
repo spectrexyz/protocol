@@ -70,7 +70,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         _sERC20Base = sERC20Base_;
         _unwrappedURI = unwrappedURI_;
 
-        _setupRole(ADMIN_ROLE,_msgSender());
+        _setupRole(ADMIN_ROLE, _msgSender());
         _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
     }
 

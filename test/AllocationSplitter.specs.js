@@ -1,40 +1,31 @@
 const { expect } = require('chai');
-const { deployContract, createFixtureLoader } = require('ethereum-waffle');
 const { ethers } = require('ethers');
-const {
-  initialize,
-  allocate,
-  mint,
-  mock,
-  safeBatchTransferFrom,
-  safeTransferFrom,
-  setApprovalForAll,
-  setup,
-  spectralize,
-  transfer,
-  unlock,
-  withdraw,
-  itSafeBatchTransfersFromLikeExpected,
-  itSafeTransfersFromLikeExpected,
-  itSpectralizesLikeExpected,
-  CloneFactory,
-  PaymentSplitter,
-  SERC20,
-} = require('./helpers');
-
-// const setup = async (ctx) => {
-//   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
-//   ctx.contracts.CloneFactory = await deployContract(ctx.signers.root, CloneFactory);
-//   ctx.contracts.PaymentSplitter = await deployContract(ctx.signers.root, PaymentSplitter);
-// };
+const { initialize, allocate, mint, setup, spectralize, transfer, withdraw } = require('./helpers');
 
 describe.only('AllocationSplitter', () => {
   before(async () => {
     await initialize(this);
   });
 
+  describe('⇛ constructor', () => {
+    before(async () => {
+      await setup(this);
+    });
+
+    it('# it sets up permissions', async () => {
+      expect(await this.contracts.AllocationSplitter.hasRole(await this.contracts.AllocationSplitter.DEFAULT_ADMIN_ROLE(), this.signers.root.address)).to.equal(
+        true
+      );
+      expect(await this.contracts.AllocationSplitter.hasRole(await this.contracts.AllocationSplitter.ALLOCATE_ROLE(), this.signers.admin.address)).to.equal(
+        true
+      );
+    });
+  });
+
+  describe('⇛ allocate', () => {});
+
   describe('⇛ withdraw', () => {
-    describe('» allocation exists', () => {
+    describe('» token is allocated', () => {
       describe('» and there is something to withdraw', () => {
         before(async () => {
           await setup(this);
@@ -82,8 +73,27 @@ describe.only('AllocationSplitter', () => {
           expect(await this.contracts.AllocationSplitter.withdrawnBy(this.contracts.sERC20.address, this.signers.beneficiaries[2].address)).to.equal(7200);
         });
 
-        it('it transfers sERC20s', async () => {});
-        it('it emits a Withdraw event', async () => {});
+        it('it transfers sERC20s', async () => {
+          expect(await this.contracts.sERC20.balanceOf(this.signers.beneficiaries[0].address)).to.equal(3600);
+          expect(await this.contracts.sERC20.balanceOf(this.signers.beneficiaries[1].address)).to.equal(1200);
+          expect(await this.contracts.sERC20.balanceOf(this.signers.beneficiaries[2].address)).to.equal(7200);
+        });
+
+        it('it emits a Withdraw event', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.contracts.AllocationSplitter, 'Withdraw')
+            .withArgs(this.contracts.sERC20.address, this.signers.beneficiaries[2].address, 7200);
+        });
+      });
+    });
+
+    describe('» token is not allocated', () => {
+      before(async () => {
+        await setup(this);
+      });
+
+      it('it reverts', async () => {
+        await expect(withdraw(this)).to.be.revertedWith('AllocationSplitter: non-allocated token');
       });
     });
   });

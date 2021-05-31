@@ -13,6 +13,8 @@
   » built by punks on <a href="http://ethereum.org" target="_blank">Ethereum</a>
 </pre>
 
+[![Node.js CI](https://github.com/spectrexyz/protocol/actions/workflows/node.js.yml/badge.svg?branch=master)](https://github.com/spectrexyz/protocol/actions/workflows/node.js.yml)
+
 ## Introduction
 
 For a deeper documentation of spectre ⇌ protocol see here.

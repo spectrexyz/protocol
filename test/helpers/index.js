@@ -67,6 +67,7 @@ const initialize = async (ctx) => {
 };
 
 const allocate = async (ctx) => {
+  ctx.contracts.AllocationSplitter = ctx.contracts.AllocationSplitter.connect(ctx.signers.admin);
   ctx.data.tx = await ctx.contracts.AllocationSplitter.allocate(
     ctx.contracts.sERC20.address,
     [ctx.signers.beneficiaries[0].address, ctx.signers.beneficiaries[1].address, ctx.signers.beneficiaries[2].address],
@@ -153,7 +154,7 @@ const setup = async (ctx, opts = { approve: true }) => {
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
   ctx.contracts.sERC721 = await deployContract(ctx.signers.root, SERC721, ['sERC721 Collection', 'sERC721']);
   ctx.contracts.sERC1155 = await deployContract(ctx.signers.root, SERC1155, [ctx.contracts.sERC20Base.address, ctx.constants.unwrappedURI]);
-  ctx.contracts.AllocationSplitter = await deployContract(ctx.signers.root, AllocationSplitter, [ctx.signers.root.address]);
+  ctx.contracts.AllocationSplitter = await deployContract(ctx.signers.root, AllocationSplitter, [ctx.signers.admin.address]);
 
   ctx.data.receipt = await (await ctx.contracts.sERC721.mint(ctx.signers.owners[0].address, ctx.constants.tokenURI)).wait();
   ctx.data.tokenId = ctx.data.receipt.events[0].args.tokenId.toString();

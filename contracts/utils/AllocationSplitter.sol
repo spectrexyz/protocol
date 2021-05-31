@@ -51,8 +51,8 @@ contract AllocationSplitter is Context, AccessControlEnumerable {
       allocation.exists = true;
       for (uint256 i = 0; i < beneficiaries.length; i++) {
           allocation.shares[beneficiaries[i]] = shares[i];
-        console.log("FBeneficiary: %s", beneficiaries[i]);
-        console.log("shares: %s", shares[i]);
+        // console.log("FBeneficiary: %s", beneficiaries[i]);
+        // console.log("shares: %s", shares[i]);
 
 
       }
@@ -60,6 +60,7 @@ contract AllocationSplitter is Context, AccessControlEnumerable {
 
     function withdraw(address token) external {
         Allocation storage allocation = _allocations[token];
+        require(allocation.exists, "AllocationSplitter: non-allocated token");
         address beneficiary = _msgSender();
 
         _poke(token, allocation);
@@ -72,9 +73,9 @@ contract AllocationSplitter is Context, AccessControlEnumerable {
         allocation.withdrawnBy[beneficiary] += amount;
         allocation.withdrawn += amount;
 
-        console.log("Withdrawing: %s", amount);
-        console.log("For: %s", beneficiary);
-        console.log("========");
+        // console.log("Withdrawing: %s", amount);
+        // console.log("For: %s", beneficiary);
+        // console.log("========");
 
         SERC20(token).transfer(beneficiary, amount);
 
@@ -85,10 +86,10 @@ contract AllocationSplitter is Context, AccessControlEnumerable {
         uint256 balance = SERC20(token).balanceOf(address(this));
         allocation.received = balance + allocation.withdrawn;
 
-        console.log("Received: %s", allocation.received);
-        console.log("Withdrawn: %s", allocation.withdrawn);
+        // console.log("Received: %s", allocation.received);
+        // console.log("Withdrawn: %s", allocation.withdrawn);
 
-        console.log("========");
+        // console.log("========");
     }
 
 }

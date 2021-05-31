@@ -590,7 +590,7 @@ describe('sERC1155', () => {
     });
   });
 
-  describe.only('⇛ ERC721Receiver', () => {
+  describe('⇛ ERC721Receiver', () => {
     describe('# onERC721Received', () => {
       describe('» is called by a standard-compliant ERC721', () => {
         describe('» and spectralization data have a valid length', () => {
