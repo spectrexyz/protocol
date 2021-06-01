@@ -3,7 +3,7 @@ node_modules
 
 # hardhat
 cache
-# artifacts
+artifacts
 coverage
 coverage.json
 
