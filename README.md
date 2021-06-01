@@ -27,14 +27,14 @@ For a deeper documentation of spectre ⇌ protocol see here.
 
 ### Install
 
-```bash
+```
 git clone https://github.com/spectrexyz/protocol.git
 cd protocol && npm install
 ```
 
 ### Scripts
 
-```bash
+```
 npm run lint
 npm run compile
 npm run test
