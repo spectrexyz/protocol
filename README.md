@@ -15,7 +15,7 @@
 </h1>
 
 <pre align="center">
-  » where the one becomes multitudes
+  » where the one becomes multitude
   » built by punks on <a href="http://ethereum.org" target="_blank">Ethereum</a>
 </pre>
 
