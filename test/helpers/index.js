@@ -66,12 +66,16 @@ const initialize = async (ctx) => {
   ] = await ethers.getSigners();
 };
 
-const allocate = async (ctx) => {
-  ctx.contracts.AllocationSplitter = ctx.contracts.AllocationSplitter.connect(ctx.signers.admin);
+const allocate = async (ctx, opts = {}) => {
+  opts.from ??= ctx.signers.admin;
+  opts.beneficiaries ??= [ctx.signers.beneficiaries[0], ctx.signers.beneficiaries[1], ctx.signers.beneficiaries[2]];
+  opts.shares ??= [ctx.constants.shares[0], ctx.constants.shares[1], ctx.constants.shares[2]];
+
+  ctx.contracts.AllocationSplitter = ctx.contracts.AllocationSplitter.connect(opts.from);
   ctx.data.tx = await ctx.contracts.AllocationSplitter.allocate(
     ctx.contracts.sERC20.address,
-    [ctx.signers.beneficiaries[0].address, ctx.signers.beneficiaries[1].address, ctx.signers.beneficiaries[2].address],
-    [ctx.constants.shares[0], ctx.constants.shares[1], ctx.constants.shares[2]]
+    opts.beneficiaries.map((beneficiary) => beneficiary.address),
+    opts.shares
   );
   ctx.data.receipt = await ctx.data.tx.wait();
 };

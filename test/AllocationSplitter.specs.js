@@ -22,9 +22,120 @@ describe.only('AllocationSplitter', () => {
     });
   });
 
-  describe('⇛ allocate', () => {});
+  describe('# allocate', () => {
+    describe('» sender has ALLOCATE_ROLE', () => {
+      describe('» and token is yet not allocated', () => {
+        describe('» and parameters arrays have the same length', () => {
+          describe('» and no beneficiaries address is the zero address', () => {
+            describe('» and no share is zero', () => {
+              describe('» and shares entail for 100%', () => {
+                before(async () => {
+                  await setup(this);
+                  await spectralize(this);
+                  await allocate(this);
+                });
 
-  describe('⇛ withdraw', () => {
+                it('it registers allocation', async () => {
+                  const allocation = await this.contracts.AllocationSplitter.allocationOf(this.contracts.sERC20.address);
+
+                  expect(allocation.exists).to.equal(true);
+                  expect(allocation.received).to.equal(0);
+                  expect(allocation.withdrawn).to.equal(0);
+                });
+
+                it('it emits an Allocate event', async () => {
+                  await expect(this.data.tx)
+                    .to.emit(this.contracts.AllocationSplitter, 'Allocate')
+                    .withArgs(
+                      this.contracts.sERC20.address,
+                      [this.signers.beneficiaries[0].address, this.signers.beneficiaries[1].address, this.signers.beneficiaries[2].address],
+                      [this.constants.shares[0], this.constants.shares[1], this.constants.shares[2]]
+                    );
+                });
+              });
+
+              describe('» but shares do not entail for 100%', () => {
+                before(async () => {
+                  await setup(this);
+                  await spectralize(this);
+                });
+
+                it('it reverts', async () => {
+                  await expect(allocate(this, { shares: [this.constants.shares[0], this.constants.shares[1], '10'] })).to.be.revertedWith(
+                    'AllocationSplitter: shares must entail for 100%'
+                  );
+                });
+              });
+            });
+
+            describe('» but one share is zero', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+              });
+
+              it('it reverts', async () => {
+                await expect(allocate(this, { shares: [this.constants.shares[0], this.constants.shares[1], 0] })).to.be.revertedWith(
+                  'AllocationSplitter: share cannot be zero'
+                );
+              });
+            });
+          });
+
+          describe('» but one beneficiary is the zero address', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+            });
+
+            it('it reverts', async () => {
+              await expect(
+                allocate(this, { beneficiaries: [this.signers.beneficiaries[0], this.signers.beneficiaries[1], { address: ethers.constants.AddressZero }] })
+              ).to.be.revertedWith('AllocationSplitter: beneficiary cannot be the zero address');
+            });
+          });
+        });
+
+        describe('» but parameters arrays do not have the same length', () => {
+          before(async () => {
+            await setup(this);
+            await spectralize(this);
+          });
+
+          it('it reverts', async () => {
+            await expect(allocate(this, { shares: [this.constants.shares[0], this.constants.shares[1]] })).to.be.revertedWith(
+              'AllocationSplitter: beneficiaries and shares length mismatch'
+            );
+          });
+        });
+      });
+
+      describe('» but token is already allocated', () => {
+        before(async () => {
+          await setup(this);
+          await spectralize(this);
+          await allocate(this);
+        });
+
+        it('it reverts', async () => {
+          await expect(allocate(this)).to.be.revertedWith('AllocationSplitter: token already allocated');
+        });
+      });
+    });
+
+    describe('» sender does not have ALLOCATE_ROLE', () => {
+      before(async () => {
+        await setup(this);
+        await spectralize(this);
+      });
+
+      it('it reverts', async () => {
+        await expect(allocate(this, { from: this.signers.others[0] })).to.be.revertedWith('AllocationSplitter: must have allocate role to allocate');
+      });
+    });
+  });
+
+  describe('# withdraw', () => {
     describe('» token is allocated', () => {
       describe('» and there is something to withdraw', () => {
         before(async () => {
