@@ -1,7 +1,7 @@
 const SERC20 = require('../../artifacts/contracts/core/SERC20.sol/sERC20.json');
 const SERC721 = require('../../artifacts/contracts/core/SERC721.sol/sERC721.json');
 const SERC1155 = require('../../artifacts/contracts/core/SERC1155.sol/sERC1155.json');
-const AllocationSplitter = require('../../artifacts/contracts/utils/AllocationSplitter.sol/AllocationSplitter.json');
+const SERC20Splitter = require('../../artifacts/contracts/utils/SERC20Splitter.sol/SERC20Splitter.json');
 
 const ERC1155Receiver = require('../../artifacts/contracts/test/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json');
 const CloneFactory = require('../../artifacts/contracts/test/CloneFactory.sol/CloneFactory.json');
@@ -66,13 +66,13 @@ const initialize = async (ctx) => {
   ] = await ethers.getSigners();
 };
 
-const allocate = async (ctx, opts = {}) => {
+const register = async (ctx, opts = {}) => {
   opts.from ??= ctx.signers.admin;
   opts.beneficiaries ??= [ctx.signers.beneficiaries[0], ctx.signers.beneficiaries[1], ctx.signers.beneficiaries[2]];
   opts.shares ??= [ctx.constants.shares[0], ctx.constants.shares[1], ctx.constants.shares[2]];
 
-  ctx.contracts.AllocationSplitter = ctx.contracts.AllocationSplitter.connect(opts.from);
-  ctx.data.tx = await ctx.contracts.AllocationSplitter.allocate(
+  ctx.contracts.SERC20Splitter = ctx.contracts.SERC20Splitter.connect(opts.from);
+  ctx.data.tx = await ctx.contracts.SERC20Splitter.register(
     ctx.contracts.sERC20.address,
     opts.beneficiaries.map((beneficiary) => beneficiary.address),
     opts.shares
@@ -158,7 +158,7 @@ const setup = async (ctx, opts = { approve: true }) => {
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
   ctx.contracts.sERC721 = await deployContract(ctx.signers.root, SERC721, ['sERC721 Collection', 'sERC721']);
   ctx.contracts.sERC1155 = await deployContract(ctx.signers.root, SERC1155, [ctx.contracts.sERC20Base.address, ctx.constants.unwrappedURI]);
-  ctx.contracts.AllocationSplitter = await deployContract(ctx.signers.root, AllocationSplitter, [ctx.signers.admin.address]);
+  ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
 
   ctx.data.receipt = await (await ctx.contracts.sERC721.mint(ctx.signers.owners[0].address, ctx.constants.tokenURI)).wait();
   ctx.data.tokenId = ctx.data.receipt.events[0].args.tokenId.toString();
@@ -225,7 +225,7 @@ const spectralize = async (ctx, opts = {}) => {
 const transfer = {
   sERC20: async (ctx, opts = {}) => {
     opts.from ??= ctx.signers.holders[0];
-    opts.to ??= ctx.contracts.AllocationSplitter;
+    opts.to ??= ctx.contracts.SERC20Splitter;
     opts.amount ??= ctx.constants.amount;
 
     ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(opts.from);
@@ -243,8 +243,7 @@ const unlock = async (ctx) => {
 const withdraw = async (ctx, opts = {}) => {
   opts.from ??= ctx.signers.beneficiaries[0];
 
-  ctx.contracts.AllocationSplitter = ctx.contracts.AllocationSplitter.connect(opts.from);
-  ctx.data.tx = await ctx.contracts.AllocationSplitter.withdraw(ctx.contracts.sERC20.address);
+  ctx.data.tx = await ctx.contracts.SERC20Splitter.withdraw(ctx.contracts.sERC20.address, opts.from.address);
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
@@ -338,7 +337,7 @@ const itSpectralizesLikeExpected = (ctx) => {
 
 module.exports = {
   initialize,
-  allocate,
+  register,
   mint,
   mock,
   setApprovalForAll,
@@ -353,7 +352,7 @@ module.exports = {
   itSafeTransfersFromLikeExpected,
   itSpectralizesLikeExpected,
   CloneFactory,
-  AllocationSplitter,
+  SERC20Splitter,
   SERC20,
   SERC721,
   SERC1155,
