@@ -27,41 +27,53 @@ contract SERC20Splitter is Context, AccessControlEnumerable {
         _setupRole(REGISTER_ROLE, registrar);
     }
 
+    /**
+     * @dev - We do not check that `sERC20` actually is an ERC20 to save gas as only spectre's trusted template has
+      *     REGISTER_ROLE - and it passes the sERC20 address out of the sERC20 deployment.
+     *      - Other parameters are checked because they are passed by users and forwarded unchecked by the template.
+     */
     function register(address sERC20, address[] calldata beneficiaries, uint256[] calldata shares) external {
-      Split storage split = _splits[sERC20];
+        Split storage split = _splits[sERC20];
 
-      require(hasRole(REGISTER_ROLE, _msgSender()), "SERC20Splitter: must have register role to register");
-      require(split.sERC20 == address(0), "SERC20Splitter: sERC20 split already registered");
-      require(beneficiaries.length == shares.length, "SERC20Splitter: beneficiaries and shares length mismatch");
-      
-      split.sERC20 = sERC20;
-      address beneficiary;
-      uint256 share;
-      uint256 total;
+        require(hasRole(REGISTER_ROLE, _msgSender()), "SERC20Splitter: must have register role to register");
+        require(split.sERC20 == address(0), "SERC20Splitter: sERC20 split already registered");
+        require(beneficiaries.length == shares.length, "SERC20Splitter: beneficiaries and shares length mismatch");
+        
+        split.sERC20 = sERC20;
+        address beneficiary;
+        uint256 share;
+        uint256 total;
 
-      for (uint256 i = 0; i < beneficiaries.length; i++) {
-          beneficiary = beneficiaries[i];
-          share = shares[i];
+        for (uint256 i = 0; i < beneficiaries.length; i++) {
+            beneficiary = beneficiaries[i];
+            share = shares[i];
 
-          require(beneficiary != address(0), "SERC20Splitter: beneficiary cannot be the zero address");
-          require(share != uint256(0), "SERC20Splitter: share cannot be worth zero");
+            require(beneficiary != address(0), "SERC20Splitter: beneficiary cannot be the zero address");
+            require(share != uint256(0), "SERC20Splitter: share cannot be worth zero");
 
-          split.shares[beneficiary] = share;
-          total += share;
-      }
+            split.shares[beneficiary] = share;
+            total += share;
+        }
 
-      require(total == PCT_BASE, "SERC20Splitter: shares must add up to 100%");
+        require(total == PCT_BASE, "SERC20Splitter: shares must add up to 100%");
 
-      emit Register(sERC20, beneficiaries, shares);
+        emit Register(sERC20, beneficiaries, shares);
     }
 
+    /**
+     * @notice Withdraw due sERC20s.
+     * @dev - We do not check that split.shares[beneficiary] != 0 as the contract already reverts in such a situation
+     *      for due == withdrawn == 0
+     * @param sERC20 The sERC20 to withdraw.
+     * @param beneficiary The beneficiary to withdraw to due amount of.
+     */
     function withdraw(address sERC20, address beneficiary) external {
         Split storage split = _splits[sERC20];
         
         require(split.sERC20 != address(0), "SERC20Splitter: unsplit sERC20");
-        //require(allocations.shares[beneficiary] != 0) // will revert anyhow because of due == withdrawn == 0 => nothing to withdraw
         
-        uint256 due = (SERC20(sERC20).balanceOf(address(this)) + split.totalWithdrawn) * split.shares[beneficiary] / PCT_BASE;
+        uint256 due =
+            (SERC20(sERC20).balanceOf(address(this)) + split.totalWithdrawn) * split.shares[beneficiary] / PCT_BASE;
         uint256 withdrawn = split.withdrawn[beneficiary];
         require(due > withdrawn, "SERC20Splitter: nothing to withdraw");
         
