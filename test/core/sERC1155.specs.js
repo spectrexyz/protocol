@@ -14,7 +14,7 @@ const {
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
   itSpectralizesLikeExpected,
-} = require('./helpers');
+} = require('../helpers');
 
 describe('sERC1155', () => {
   before(async () => {

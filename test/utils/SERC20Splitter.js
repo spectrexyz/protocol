@@ -1,6 +1,6 @@
 const { expect } = require('chai');
 const { ethers } = require('ethers');
-const { initialize, register, mint, setup, spectralize, transfer, withdraw, withdrawBatch } = require('./helpers');
+const { initialize, register, mint, setup, spectralize, transfer, withdraw, withdrawBatch } = require('../helpers');
 
 describe.only('SERC20Splitter', () => {
   before(async () => {
