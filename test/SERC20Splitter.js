@@ -1,6 +1,6 @@
 const { expect } = require('chai');
 const { ethers } = require('ethers');
-const { initialize, register, mint, setup, spectralize, transfer, withdraw } = require('./helpers');
+const { initialize, register, mint, setup, spectralize, transfer, withdraw, withdrawBatch } = require('./helpers');
 
 describe.only('SERC20Splitter', () => {
   before(async () => {
@@ -132,7 +132,7 @@ describe.only('SERC20Splitter', () => {
   });
 
   describe('# withdraw', () => {
-    describe('» sERC20 is allocated', () => {
+    describe('» sERC20 split is registered', () => {
       describe('» and there is something to withdraw', () => {
         before(async () => {
           await setup(this);
@@ -209,13 +209,113 @@ describe.only('SERC20Splitter', () => {
       });
     });
 
-    describe('» sERC20 is not allocated', () => {
+    describe('» sERC20 split is not registered', () => {
       before(async () => {
         await setup(this);
       });
 
       it('it reverts', async () => {
         await expect(withdraw(this)).to.be.revertedWith('SERC20Splitter: unsplit sERC20');
+      });
+    });
+  });
+
+  describe('# withdrawBatch', () => {
+    describe('» all sERC20s splits are registered', () => {
+      describe('» and there is something to withdraw for all sERC20s', () => {
+        before(async () => {
+          await setup(this);
+
+          await spectralize(this);
+          await register(this);
+          await mint.sERC20(this);
+          await transfer.sERC20(this, { amount: '1000' });
+          this.data.sERC201 = this.contracts.sERC20;
+
+          await mint.sERC721(this);
+          await spectralize(this);
+          await register(this);
+          await mint.sERC20(this);
+          await transfer.sERC20(this, { amount: '2000' });
+          this.data.sERC202 = this.contracts.sERC20;
+
+          await withdrawBatch(this);
+        });
+
+        it('it updates split history', async () => {
+          const split1 = await this.contracts.SERC20Splitter.splitOf(this.data.sERC201.address);
+          const split2 = await this.contracts.SERC20Splitter.splitOf(this.data.sERC202.address);
+
+          expect(split1.received).to.equal(1000);
+          expect(split1.totalWithdrawn).to.equal(300);
+
+          expect(split2.received).to.equal(2000);
+          expect(split2.totalWithdrawn).to.equal(600);
+
+          expect(await this.contracts.SERC20Splitter.withdrawnBy(this.data.sERC201.address, this.signers.beneficiaries[0].address)).to.equal(300);
+          expect(await this.contracts.SERC20Splitter.withdrawnBy(this.data.sERC202.address, this.signers.beneficiaries[0].address)).to.equal(600);
+        });
+
+        it('it transfers sERC20s', async () => {
+          expect(await this.data.sERC201.balanceOf(this.signers.beneficiaries[0].address)).to.equal(300);
+          expect(await this.data.sERC202.balanceOf(this.signers.beneficiaries[0].address)).to.equal(600);
+        });
+
+        it('it emits Withdraw events', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.contracts.SERC20Splitter, 'Withdraw')
+            .withArgs(this.data.sERC201.address, this.signers.beneficiaries[0].address, 300);
+          await expect(this.data.tx)
+            .to.emit(this.contracts.SERC20Splitter, 'Withdraw')
+            .withArgs(this.data.sERC202.address, this.signers.beneficiaries[0].address, 600);
+        });
+      });
+
+      describe('» but there is nothing to withdraw for one sERC20', () => {
+        before(async () => {
+          await setup(this);
+
+          await spectralize(this);
+          await register(this);
+          await mint.sERC20(this);
+          await transfer.sERC20(this, { amount: '1000' });
+          this.data.sERC201 = this.contracts.sERC20;
+
+          await mint.sERC721(this);
+          await spectralize(this);
+          await register(this);
+          await mint.sERC20(this);
+          await transfer.sERC20(this, { amount: '2000' });
+          this.data.sERC202 = this.contracts.sERC20;
+
+          await withdraw(this);
+        });
+
+        it('it reverts', async () => {
+          await expect(withdrawBatch(this)).to.be.revertedWith('SERC20Splitter: nothing to withdraw');
+        });
+      });
+    });
+
+    describe('» one sERC20 split is not registered', () => {
+      before(async () => {
+        await setup(this);
+
+        await spectralize(this);
+        await register(this);
+        await mint.sERC20(this);
+        await transfer.sERC20(this, { amount: '1000' });
+        this.data.sERC201 = this.contracts.sERC20;
+
+        await mint.sERC721(this);
+        await spectralize(this);
+        await mint.sERC20(this);
+        await transfer.sERC20(this, { amount: '2000' });
+        this.data.sERC202 = this.contracts.sERC20;
+      });
+
+      it('it reverts', async () => {
+        await expect(withdrawBatch(this)).to.be.revertedWith('SERC20Splitter: unsplit sERC20');
       });
     });
   });

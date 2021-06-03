@@ -247,6 +247,13 @@ const withdraw = async (ctx, opts = {}) => {
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
+const withdrawBatch = async (ctx, opts = {}) => {
+  opts.from ??= ctx.signers.beneficiaries[0];
+
+  ctx.data.tx = await ctx.contracts.SERC20Splitter.withdrawBatch([ctx.data.sERC201.address, ctx.data.sERC202.address], opts.from.address);
+  ctx.data.receipt = await ctx.data.tx.wait();
+};
+
 const itSafeTransfersFromLikeExpected = (ctx, opts = { operator: undefined }) => {
   it("it debits sender's balance", async () => {
     expect(await ctx.contracts.sERC20.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount));
@@ -348,6 +355,7 @@ module.exports = {
   transfer,
   unlock,
   withdraw,
+  withdrawBatch,
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
   itSpectralizesLikeExpected,
