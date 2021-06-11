@@ -13,6 +13,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import "hardhat/console.sol";
 
 /**
  * @title sERC1155
@@ -48,6 +49,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     bytes4 private constant ERC721_ID = 0x80ac58cd;
     
     address private _sERC20Base;
+    string private _unavailableURI;
     string private _unwrappedURI;
 
     mapping (address => mapping(address => bool)) private _operatorApprovals;
@@ -62,10 +64,11 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @notice sERC1155 constructor.
      * @dev Context, ERC165 and AccessControlEnumerable have no constructor.
      */
-    constructor(address sERC20Base_, string memory unwrappedURI_) {
+    constructor(address sERC20Base_, string memory unavailableURI_, string memory unwrappedURI_) {
         require(sERC20Base_ != address(0), "sERC1155: sERC20 base cannot be the zero address");
 
         _sERC20Base = sERC20Base_;
+        _unavailableURI = unavailableURI_;
         _unwrappedURI = unwrappedURI_;
 
         _setupRole(ADMIN_ROLE, _msgSender());
@@ -99,7 +102,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @param id The token type whose balance is queried.
      * @return The amount of tokens of type `id` owned by `account`.
      */
-    function balanceOf(address account, uint256 id) external view override returns (uint256) {
+    function balanceOf(address account, uint256 id) public view override returns (uint256) {
         require(account != address(0), "sERC1155: balance query for the zero address");
 
         return _spectres[id].state != SpectreState.Null ? id.toSERC20().balanceOf(account) : 0;
@@ -114,8 +117,8 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @return The amount of tokens of types `ids` owned by `accounts`.
      */
     function balanceOfBatch(
-        address[] memory accounts,
-        uint256[] memory ids
+        address[] calldata accounts,
+        uint256[] calldata ids
     )
         external
         view
@@ -124,16 +127,10 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     {
         require(accounts.length == ids.length, "sERC1155: accounts and ids length mismatch");
 
-        address account;
-        uint256 id;
         uint256[] memory batchBalances = new uint256[](accounts.length);
 
-        for (uint256 i = 0; i < accounts.length; ++i) {
-            account = accounts[i];
-            id = ids[i];
-
-            require(account != address(0), "sERC1155: balance query for the zero address");
-            batchBalances[i] = _spectres[id].state != SpectreState.Null ? id.toSERC20().balanceOf(account) : 0;
+        for (uint256 i = 0; i < accounts.length; i++) {
+            batchBalances[i] = balanceOf(accounts[i], ids[i]);
         }
 
         return batchBalances;
@@ -180,15 +177,16 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         address to,
         uint256 id,
         uint256 amount,
-        bytes memory data
+        bytes calldata data
     )
         external
         override
     {
-        require(to != address(0), "sERC1155: transfer to the zero address");
-        require(_canTransfer(from), "sERC1155: must be owner or approved to transfer");
-
         address operator = _msgSender();
+
+        require(to != address(0), "sERC1155: transfer to the zero address");
+        require(from == operator || _operatorApprovals[from][operator], "sERC1155: must be owner or approved to transfer");
+
         id.toSERC20().onSERC1155Transferred(from, to, amount);
 
         emit TransferSingle(operator, from, to, id, amount);
@@ -199,23 +197,24 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     function safeBatchTransferFrom(
         address from,
         address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
+        uint256[] calldata ids,
+        uint256[] calldata amounts,
+        bytes calldata data
     )
         external
         override
     {
+        address operator = _msgSender();
+
         require(ids.length == amounts.length, "sERC1155: ids and amounts length mismatch");
         require(to != address(0), "sERC1155: transfer to the zero address");
-        require(_canTransfer(from), "sERC1155: must be owner or approved to transfer");
+        require(from == operator || _operatorApprovals[from][operator], "sERC1155: must be owner or approved to transfer");
 
-        address operator = _msgSender();
-        for (uint256 i = 0; i < ids.length; ++i) {
+        for (uint256 i = 0; i < ids.length; i++) {
             ids[i].toSERC20().onSERC1155Transferred(from, to, amounts[i]);
         }
 
-        emit TransferBatch(operator, from, to, ids, amounts);  // déjà emis dans le hook on SERC20 transferred ?
+        emit TransferBatch(operator, from, to, ids, amounts);
 
         _doSafeBatchTransferAcceptanceCheck(operator, from, to, ids, amounts, data);
     }
@@ -234,9 +233,13 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     function uri(uint256 id) external view override returns (string memory) {
         Spectre storage spectre = _spectres[id];
 
-        if (spectre.state == SpectreState.Locked)
-            // what if the contract does not implement tokenURI ? To check
-            return IERC721Metadata(spectre.collection).tokenURI(spectre.tokenId);
+        if (spectre.state == SpectreState.Locked) {
+            try IERC721Metadata(spectre.collection).tokenURI(spectre.tokenId) returns (string memory uri_) {
+                return uri_;
+            } catch {
+                return _unavailableURI;
+            }
+        }
 
         if (spectre.state == SpectreState.Unlocked)
             return _unwrappedURI;
@@ -393,6 +396,10 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         emit TransferSingle(operator, from, to, id, amount);
     }
 
+    function unavailableURI() public view returns (string memory) {
+        return _unavailableURI;
+    }
+
     function unwrappedURI() public view returns (string memory) {
         return _unwrappedURI;
     }
@@ -438,10 +445,6 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
   /* #endregion*/
 
   /* #region private */
-    function _canTransfer(address from) private view returns (bool) {
-        return from == _msgSender() || _operatorApprovals[from][_msgSender()];
-    }
-
     function _spectralize(
         address collection,
         uint256 tokenId,

@@ -2,8 +2,8 @@ const SERC20 = require('../../artifacts/contracts/core/SERC20.sol/sERC20.json');
 const SERC721 = require('../../artifacts/contracts/core/SERC721.sol/sERC721.json');
 const SERC1155 = require('../../artifacts/contracts/core/SERC1155.sol/sERC1155.json');
 const SERC20Splitter = require('../../artifacts/contracts/utils/SERC20Splitter.sol/SERC20Splitter.json');
-
 const ERC1155Receiver = require('../../artifacts/contracts/test/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json');
+const ERC721Mock = require('../../artifacts/contracts/test/ERC721Mock.sol/ERC721Mock.json');
 const CloneFactory = require('../../artifacts/contracts/test/CloneFactory.sol/CloneFactory.json');
 
 const { deployContract } = require('ethereum-waffle');
@@ -27,6 +27,7 @@ const initialize = async (ctx) => {
       ERC721Unlocked: 2,
     },
     unwrappedURI: 'ipfs://Qm.../unwrapped',
+    unavailableURI: 'ipfs://Qm.../unavailable',
     tokenURI: 'ipfs://Qm.../',
     name: 'My Awesome sERC20',
     symbol: 'MAS',
@@ -95,6 +96,9 @@ const mock = {
         opts.batchReverts,
       ]);
     },
+    ERC721: async (ctx) => {
+      ctx.contracts.ERC721Mock = await deployContract(ctx.signers.root, ERC721Mock);
+    },
   },
 };
 
@@ -157,7 +161,11 @@ const safeBatchTransferFrom = async (ctx, opts = {}) => {
 const setup = async (ctx, opts = { approve: true }) => {
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
   ctx.contracts.sERC721 = await deployContract(ctx.signers.root, SERC721, ['sERC721 Collection', 'sERC721']);
-  ctx.contracts.sERC1155 = await deployContract(ctx.signers.root, SERC1155, [ctx.contracts.sERC20Base.address, ctx.constants.unwrappedURI]);
+  ctx.contracts.sERC1155 = await deployContract(ctx.signers.root, SERC1155, [
+    ctx.contracts.sERC20Base.address,
+    ctx.constants.unavailableURI,
+    ctx.constants.unwrappedURI,
+  ]);
   ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
 
   ctx.data.receipt = await (await ctx.contracts.sERC721.mint(ctx.signers.owners[0].address, ctx.constants.tokenURI)).wait();
@@ -173,42 +181,15 @@ const spectralize = async (ctx, opts = {}) => {
   opts.transfer ??= false;
   opts.derrida ??= DERRIDA;
   opts.short ??= false;
+  opts.mock ??= false;
 
-  if (opts.transfer) {
-    const data = opts.short
-      ? ethers.utils.concat([
-          ethers.utils.formatBytes32String(ctx.constants.name),
-          ethers.utils.formatBytes32String(ctx.constants.symbol),
-          ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
-          ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
-          ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
-        ])
-      : ethers.utils.concat([
-          ethers.utils.formatBytes32String(ctx.constants.name),
-          ethers.utils.formatBytes32String(ctx.constants.symbol),
-          ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
-          ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
-          ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
-          ethers.utils.defaultAbiCoder.encode(['bytes32'], [opts.derrida]),
-        ]);
+  if (opts.mock) {
+    await mock.deploy.ERC721(ctx);
 
-    ctx.contracts.sERC721 = ctx.contracts.sERC721.connect(ctx.signers.owners[0]);
-    ctx.data.tx = await ctx.contracts.sERC721['safeTransferFrom(address,address,uint256,bytes)'](
-      ctx.signers.owners[0].address,
-      ctx.contracts.sERC1155.address,
-      ctx.data.tokenId,
-      data
-    );
-    ctx.data.receipt = await ctx.data.tx.wait();
-    ctx.data.id = (await ctx.contracts.sERC1155.queryFilter(ctx.contracts.sERC1155.filters.Spectralize())).filter(
-      (event) => event.event === 'Spectralize'
-    )[0].args.id;
-    ctx.contracts.sERC20 = new ethers.Contract(await ctx.contracts.sERC1155.sERC20Of(ctx.data.id), SERC20.abi, ctx.signers.root);
-  } else {
     ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(ctx.signers.root);
     ctx.data.tx = await ctx.contracts.sERC1155.spectralize(
-      ctx.contracts.sERC721.address,
-      ctx.data.tokenId,
+      ctx.contracts.ERC721Mock.address,
+      0,
       ctx.constants.name,
       ctx.constants.symbol,
       ctx.constants.cap,
@@ -218,6 +199,52 @@ const spectralize = async (ctx, opts = {}) => {
     ctx.data.receipt = await ctx.data.tx.wait();
     ctx.data.id = ctx.data.receipt.events.filter((event) => event.event === 'Spectralize')[0].args.id;
     ctx.contracts.sERC20 = new ethers.Contract(await ctx.contracts.sERC1155.sERC20Of(ctx.data.id), SERC20.abi, ctx.signers.root);
+  } else {
+    if (opts.transfer) {
+      const data = opts.short
+        ? ethers.utils.concat([
+            ethers.utils.formatBytes32String(ctx.constants.name),
+            ethers.utils.formatBytes32String(ctx.constants.symbol),
+            ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
+            ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
+            ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
+          ])
+        : ethers.utils.concat([
+            ethers.utils.formatBytes32String(ctx.constants.name),
+            ethers.utils.formatBytes32String(ctx.constants.symbol),
+            ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
+            ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
+            ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
+            ethers.utils.defaultAbiCoder.encode(['bytes32'], [opts.derrida]),
+          ]);
+
+      ctx.contracts.sERC721 = ctx.contracts.sERC721.connect(ctx.signers.owners[0]);
+      ctx.data.tx = await ctx.contracts.sERC721['safeTransferFrom(address,address,uint256,bytes)'](
+        ctx.signers.owners[0].address,
+        ctx.contracts.sERC1155.address,
+        ctx.data.tokenId,
+        data
+      );
+      ctx.data.receipt = await ctx.data.tx.wait();
+      ctx.data.id = (await ctx.contracts.sERC1155.queryFilter(ctx.contracts.sERC1155.filters.Spectralize())).filter(
+        (event) => event.event === 'Spectralize'
+      )[0].args.id;
+      ctx.contracts.sERC20 = new ethers.Contract(await ctx.contracts.sERC1155.sERC20Of(ctx.data.id), SERC20.abi, ctx.signers.root);
+    } else {
+      ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(ctx.signers.root);
+      ctx.data.tx = await ctx.contracts.sERC1155.spectralize(
+        ctx.contracts.sERC721.address,
+        ctx.data.tokenId,
+        ctx.constants.name,
+        ctx.constants.symbol,
+        ctx.constants.cap,
+        ctx.signers.admin.address,
+        ctx.signers.owners[1].address
+      );
+      ctx.data.receipt = await ctx.data.tx.wait();
+      ctx.data.id = ctx.data.receipt.events.filter((event) => event.event === 'Spectralize')[0].args.id;
+      ctx.contracts.sERC20 = new ethers.Contract(await ctx.contracts.sERC1155.sERC20Of(ctx.data.id), SERC20.abi, ctx.signers.root);
+    }
   }
   ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(ctx.signers.admin);
   await await ctx.contracts.sERC20.grantRole(await ctx.contracts.sERC20.MINTER_ROLE(), ctx.signers.admin.address);

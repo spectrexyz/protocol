@@ -21,7 +21,7 @@ describe.only('sERC1155', () => {
     await initialize(this);
   });
 
-  describe.skip('⇛ constructor', () => {
+  describe.only('⇛ constructor', () => {
     describe('» sERC20 base address is not the zero address', () => {
       before(async () => {
         await setup(this);
@@ -29,6 +29,7 @@ describe.only('sERC1155', () => {
 
       it('# it initializes sERC1155', async () => {
         expect(await this.contracts.sERC1155.sERC20Base()).to.equal(this.contracts.sERC20Base.address);
+        expect(await this.contracts.sERC1155.unavailableURI()).to.equal(this.constants.unavailableURI);
         expect(await this.contracts.sERC1155.unwrappedURI()).to.equal(this.constants.unwrappedURI);
       });
 
@@ -77,7 +78,7 @@ describe.only('sERC1155', () => {
     });
   });
 
-  describe.only('⇛ ERC1155', () => {
+  describe.skip('⇛ ERC1155', () => {
     describe('# balanceOf', () => {
       describe('» the queried address is not the zero address', () => {
         describe('» and the queried token type exists', () => {
@@ -370,7 +371,7 @@ describe.only('sERC1155', () => {
       });
     });
 
-    describe.only('# safeBatchTransferFrom', () => {
+    describe('# safeBatchTransferFrom', () => {
       describe('» input arrays match', () => {
         describe('» and recipient is not the zero address', () => {
           describe("» and no transferred amount is inferior to sender's balance", () => {
@@ -636,21 +637,52 @@ describe.only('sERC1155', () => {
         });
       });
 
-      describe.skip('» input arrays do not match', () => {});
+      describe('» input arrays do not match', () => {
+        before(async () => {
+          await setup(this);
+          await spectralize(this);
+          await mint.sERC20(this);
+          this.data.sERC201 = this.contracts.sERC20;
+          this.data.id1 = this.data.id;
+
+          await mint.sERC721(this);
+          await spectralize(this);
+          await mint.sERC20(this);
+          this.data.sERC202 = this.contracts.sERC20;
+          this.data.id2 = this.data.id;
+        });
+
+        it('it reverts', async () => {
+          await expect(safeBatchTransferFrom(this, { amounts: [this.constants.amount1] })).to.be.revertedWith('sERC1155: ids and amounts length mismatch');
+        });
+      });
     });
   });
 
-  describe('⇛ ERC1155MetadataURI', () => {
+  describe.only('⇛ ERC1155MetadataURI', () => {
     describe('# uri', () => {
       describe('» token type exists', () => {
         describe('» and its associated ERC721 is still locked', () => {
-          before(async () => {
-            await setup(this);
-            await spectralize(this);
+          describe('» and its associated ERC721 implements IERC721Metadata', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+            });
+
+            it('it returns its associated ERC721 URI', async () => {
+              expect(await this.contracts.sERC1155.uri(this.data.id)).to.equal(this.constants.tokenURI);
+            });
           });
 
-          it('it returns its associated ERC721 URI', async () => {
-            expect(await this.contracts.sERC1155.uri(this.data.id)).to.equal(this.constants.tokenURI);
+          describe('» but its associated ERC721 does not implement IERC721Metadata', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this, { mock: true });
+            });
+
+            it('it returns the default unavailable URI', async () => {
+              expect(await this.contracts.sERC1155.uri(this.data.id)).to.equal(this.constants.unavailableURI);
+            });
           });
         });
 
@@ -848,6 +880,7 @@ describe.only('sERC1155', () => {
     });
 
     describe('# onSERC20Transferred', () => {
+      // vérifier que c'est pas appelé quand l'origine du transfer c'est le sERC1155
       // vérifier qu'un event Transfersingle est émis en cas de mint / burn du ERC20 avec from / to qui vient de la zero address
       // vérifier qu'un event TransferSingle est émis en cas de transfert au niveau du ERC20
     });
