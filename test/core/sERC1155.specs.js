@@ -1,6 +1,6 @@
 const { expect } = require('chai');
-const { deployContract, createFixtureLoader } = require('ethereum-waffle');
 const { ethers } = require('ethers');
+const { deployContract } = require('ethereum-waffle');
 const {
   initialize,
   mint,
@@ -16,12 +16,12 @@ const {
   itSpectralizesLikeExpected,
 } = require('../helpers');
 
-describe('sERC1155', () => {
+describe.only('sERC1155', () => {
   before(async () => {
     await initialize(this);
   });
 
-  describe('⇛ constructor', () => {
+  describe.skip('⇛ constructor', () => {
     describe('» sERC20 base address is not the zero address', () => {
       before(async () => {
         await setup(this);
@@ -47,7 +47,7 @@ describe('sERC1155', () => {
     });
   });
 
-  describe('⇛ ERC165', () => {
+  describe.skip('⇛ ERC165', () => {
     before(async () => {
       await setup(this);
     });
@@ -77,21 +77,8 @@ describe('sERC1155', () => {
     });
   });
 
-  describe('⇛ ERC1155', () => {
+  describe.only('⇛ ERC1155', () => {
     describe('# balanceOf', () => {
-      describe('» the queried address is the zero address', () => {
-        before(async () => {
-          await setup(this);
-          await spectralize(this);
-        });
-
-        it('it reverts', async () => {
-          await expect(this.contracts.sERC1155.balanceOf(ethers.constants.AddressZero, this.data.id)).to.be.revertedWith(
-            'sERC1155: balance query for the zero address'
-          );
-        });
-      });
-
       describe('» the queried address is not the zero address', () => {
         describe('» and the queried token type exists', () => {
           before(async () => {
@@ -118,6 +105,19 @@ describe('sERC1155', () => {
           });
         });
       });
+
+      describe('» the queried address is the zero address', () => {
+        before(async () => {
+          await setup(this);
+          await spectralize(this);
+        });
+
+        it('it reverts', async () => {
+          await expect(this.contracts.sERC1155.balanceOf(ethers.constants.AddressZero, this.data.id)).to.be.revertedWith(
+            'sERC1155: balance query for the zero address'
+          );
+        });
+      });
     });
 
     describe('# balanceOfBatch', () => {
@@ -129,6 +129,7 @@ describe('sERC1155', () => {
             this.data.id1 = this.data.id;
             await mint.sERC20(this, { to: this.signers.holders[0], amount: '1000' });
             await mint.sERC20(this, { to: this.signers.holders[1], amount: '1500' });
+
             await mint.sERC721(this);
             await spectralize(this);
             this.data.id2 = this.data.id;
@@ -152,7 +153,6 @@ describe('sERC1155', () => {
           before(async () => {
             await setup(this);
             await spectralize(this);
-            await mint.sERC20(this);
           });
 
           it('it reverts', async () => {
@@ -167,7 +167,6 @@ describe('sERC1155', () => {
         before(async () => {
           await setup(this);
           await spectralize(this);
-          await mint.sERC20(this);
         });
 
         it('it reverts', async () => {
@@ -202,11 +201,10 @@ describe('sERC1155', () => {
       describe('» operator is setting approval status for self', () => {
         before(async () => {
           await setup(this);
-          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.owners[0]);
         });
 
         it('it reverts', async () => {
-          await expect(this.contracts.sERC1155.setApprovalForAll(this.signers.owners[0].address, true)).to.be.revertedWith(
+          await expect(setApprovalForAll(this, { from: this.signers.operator, operator: this.signers.operator })).to.be.revertedWith(
             'sERC1155: setting approval status for self'
           );
         });
@@ -214,103 +212,122 @@ describe('sERC1155', () => {
     });
 
     describe('# safeTransferFrom', () => {
-      describe('» transfer acceptance', () => {
-        describe('» the receiver implements onERC1155Received', () => {
-          describe('» and the receiver returns a valid value', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
-              await mint.sERC20(this);
-              await mock.deploy.ERC1155Receiver(this);
-              await setApprovalForAll(this);
-              await safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' });
-            });
-
-            it('it calls onERC1155Received', async () => {
-              await expect(this.data.tx)
-                .to.emit(this.contracts.ERC1155Receiver, 'Received')
-                .withArgs(this.signers.operator.address, this.signers.holders[0].address, this.data.id, this.constants.amount, '0x12345678');
-            });
-          });
-
-          describe('» but the receiver returns an invalid value', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
-              await mint.sERC20(this);
-              await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
-              await setApprovalForAll(this);
-            });
-
-            it('it reverts', async () => {
-              await expect(
-                safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' })
-              ).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
-            });
-          });
-
-          describe('» but the receiver reverts', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
-              await mint.sERC20(this);
-              await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
-              await setApprovalForAll(this);
-            });
-
-            it('it reverts', async () => {
-              await expect(
-                safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' })
-              ).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
-            });
-          });
-        });
-
-        describe('» the receiver does not implement onERC1155Received', () => {
-          // sERC1155: transfer to non ERC1155Receiver implementer
-        });
-      });
-
       describe('» recipient is not the zero address', () => {
         describe("» and transferred amount is inferior to sender's balance", () => {
           describe('» and transfer is triggered by sender', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
-              await mint.sERC20(this);
-              this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.holders[0]);
-              this.data.tx = await this.contracts.sERC1155.safeTransferFrom(
-                this.signers.holders[0].address,
-                this.signers.others[0].address,
-                this.data.id,
-                this.constants.amount,
-                ethers.constants.HashZero
-              );
-              this.data.receipt = await this.data.tx.wait();
+            describe('» and the receiver is on EOA', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+                await mint.sERC20(this);
+                await safeTransferFrom(this);
+              });
+
+              itSafeTransfersFromLikeExpected(this);
             });
 
-            itSafeTransfersFromLikeExpected(this);
+            describe('» and the receiver is a contract', () => {
+              describe('» and the receiver contract implements onERC1155Received', () => {
+                describe('» and the receiver contract returns a valid value', () => {
+                  before(async () => {
+                    await setup(this);
+                    await spectralize(this);
+                    await mint.sERC20(this);
+                    await mock.deploy.ERC1155Receiver(this);
+                    await safeTransferFrom(this, { to: this.contracts.ERC1155Receiver, data: '0x12345678' });
+                  });
+
+                  itSafeTransfersFromLikeExpected(this, { mock: true });
+
+                  it('it calls onERC1155Received', async () => {
+                    await expect(this.data.tx)
+                      .to.emit(this.contracts.ERC1155Receiver, 'Received')
+                      .withArgs(this.signers.holders[0].address, this.signers.holders[0].address, this.data.id, this.constants.amount, '0x12345678');
+                  });
+                });
+
+                describe('» but the receiver contract returns an invalid value', () => {
+                  before(async () => {
+                    await setup(this);
+                    await spectralize(this);
+                    await mint.sERC20(this);
+                    await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
+                  });
+
+                  it('it reverts', async () => {
+                    await expect(safeTransferFrom(this, { to: this.contracts.ERC1155Receiver, data: '0x12345678' })).to.be.revertedWith(
+                      'sERC1155: ERC1155Receiver rejected tokens'
+                    );
+                  });
+                });
+
+                describe('» but the receiver contract reverts', () => {
+                  before(async () => {
+                    await setup(this);
+                    await spectralize(this);
+                    await mint.sERC20(this);
+                    await mock.deploy.ERC1155Receiver(this, { singleReverts: true });
+                  });
+
+                  it('it reverts', async () => {
+                    await expect(safeTransferFrom(this, { to: this.contracts.ERC1155Receiver, data: '0x12345678' })).to.be.revertedWith(
+                      'ERC1155ReceiverMock: reverting on receive'
+                    );
+                  });
+                });
+              });
+
+              describe('» but the receiver contract does not implement onERC1155Received', () => {
+                before(async () => {
+                  await setup(this);
+                  await spectralize(this);
+                  await mint.sERC20(this);
+                });
+
+                it('it reverts', async () => {
+                  await expect(safeTransferFrom(this, { to: this.contracts.sERC20, data: '0x12345678' })).to.be.revertedWith(
+                    'sERC1155: transfer to non ERC1155Receiver implementer'
+                  );
+                });
+              });
+            });
           });
 
           describe('» and transfer is triggered by an approved operator', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
-              await mint.sERC20(this);
-              this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.holders[0]);
-              await setApprovalForAll(this);
-              this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.operator);
-              this.data.tx = await this.contracts.sERC1155.safeTransferFrom(
-                this.signers.holders[0].address,
-                this.signers.others[0].address,
-                this.data.id,
-                this.constants.amount,
-                ethers.constants.HashZero
-              );
-              this.data.receipt = await this.data.tx.wait();
+            describe('» and the receiver is on EOA', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+                await mint.sERC20(this);
+                await setApprovalForAll(this);
+                await safeTransferFrom(this, { operator: this.signers.operator });
+              });
+
+              itSafeTransfersFromLikeExpected(this, { operator: true });
             });
 
-            itSafeTransfersFromLikeExpected(this, { operator: true });
+            describe('» and the receiver is a contract', () => {
+              describe('» and the receiver contract implements onERC1155Received', () => {
+                describe('» and the receiver contract returns a valid value', () => {
+                  before(async () => {
+                    await setup(this);
+                    await spectralize(this);
+                    await mint.sERC20(this);
+                    await mock.deploy.ERC1155Receiver(this);
+                    await setApprovalForAll(this);
+                    await safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' });
+                  });
+
+                  itSafeTransfersFromLikeExpected(this, { mock: true, operator: true });
+
+                  it('it calls onERC1155Received', async () => {
+                    await expect(this.data.tx)
+                      .to.emit(this.contracts.ERC1155Receiver, 'Received')
+                      .withArgs(this.signers.operator.address, this.signers.holders[0].address, this.data.id, this.constants.amount, '0x12345678');
+                  });
+                });
+              });
+            });
           });
 
           describe('» but transfer is triggered by an unapproved operator', () => {
@@ -318,19 +335,10 @@ describe('sERC1155', () => {
               await setup(this);
               await spectralize(this);
               await mint.sERC20(this);
-              this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.operator);
             });
 
             it('it reverts', async () => {
-              await expect(
-                this.contracts.sERC1155.safeTransferFrom(
-                  this.signers.holders[0].address,
-                  this.signers.others[0].address,
-                  this.data.id,
-                  this.constants.amount,
-                  ethers.constants.HashZero
-                )
-              ).to.be.revertedWith('sERC1155: must be owner or approved to transfer');
+              await expect(safeTransferFrom(this, { operator: this.signers.operator })).to.be.revertedWith('sERC1155: must be owner or approved to transfer');
             });
           });
         });
@@ -340,19 +348,10 @@ describe('sERC1155', () => {
             await setup(this);
             await spectralize(this);
             await mint.sERC20(this);
-            this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.holders[0]);
           });
 
           it('it reverts', async () => {
-            await expect(
-              this.contracts.sERC1155.safeTransferFrom(
-                this.signers.holders[0].address,
-                this.signers.others[0].address,
-                this.data.id,
-                this.constants.balance.add(1),
-                ethers.constants.HashZero
-              )
-            ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+            await expect(safeTransferFrom(this, { amount: this.constants.balance.add(1) })).to.be.revertedWith('ERC20: transfer amount exceeds balance');
           });
         });
       });
@@ -366,118 +365,206 @@ describe('sERC1155', () => {
         });
 
         it('it reverts', async () => {
-          await expect(
-            this.contracts.sERC1155.safeTransferFrom(
-              this.signers.holders[0].address,
-              ethers.constants.AddressZero,
-              this.data.id,
-              '1000',
-              ethers.constants.HashZero
-            )
-          ).to.be.revertedWith('sERC1155: transfer to the zero address');
+          await expect(safeTransferFrom(this, { to: { address: ethers.constants.AddressZero } })).to.be.revertedWith('sERC1155: transfer to the zero address');
         });
       });
     });
 
-    describe('# safeBatchTransferFrom', () => {
-      describe.skip('» transfer acceptance', () => {
-        describe('» the receiver implements onERC1155Received', () => {
-          describe('» and the receiver returns a valid value', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
-              await mint.sERC20(this);
-              await mock.deploy.ERC1155Receiver(this);
-              await setApprovalForAll(this);
-              await safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' });
-            });
-
-            it('it calls onERC1155Received', async () => {
-              await expect(this.data.tx)
-                .to.emit(this.contracts.ERC1155Receiver, 'Received')
-                .withArgs(this.signers.operator.address, this.signers.holders[0].address, this.data.id, this.constants.amount, '0x12345678');
-            });
-          });
-
-          describe('» but the receiver returns an invalid value', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
-              await mint.sERC20(this);
-              await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
-              await setApprovalForAll(this);
-            });
-
-            it('it reverts', async () => {
-              await expect(
-                safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' })
-              ).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
-            });
-          });
-
-          describe('» but the receiver reverts', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
-              await mint.sERC20(this);
-              await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
-              await setApprovalForAll(this);
-            });
-
-            it('it reverts', async () => {
-              await expect(
-                safeTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' })
-              ).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
-            });
-          });
-        });
-
-        describe('» the receiver does not implement onERC1155Received', () => {});
-      });
-
+    describe.only('# safeBatchTransferFrom', () => {
       describe('» input arrays match', () => {
-        describe('» and no recipient is the zero address', () => {
+        describe('» and recipient is not the zero address', () => {
           describe("» and no transferred amount is inferior to sender's balance", () => {
             describe('» and transfer is triggered by sender', () => {
-              before(async () => {
-                await setup(this);
-                await spectralize(this);
-                await mint.sERC20(this);
-                this.data.sERC201 = this.contracts.sERC20;
-                this.data.id1 = this.data.id;
+              describe('» and the receiver is an EOA', () => {
+                before(async () => {
+                  await setup(this);
+                  await spectralize(this);
+                  await mint.sERC20(this);
+                  this.data.sERC201 = this.contracts.sERC20;
+                  this.data.id1 = this.data.id;
 
-                await mint.sERC721(this);
-                await spectralize(this);
-                await mint.sERC20(this);
-                this.data.sERC202 = this.contracts.sERC20;
-                this.data.id2 = this.data.id;
+                  await mint.sERC721(this);
+                  await spectralize(this);
+                  await mint.sERC20(this);
+                  this.data.sERC202 = this.contracts.sERC20;
+                  this.data.id2 = this.data.id;
 
-                await safeBatchTransferFrom(this);
+                  await safeBatchTransferFrom(this);
+                });
+
+                itSafeBatchTransfersFromLikeExpected(this);
               });
 
-              itSafeBatchTransfersFromLikeExpected(this);
+              describe('» and the receiver is a contract', () => {
+                describe('» and the receiver contract implements onERC1155Received', () => {
+                  describe('» and the receiver contract returns a valid value', () => {
+                    before(async () => {
+                      await setup(this);
+                      await spectralize(this);
+                      await mint.sERC20(this);
+                      this.data.sERC201 = this.contracts.sERC20;
+                      this.data.id1 = this.data.id;
+
+                      await mint.sERC721(this);
+                      await spectralize(this);
+                      await mint.sERC20(this);
+                      this.data.sERC202 = this.contracts.sERC20;
+                      this.data.id2 = this.data.id;
+
+                      await mock.deploy.ERC1155Receiver(this);
+
+                      await safeBatchTransferFrom(this, { to: this.contracts.ERC1155Receiver, data: '0x12345678' });
+                    });
+
+                    itSafeBatchTransfersFromLikeExpected(this, { mock: true });
+
+                    it('it calls onERC1155Received', async () => {
+                      await expect(this.data.tx)
+                        .to.emit(this.contracts.ERC1155Receiver, 'BatchReceived')
+                        .withArgs(
+                          this.signers.holders[0].address,
+                          this.signers.holders[0].address,
+                          [this.data.id1, this.data.id2],
+                          [this.constants.amount1, this.constants.amount2],
+                          '0x12345678'
+                        );
+                    });
+                  });
+
+                  describe('» but the receiver contract returns an invalid value', () => {
+                    before(async () => {
+                      await setup(this);
+                      await spectralize(this);
+                      await mint.sERC20(this);
+                      this.data.sERC201 = this.contracts.sERC20;
+                      this.data.id1 = this.data.id;
+
+                      await mint.sERC721(this);
+                      await spectralize(this);
+                      await mint.sERC20(this);
+                      this.data.sERC202 = this.contracts.sERC20;
+                      this.data.id2 = this.data.id;
+
+                      await mock.deploy.ERC1155Receiver(this, { batchValue: '0x12345678' });
+                    });
+
+                    it('it reverts', async () => {
+                      await expect(safeBatchTransferFrom(this, { to: this.contracts.ERC1155Receiver, data: '0x12345678' })).to.be.revertedWith(
+                        'sERC1155: ERC1155Receiver rejected tokens'
+                      );
+                    });
+                  });
+
+                  describe('» but the receiver contract reverts', () => {
+                    before(async () => {
+                      await setup(this);
+                      await spectralize(this);
+                      await mint.sERC20(this);
+                      this.data.sERC201 = this.contracts.sERC20;
+                      this.data.id1 = this.data.id;
+
+                      await mint.sERC721(this);
+                      await spectralize(this);
+                      await mint.sERC20(this);
+                      this.data.sERC202 = this.contracts.sERC20;
+                      this.data.id2 = this.data.id;
+
+                      await mock.deploy.ERC1155Receiver(this, { batchReverts: true });
+                    });
+
+                    it('it reverts', async () => {
+                      await expect(safeBatchTransferFrom(this, { to: this.contracts.ERC1155Receiver, data: '0x12345678' })).to.be.revertedWith(
+                        'ERC1155ReceiverMock: reverting on batch receive'
+                      );
+                    });
+                  });
+                });
+
+                describe('» but the receiver does not implement onERC1155Received', () => {
+                  before(async () => {
+                    await setup(this);
+                    await spectralize(this);
+                    await mint.sERC20(this);
+                    this.data.sERC201 = this.contracts.sERC20;
+                    this.data.id1 = this.data.id;
+
+                    await mint.sERC721(this);
+                    await spectralize(this);
+                    await mint.sERC20(this);
+                    this.data.sERC202 = this.contracts.sERC20;
+                    this.data.id2 = this.data.id;
+                  });
+
+                  it('it reverts', async () => {
+                    await expect(safeBatchTransferFrom(this, { to: this.contracts.sERC20, data: '0x12345678' })).to.be.revertedWith(
+                      'sERC1155: transfer to non ERC1155Receiver implementer'
+                    );
+                  });
+                });
+              });
             });
 
             describe('» and transfer is triggered by an approved operator', () => {
-              before(async () => {
-                await setup(this);
-                await spectralize(this);
-                await mint.sERC20(this);
-                this.data.sERC201 = this.contracts.sERC20;
-                this.data.id1 = this.data.id;
+              describe('» and the receiver is on EOA', () => {
+                before(async () => {
+                  await setup(this);
+                  await spectralize(this);
+                  await mint.sERC20(this);
+                  this.data.sERC201 = this.contracts.sERC20;
+                  this.data.id1 = this.data.id;
 
-                await mint.sERC721(this);
-                await spectralize(this);
-                await mint.sERC20(this);
-                this.data.sERC202 = this.contracts.sERC20;
-                this.data.id2 = this.data.id;
+                  await mint.sERC721(this);
+                  await spectralize(this);
+                  await mint.sERC20(this);
+                  this.data.sERC202 = this.contracts.sERC20;
+                  this.data.id2 = this.data.id;
 
-                await setApprovalForAll(this);
+                  await setApprovalForAll(this);
 
-                await safeBatchTransferFrom(this, { operator: this.signers.operator });
+                  await safeBatchTransferFrom(this, { operator: this.signers.operator });
+                });
+
+                itSafeBatchTransfersFromLikeExpected(this, { operator: true });
               });
 
-              itSafeBatchTransfersFromLikeExpected(this, { operator: true });
+              describe('» and the receiver is a contract', () => {
+                describe('» and the receiver contract implements onERC1155Received', () => {
+                  describe('» and the receiver contract returns a valid value', () => {
+                    before(async () => {
+                      await setup(this);
+                      await spectralize(this);
+                      await mint.sERC20(this);
+                      this.data.sERC201 = this.contracts.sERC20;
+                      this.data.id1 = this.data.id;
+
+                      await mint.sERC721(this);
+                      await spectralize(this);
+                      await mint.sERC20(this);
+                      this.data.sERC202 = this.contracts.sERC20;
+                      this.data.id2 = this.data.id;
+
+                      await mock.deploy.ERC1155Receiver(this);
+
+                      await setApprovalForAll(this);
+                      await safeBatchTransferFrom(this, { operator: this.signers.operator, to: this.contracts.ERC1155Receiver, data: '0x12345678' });
+                    });
+
+                    itSafeBatchTransfersFromLikeExpected(this, { mock: true, operator: true });
+
+                    it('it calls onERC1155Received', async () => {
+                      await expect(this.data.tx)
+                        .to.emit(this.contracts.ERC1155Receiver, 'BatchReceived')
+                        .withArgs(
+                          this.signers.operator.address,
+                          this.signers.holders[0].address,
+                          [this.data.id1, this.data.id2],
+                          [this.constants.amount1, this.constants.amount2],
+                          '0x12345678'
+                        );
+                    });
+                  });
+                });
+              });
             });
 
             describe('» but transfer is triggered by an unapproved operator', () => {
@@ -526,7 +613,7 @@ describe('sERC1155', () => {
           });
         });
 
-        describe.skip('» but one recipient is the zero address', () => {
+        describe('» but recipient is the zero address', () => {
           before(async () => {
             await setup(this);
             await spectralize(this);
@@ -542,7 +629,9 @@ describe('sERC1155', () => {
           });
 
           it('it reverts', async () => {
-            await expect(safeBatchTransferFrom(this, { to: ethers.constants.AddressZero })).to.be.revertedWith('sERC1155: transfer to the zero address');
+            await expect(safeBatchTransferFrom(this, { to: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
+              'sERC1155: transfer to the zero address'
+            );
           });
         });
       });
@@ -642,7 +731,7 @@ describe('sERC1155', () => {
   });
 
   describe('⇛ sERC1155', () => {
-    describe('# wrap', () => {
+    describe('# spectralize', () => {
       describe('» ERC721 has never been spectralized', () => {
         describe('» and ERC721 is standard-compliant', () => {
           describe('» and sERC1155 has been approved to transfer NFT', () => {
@@ -756,6 +845,11 @@ describe('sERC1155', () => {
           });
         });
       });
+    });
+
+    describe('# onSERC20Transferred', () => {
+      // vérifier qu'un event Transfersingle est émis en cas de mint / burn du ERC20 avec from / to qui vient de la zero address
+      // vérifier qu'un event TransferSingle est émis en cas de transfert au niveau du ERC20
     });
   });
 });

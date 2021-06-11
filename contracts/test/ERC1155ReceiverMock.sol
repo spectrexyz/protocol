@@ -64,7 +64,7 @@ contract ERC1155ReceiverMock is IERC1155Receiver {
     override
     returns(bytes4)
     {
-        require(_batchReceiveReverts, "ERC1155ReceiverMock: reverting on batch receive");
+        require(!_batchReceiveReverts, "ERC1155ReceiverMock: reverting on batch receive");
         emit BatchReceived(operator, from, ids, values, data);
         return _batchReceiveValue;
     }

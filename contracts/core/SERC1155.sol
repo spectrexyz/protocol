@@ -13,21 +13,19 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
-import "hardhat/console.sol";
 
 /**
  * @title sERC1155
  * @notice sERC1155 token wrapping ERC721s into sERC20s.
- * @dev Remarks:
- *        - sERC1155 does not implement mint nor burn in an effort to maintain some separation of concerns between
- * financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
- * sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
+ * @dev sERC1155 does not implement mint nor burn in an effort to maintain some separation of concerns between
+ *      financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
+ *      sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
  */
 contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155MetadataURI, IERC721Receiver {
     using Address for address;
     using Cast for address;
-    using Cast for uint256;
     using Cast for bytes32;
+    using Cast for uint256;
     using Clones for address;
     using ERC165Checker for address;
 
@@ -95,57 +93,88 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
 
   /* #region ERC1155 */
     /**
-     * @notice Returns the amount of tokens of token type `id` owned by `account`.
+     * @notice Returns the amount of tokens of type `id` owned by `account`.
      * @dev `account` cannot be the zero address.
      * @param account The account whose balance is queried.
      * @param id The token type whose balance is queried.
-     * @return The amount of tokens of token type `id` owned by `account`.
+     * @return The amount of tokens of type `id` owned by `account`.
      */
-    function balanceOf(address account, uint256 id) public view override returns (uint256) {
+    function balanceOf(address account, uint256 id) external view override returns (uint256) {
         require(account != address(0), "sERC1155: balance query for the zero address");
 
         return _spectres[id].state != SpectreState.Null ? id.toSERC20().balanceOf(account) : 0;
     }
 
     /**
-     * @notice Batched version of `balanceOf`
-     * @dev `accounts` and `ids` must have the same length.
+     * @notice Batched version of `balanceOf`.
+     * @dev - `accounts` and `ids` must have the same length.
+     *      - `accounts` entries cannot be the zero address.
+     * @param accounts The accounts whose balance are queried.
+     * @param ids The token types whose balance are queried.
+     * @return The amount of tokens of types `ids` owned by `accounts`.
      */
     function balanceOfBatch(
         address[] memory accounts,
         uint256[] memory ids
     )
-        public
+        external
         view
         override
         returns (uint256[] memory)
     {
         require(accounts.length == ids.length, "sERC1155: accounts and ids length mismatch");
 
+        address account;
+        uint256 id;
         uint256[] memory batchBalances = new uint256[](accounts.length);
 
         for (uint256 i = 0; i < accounts.length; ++i) {
-            batchBalances[i] = balanceOf(accounts[i], ids[i]);
+            account = accounts[i];
+            id = ids[i];
+
+            require(account != address(0), "sERC1155: balance query for the zero address");
+            batchBalances[i] = _spectres[id].state != SpectreState.Null ? id.toSERC20().balanceOf(account) : 0;
         }
 
         return batchBalances;
     }
+    
+    /**
+     * @notice Check whether `operator` is approved to transfer `account`'s tokens.
+     * @param account The account whose approval of `operator` is being queried.
+     * @param operator The operator whose approval from `account` is being quieried.
+     * @return True if `operator` is approved to transfer `account`'s tokens, false otherwise.
+     */
+    function isApprovedForAll(address account, address operator) external view override returns (bool) {
+        return _operatorApprovals[account][operator];
+    }
 
     /**
-     * @notice Grants or revokes permission to `operator` to transfer the caller's tokens, according to `approved`
-     * @dev Emits an `ApprovalForAll` event.
+     * @notice Grants or revokes permission to `operator` to transfer the caller's tokens, according to `approved`.
+     * @dev Caller cannot set approval for self.
+     * @param operator The operator being approved.
+     * @param approved The approval status: true if the operator is approved, false to revoke its approval.
      */
-    function setApprovalForAll(address operator, bool approved) public override {
+    function setApprovalForAll(address operator, bool approved) external override {
         require(_msgSender() != operator, "sERC1155: setting approval status for self");
 
         _operatorApprovals[_msgSender()][operator] = approved;
         emit ApprovalForAll(_msgSender(), operator, approved);
     }
 
-    function isApprovedForAll(address account, address operator) public view override returns (bool) {
-        return _operatorApprovals[account][operator];
-    }
-
+    /**
+     * @notice Transfers `amount` tokens of type `id` from `from` to `to`.
+     * @dev - `to` cannot be the zero address.
+     *      - If the caller is not `from`, it must be an approved operator of `from`.
+     *      - `from` must have a balance of tokens of type `id` of at least `amount`.
+     *      - If `to` refers to a smart contract, it must implement onERC1155Received and return the acceptance magic
+     *      value.
+     * @param from   The address to transfer the tokens from.
+     * @param to     The address to transfer the tokens to.
+     * @param id     The id of the token type to transfer.
+     * @param amount The amount of tokens to transfer.
+     * @param data   The data to be passed to `onERC1155Received` on `_to` if it is a contract.
+     */
     function safeTransferFrom(
         address from,
         address to,
@@ -153,7 +182,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         uint256 amount,
         bytes memory data
     )
-        public
+        external
         override
     {
         require(to != address(0), "sERC1155: transfer to the zero address");
@@ -162,7 +191,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         address operator = _msgSender();
         id.toSERC20().onSERC1155Transferred(from, to, amount);
 
-        emit TransferSingle(operator, from, to, id, amount);  // déjà emis dans le hook on SERC20 transferred ?
+        emit TransferSingle(operator, from, to, id, amount);
 
         _doSafeTransferAcceptanceCheck(operator, from, to, id, amount, data);
     }
@@ -174,7 +203,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         uint256[] memory amounts,
         bytes memory data
     )
-        public
+        external
         override
     {
         require(ids.length == amounts.length, "sERC1155: ids and amounts length mismatch");
@@ -196,13 +225,13 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     /**
      * @notice Returns the URI for token type `id`.
      * @dev The ERC1155 standard requires this function to return the same value as the latest `URI` event for an `_id`
-     * if such events are emitted. Because we cannot control the original NFT's uri updates, we do NOT emit such `URI`
-     * event at token type creation. See https://eips.ethereum.org/EIPS/eip-1155#metadata.
+     *      if such events are emitted. Because we cannot control the original NFT's uri updates, we do NOT emit such `URI`
+     *      event at token type creation. See https://eips.ethereum.org/EIPS/eip-1155#metadata.
      * @param id The ERC1155 id of the token type.
      * @return "" if the token type does not exist, `_unwrappedURI` if the token type exists but its underlying ERC721 has
      * been unwrapped, the original ERC721's URI otherwise.
      */
-    function uri(uint256 id) public view override returns (string memory) {
+    function uri(uint256 id) external view override returns (string memory) {
         Spectre storage spectre = _spectres[id];
 
         if (spectre.state == SpectreState.Locked)
@@ -410,7 +439,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
 
   /* #region private */
     function _canTransfer(address from) private view returns (bool) {
-        return from == _msgSender() || isApprovedForAll(from, _msgSender());
+        return from == _msgSender() || _operatorApprovals[from][_msgSender()];
     }
 
     function _spectralize(
@@ -432,6 +461,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         _spectres[id] = Spectre({ state: SpectreState.Locked, collection: collection, tokenId: tokenId, guardian: guardian });
         SERC20(sERC20).initialize(name, symbol, cap, admin);
 
+        emit TransferSingle(_msgSender(), address(0), address(0), id, uint256(0));
         emit Spectralize(collection, tokenId, id, sERC20, guardian);
 
         return id;

@@ -205,6 +205,7 @@ const spectralize = async (ctx, opts = {}) => {
     )[0].args.id;
     ctx.contracts.sERC20 = new ethers.Contract(await ctx.contracts.sERC1155.sERC20Of(ctx.data.id), SERC20.abi, ctx.signers.root);
   } else {
+    ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(ctx.signers.root);
     ctx.data.tx = await ctx.contracts.sERC1155.spectralize(
       ctx.contracts.sERC721.address,
       ctx.data.tokenId,
@@ -254,24 +255,27 @@ const withdrawBatch = async (ctx, opts = {}) => {
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
-const itSafeTransfersFromLikeExpected = (ctx, opts = { operator: undefined }) => {
+const itSafeTransfersFromLikeExpected = (ctx, opts = {}) => {
   it("it debits sender's balance", async () => {
     expect(await ctx.contracts.sERC20.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount));
     expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.holders[0].address, ctx.data.id)).to.equal(ctx.constants.balance.sub(ctx.constants.amount));
   });
 
   it("it credits receiver's balance", async () => {
-    expect(await ctx.contracts.sERC20.balanceOf(ctx.signers.others[0].address)).to.equal(ctx.constants.amount);
-    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.others[0].address, ctx.data.id)).to.equal(ctx.constants.amount);
+    opts.to = opts.mock ? ctx.contracts.ERC1155Receiver : ctx.signers.others[0];
+
+    expect(await ctx.contracts.sERC20.balanceOf(opts.to.address)).to.equal(ctx.constants.amount);
+    expect(await ctx.contracts.sERC1155.balanceOf(opts.to.address, ctx.data.id)).to.equal(ctx.constants.amount);
   });
 
   it('it emits one TransferSingle event', async () => {
-    opts.operator = opts.operator ? ctx.signers.operator.address : ctx.signers.holders[0].address;
+    opts.operator = opts.operator ? ctx.signers.operator : ctx.signers.holders[0];
+    opts.to = opts.mock ? ctx.contracts.ERC1155Receiver : ctx.signers.others[0];
 
     expect(ctx.data.receipt.events.filter((event) => event.event === 'TransferSingle').length).to.equal(1);
     await expect(ctx.data.tx)
       .to.emit(ctx.contracts.sERC1155, 'TransferSingle')
-      .withArgs(opts.operator, ctx.signers.holders[0].address, ctx.signers.others[0].address, ctx.data.id, ctx.constants.amount);
+      .withArgs(opts.operator.address, ctx.signers.holders[0].address, opts.to.address, ctx.data.id, ctx.constants.amount);
   });
 };
 
@@ -284,22 +288,25 @@ const itSafeBatchTransfersFromLikeExpected = (ctx, opts = { operator: undefined 
   });
 
   it("it credits receiver's balance", async () => {
-    expect(await ctx.data.sERC201.balanceOf(ctx.signers.others[0].address)).to.equal(ctx.constants.amount1);
-    expect(await ctx.data.sERC202.balanceOf(ctx.signers.others[0].address)).to.equal(ctx.constants.amount2);
-    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.others[0].address, ctx.data.id1)).to.equal(ctx.constants.amount1);
-    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.others[0].address, ctx.data.id2)).to.equal(ctx.constants.amount2);
+    opts.to = opts.mock ? ctx.contracts.ERC1155Receiver : ctx.signers.others[0];
+
+    expect(await ctx.data.sERC201.balanceOf(opts.to.address)).to.equal(ctx.constants.amount1);
+    expect(await ctx.data.sERC202.balanceOf(opts.to.address)).to.equal(ctx.constants.amount2);
+    expect(await ctx.contracts.sERC1155.balanceOf(opts.to.address, ctx.data.id1)).to.equal(ctx.constants.amount1);
+    expect(await ctx.contracts.sERC1155.balanceOf(opts.to.address, ctx.data.id2)).to.equal(ctx.constants.amount2);
   });
 
-  it('it emits one TransferSBatch event', async () => {
-    opts.operator = opts.operator ? ctx.signers.operator.address : ctx.signers.holders[0].address;
+  it('it emits one TransferBatch event', async () => {
+    opts.operator = opts.operator ? ctx.signers.operator : ctx.signers.holders[0];
+    opts.to = opts.mock ? ctx.contracts.ERC1155Receiver : ctx.signers.others[0];
 
     expect(ctx.data.receipt.events.filter((event) => event.event === 'TransferBatch').length).to.equal(1);
     await expect(ctx.data.tx)
       .to.emit(ctx.contracts.sERC1155, 'TransferBatch')
       .withArgs(
-        opts.operator,
+        opts.operator.address,
         ctx.signers.holders[0].address,
-        ctx.signers.others[0].address,
+        opts.to.address,
         [ctx.data.id1, ctx.data.id2],
         [ctx.constants.amount1, ctx.constants.amount2]
       );
@@ -324,6 +331,12 @@ const itSpectralizesLikeExpected = (ctx) => {
     expect(await ctx.contracts.sERC20.symbol()).to.equal(ctx.constants.symbol);
     expect(await ctx.contracts.sERC20.cap()).to.equal(ctx.constants.cap);
     expect(await ctx.contracts.sERC20.hasRole(await ctx.contracts.sERC20.DEFAULT_ADMIN_ROLE(), ctx.signers.admin.address)).to.equal(true);
+  });
+
+  it('it emits a TransferSingle event as per the ERC1155 standard', async () => {
+    await expect(ctx.data.tx)
+      .to.emit(ctx.contracts.sERC1155, 'TransferSingle')
+      .withArgs(ctx.signers.root.address, ethers.constants.AddressZero, ethers.constants.AddressZero, ctx.data.id, 0);
   });
 
   it('it registers spectre', async () => {

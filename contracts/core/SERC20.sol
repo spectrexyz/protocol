@@ -171,4 +171,7 @@ contract SERC20 is
         if(!_hook)
             SERC1155(_sERC1155).onSERC20Transferred(from, to, amount);
     }
+
+    // vérifier que ça se comporte correctement quand on transfere à l'addresse zero sans minter ou burner.
+    //// IL FAUT IMPLEMENTER UNE FONCTION DE BURNING PARCE QUE SI ON TRANSFER A 0 CA VA MERDER DANS ERC155 ???
 }
