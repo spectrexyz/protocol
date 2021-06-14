@@ -49,7 +49,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     
     address private _sERC20Base;
     string private _unavailableURI;
-    string private _unwrappedURI;
+    string private _unlockedURI;
 
     mapping (address => mapping(address => bool)) private _operatorApprovals;
     mapping (uint256 => Spectre) private _spectres; // token type => Spectre [immutable]
@@ -63,12 +63,12 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @notice sERC1155 constructor.
      * @dev Context, ERC165 and AccessControlEnumerable have no constructor.
      */
-    constructor(address sERC20Base_, string memory unavailableURI_, string memory unwrappedURI_) {
+    constructor(address sERC20Base_, string memory unavailableURI_, string memory unlockedURI_) {
         require(sERC20Base_ != address(0), "sERC1155: sERC20 base cannot be the zero address");
 
         _sERC20Base = sERC20Base_;
         _unavailableURI = unavailableURI_;
-        _unwrappedURI = unwrappedURI_;
+        _unlockedURI = unlockedURI_;
 
         _setupRole(ADMIN_ROLE, _msgSender());
         _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
@@ -226,7 +226,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      *      if such events are emitted. Because we cannot control the original NFT's uri updates, we do NOT emit such `URI`
      *      event at token type creation. See https://eips.ethereum.org/EIPS/eip-1155#metadata.
      * @param id The ERC1155 id of the token type.
-     * @return "" if the token type does not exist, `_unwrappedURI` if the token type exists but its underlying ERC721 has
+     * @return "" if the token type does not exist, `_unlockedURI` if the token type exists but its underlying ERC721 has
      * been unwrapped, the original ERC721's URI otherwise.
      */
     function uri(uint256 id) external view override returns (string memory) {
@@ -241,7 +241,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         }
 
         if (spectre.state == SpectreState.Unlocked)
-            return _unwrappedURI;
+            return _unlockedURI;
 
         return "";
     }
@@ -364,10 +364,16 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
 
-    function updateUnwrappedURI(string memory unwrappedURI_) external {
-        require(hasRole(ADMIN_ROLE, _msgSender()), "sERC1155: must have admin role to update unwrappedURI");
+    function updateUnavailableURI(string memory unavailableURI_) external {
+        require(hasRole(ADMIN_ROLE, _msgSender()), "sERC1155: must have admin role to update unavailableURI");
 
-        _unwrappedURI = unwrappedURI_;
+        _unavailableURI = unavailableURI_;
+    }
+
+    function updateUnlockedURI(string memory unlockedURI_) external {
+        require(hasRole(ADMIN_ROLE, _msgSender()), "sERC1155: must have admin role to update unlockedURI");
+
+        _unlockedURI = unlockedURI_;
     }
 
     /**
@@ -391,6 +397,8 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
 
         require(_spectres[id].state != SpectreState.Null, "sERC1155: must be sERC20 to use transfer hook");
 
+        // si le contrat implémente le callback ERC1155 il faut faire l'appeler !!
+
         emit TransferSingle(operator, from, to, id, amount);
     }
 
@@ -402,8 +410,8 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         return _unavailableURI;
     }
 
-    function unwrappedURI() external view returns (string memory) {
-        return _unwrappedURI;
+    function unlockedURI() external view returns (string memory) {
+        return _unlockedURI;
     }
 
     function isLocked(address collection, uint256 tokenId) external view returns (bool) {

@@ -18,7 +18,7 @@ const {
   transfer,
 } = require('../helpers');
 
-describe.only('sERC1155', () => {
+describe('sERC1155', () => {
   before(async () => {
     await initialize(this);
   });
@@ -32,7 +32,7 @@ describe.only('sERC1155', () => {
       it('# it initializes sERC1155', async () => {
         expect(await this.contracts.sERC1155.sERC20Base()).to.equal(this.contracts.sERC20Base.address);
         expect(await this.contracts.sERC1155.unavailableURI()).to.equal(this.constants.unavailableURI);
-        expect(await this.contracts.sERC1155.unwrappedURI()).to.equal(this.constants.unwrappedURI);
+        expect(await this.contracts.sERC1155.unlockedURI()).to.equal(this.constants.unlockedURI);
       });
 
       it('# it sets up admin permissions', async () => {
@@ -43,9 +43,9 @@ describe.only('sERC1155', () => {
 
     describe('» sERC20 base address is the zero address', () => {
       it('it reverts', async () => {
-        await expect(
-          deployContract(this.signers.root, this.artifacts.SERC1155, [ethers.constants.AddressZero, this.constants.unwrappedURI])
-        ).to.be.revertedWith('sERC1155: sERC20 base cannot be the zero address');
+        await expect(deployContract(this.signers.root, this.artifacts.SERC1155, [ethers.constants.AddressZero, this.constants.unlockedURI])).to.be.revertedWith(
+          'sERC1155: sERC20 base cannot be the zero address'
+        );
       });
     });
   });
@@ -218,7 +218,7 @@ describe.only('sERC1155', () => {
       describe('» recipient is not the zero address', () => {
         describe("» and transferred amount is inferior to sender's balance", () => {
           describe('» and transfer is triggered by sender', () => {
-            describe('» and the receiver is on EOA', () => {
+            describe('» and the receiver is an EOA', () => {
               before(async () => {
                 await setup(this);
                 await spectralize(this);
@@ -297,7 +297,7 @@ describe.only('sERC1155', () => {
           });
 
           describe('» and transfer is triggered by an approved operator', () => {
-            describe('» and the receiver is on EOA', () => {
+            describe('» and the receiver is an EOA', () => {
               before(async () => {
                 await setup(this);
                 await spectralize(this);
@@ -508,7 +508,7 @@ describe.only('sERC1155', () => {
             });
 
             describe('» and transfer is triggered by an approved operator', () => {
-              describe('» and the receiver is on EOA', () => {
+              describe('» and the receiver is an EOA', () => {
                 before(async () => {
                   await setup(this);
                   await spectralize(this);
@@ -696,7 +696,7 @@ describe.only('sERC1155', () => {
           });
 
           it('it returns the default unwrapped URI', async () => {
-            expect(await this.contracts.sERC1155.uri(this.data.id)).to.equal(this.constants.unwrappedURI);
+            expect(await this.contracts.sERC1155.uri(this.data.id)).to.equal(this.constants.unlockedURI);
           });
         });
       });
@@ -934,6 +934,60 @@ describe.only('sERC1155', () => {
 
         it('it reverts', async () => {
           await expect(unlock(this, { byAddress: true })).to.be.revertedWith('sERC1155: spectre is not locked');
+        });
+      });
+    });
+
+    describe('# updateUnavailableURI', () => {
+      describe('# caller has ADMIN_ROLE', () => {
+        before(async () => {
+          await setup(this);
+          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.root);
+          await (await this.contracts.sERC1155.updateUnavailableURI('ipfs://testunavailableURI')).wait();
+        });
+
+        it('it updates unavailableURI', async () => {
+          expect(await this.contracts.sERC1155.unavailableURI()).to.equal('ipfs://testunavailableURI');
+        });
+      });
+
+      describe('# caller does not have ADMIN_ROLE', () => {
+        before(async () => {
+          await setup(this);
+          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.others[0]);
+        });
+
+        it('it reverts', async () => {
+          await expect(this.contracts.sERC1155.updateUnavailableURI('ipfs://testunavailableURI')).to.be.revertedWith(
+            'sERC1155: must have admin role to update unavailableURI'
+          );
+        });
+      });
+    });
+
+    describe('# updateUnlockedURI', () => {
+      describe('# caller has ADMIN_ROLE', () => {
+        before(async () => {
+          await setup(this);
+          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.root);
+          await (await this.contracts.sERC1155.updateUnlockedURI('ipfs://testunlockedURI')).wait();
+        });
+
+        it('it updates unlockedURI', async () => {
+          expect(await this.contracts.sERC1155.unlockedURI()).to.equal('ipfs://testunlockedURI');
+        });
+      });
+
+      describe('# caller does not have ADMIN_ROLE', () => {
+        before(async () => {
+          await setup(this);
+          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.others[0]);
+        });
+
+        it('it reverts', async () => {
+          await expect(this.contracts.sERC1155.updateUnlockedURI('ipfs://testunlockedURI')).to.be.revertedWith(
+            'sERC1155: must have admin role to update unlockedURI'
+          );
         });
       });
     });

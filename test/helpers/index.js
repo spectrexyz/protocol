@@ -26,7 +26,7 @@ const initialize = async (ctx) => {
       Locked: 1,
       Unlocked: 2,
     },
-    unwrappedURI: 'ipfs://Qm.../unwrapped',
+    unlockedURI: 'ipfs://Qm.../unwrapped',
     unavailableURI: 'ipfs://Qm.../unavailable',
     tokenURI: 'ipfs://Qm.../',
     name: 'My Awesome sERC20',
@@ -164,7 +164,7 @@ const setup = async (ctx, opts = { approve: true }) => {
   ctx.contracts.sERC1155 = await deployContract(ctx.signers.root, SERC1155, [
     ctx.contracts.sERC20Base.address,
     ctx.constants.unavailableURI,
-    ctx.constants.unwrappedURI,
+    ctx.constants.unlockedURI,
   ]);
   ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
 
