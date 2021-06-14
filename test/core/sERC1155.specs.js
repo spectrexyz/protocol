@@ -14,6 +14,8 @@ const {
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
   itSpectralizesLikeExpected,
+  itUnlocksLikeExpected,
+  transfer,
 } = require('../helpers');
 
 describe.only('sERC1155', () => {
@@ -21,7 +23,7 @@ describe.only('sERC1155', () => {
     await initialize(this);
   });
 
-  describe.only('⇛ constructor', () => {
+  describe('⇛ constructor', () => {
     describe('» sERC20 base address is not the zero address', () => {
       before(async () => {
         await setup(this);
@@ -48,7 +50,7 @@ describe.only('sERC1155', () => {
     });
   });
 
-  describe.skip('⇛ ERC165', () => {
+  describe('⇛ ERC165', () => {
     before(async () => {
       await setup(this);
     });
@@ -78,7 +80,7 @@ describe.only('sERC1155', () => {
     });
   });
 
-  describe.skip('⇛ ERC1155', () => {
+  describe('⇛ ERC1155', () => {
     describe('# balanceOf', () => {
       describe('» the queried address is not the zero address', () => {
         describe('» and the queried token type exists', () => {
@@ -659,7 +661,7 @@ describe.only('sERC1155', () => {
     });
   });
 
-  describe.only('⇛ ERC1155MetadataURI', () => {
+  describe('⇛ ERC1155MetadataURI', () => {
     describe('# uri', () => {
       describe('» token type exists', () => {
         describe('» and its associated ERC721 is still locked', () => {
@@ -721,7 +723,7 @@ describe.only('sERC1155', () => {
               await spectralize(this, { transfer: true });
             });
 
-            itSpectralizesLikeExpected(this);
+            itSpectralizesLikeExpected(this, { transfer: true });
           });
 
           describe('» but spectralization data does not end up with Derrida magic value', () => {
@@ -755,7 +757,7 @@ describe.only('sERC1155', () => {
 
         it('it reverts', async () => {
           await expect(
-            this.contracts.sERC1155.onERC721Received(ethers.constants.AddressZero, ethers.constants.AddressZero, 0, ethers.constants.HashZero)
+            this.contracts.sERC1155.onERC721Received(this.signers.others[0].address, ethers.constants.AddressZero, 0, ethers.constants.HashZero)
           ).to.be.revertedWith('sERC1155: NFT is not ERC721-compliant');
         });
       });
@@ -764,32 +766,37 @@ describe.only('sERC1155', () => {
 
   describe('⇛ sERC1155', () => {
     describe('# spectralize', () => {
-      describe('» ERC721 has never been spectralized', () => {
-        describe('» and ERC721 is standard-compliant', () => {
+      describe('» NFT has never been spectralized', () => {
+        describe('» and NFT is ERC721-compliant', () => {
           describe('» and sERC1155 has been approved to transfer NFT', () => {
-            before(async () => {
-              await setup(this);
-              await spectralize(this);
+            describe('» and NFT is not owned by sERC1155', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+              });
+
+              itSpectralizesLikeExpected(this);
             });
 
-            itSpectralizesLikeExpected(this);
+            describe('» but NFT is owned by sERC1155', () => {
+              before(async () => {
+                await setup(this);
+                await transfer.sERC721(this);
+              });
+
+              it('it reverts', async () => {
+                await expect(spectralize(this)).to.be.revertedWith('sERC1155: NFT is already owned by sERC1155');
+              });
+            });
           });
+
           describe('» but sERC1155 has not been approved to transfer NFT', () => {
             before(async () => {
               await setup(this, { approve: false });
             });
+
             it('it reverts', async () => {
-              await expect(
-                this.contracts.sERC1155.spectralize(
-                  this.contracts.sERC721.address,
-                  this.data.tokenId,
-                  this.constants.name,
-                  this.constants.symbol,
-                  this.constants.cap,
-                  this.signers.admin.address,
-                  this.signers.owners[1].address
-                )
-              ).to.be.revertedWith('ERC721: transfer caller is not owner nor approved');
+              await expect(spectralize(this)).to.be.revertedWith('ERC721: transfer caller is not owner nor approved');
             });
           });
         });
@@ -800,23 +807,13 @@ describe.only('sERC1155', () => {
           });
 
           it('it reverts', async () => {
-            await expect(
-              this.contracts.sERC1155.spectralize(
-                this.signers.others[0].address,
-                this.data.tokenId,
-                this.constants.name,
-                this.constants.symbol,
-                this.constants.cap,
-                this.signers.admin.address,
-                this.signers.owners[1].address
-              )
-            ).to.be.revertedWith('sERC1155: ERC721 is not standard');
+            await expect(spectralize(this, { collection: this.signers.others[0] })).to.be.revertedWith('sERC1155: NFT is not ERC721-compliant');
           });
         });
       });
 
-      describe('» NFT has already been wrapped', () => {
-        describe('» and NFT has been unwrapped since', () => {
+      describe('» NFT has already been spectralized', () => {
+        describe('» and NFT has been unlocked since', () => {
           before(async () => {
             await setup(this);
             await spectralize(this);
@@ -824,57 +821,119 @@ describe.only('sERC1155', () => {
             this.contracts.sERC721 = this.contracts.sERC721.connect(this.signers.owners[2]);
             await (await this.contracts.sERC721.approve(this.contracts.sERC1155.address, this.data.tokenId)).wait();
             await spectralize(this);
-
-            // tx = await sERC1155.spectralize(
-            //   sERC721.address,
-            //   tokenId,
-            //   name,
-            //   symbol,
-            //   cap,
-            //   roles.map((role) => role.address),
-            //   owners[1].address
-            // );
-            // receipt = await tx.wait();
-            // id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
-            // sERC1155 = sERC1155.connect(owners[1]);
-            // tx = await sERC1155['unwrap(uint256,address,bytes)'](id, owners[0].address, ethers.constants.HashZero);
-            // receipt = await tx.wait();
-            // sERC721 = sERC721.connect(owners[0]);
-            //
-            // tx = await sERC1155.spectralize(
-            //   sERC721.address,
-            //   tokenId,
-            //   name,
-            //   symbol,
-            //   cap,
-            //   roles.map((role) => role.address),
-            //   owners[1].address
-            // );
-            // receipt = await tx.wait();
-            // id = receipt.events.filter((event) => event.event === 'Wrap')[0].args.id;
           });
+
           itSpectralizesLikeExpected(this);
         });
 
-        describe('» but NFT still is wrapped', () => {
+        describe('» but NFT still is locked', () => {
           before(async () => {
             await setup(this);
             await spectralize(this);
             this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.owners[1]);
           });
+
           it('it reverts', async () => {
-            await expect(
-              this.contracts.sERC1155.spectralize(
-                this.contracts.sERC721.address,
-                this.data.tokenId,
-                this.constants.name,
-                this.constants.symbol,
-                this.constants.cap,
-                this.signers.admin.address,
-                this.signers.owners[1].address
-              )
-            ).to.be.revertedWith('sERC1155: ERC721 is already locked');
+            await expect(spectralize(this)).to.be.revertedWith('sERC1155: NFT is already locked');
           });
+        });
+      });
+    });
+
+    describe('# unlock [by id]', () => {
+      describe('» spectre exists', () => {
+        describe('» and spectre is locked', () => {
+          describe("» and caller is spectre's guardian", () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await unlock(this);
+            });
+
+            itUnlocksLikeExpected(this);
+          });
+
+          describe("» but caller is not spectre's guardian", () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+            });
+
+            it('it reverts', async () => {
+              await expect(unlock(this, { from: this.signers.others[0] })).to.be.revertedWith('sERC1155: must be guardian to unlock');
+            });
+          });
+        });
+
+        describe('» but spectre is not locked anymore', () => {
+          before(async () => {
+            await setup(this);
+            await spectralize(this);
+            await unlock(this);
+          });
+
+          it('it reverts', async () => {
+            await expect(unlock(this)).to.be.revertedWith('sERC1155: spectre is not locked');
+          });
+        });
+      });
+
+      describe('» spectre does not exists', () => {
+        before(async () => {
+          await setup(this);
+        });
+
+        it('it reverts', async () => {
+          await expect(unlock(this)).to.be.revertedWith('sERC1155: spectre is not locked');
+        });
+      });
+    });
+
+    describe('# unlock [by address]', () => {
+      describe('» spectre exists', () => {
+        describe('» and spectre is locked', () => {
+          describe("» and caller is spectre's guardian", () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await unlock(this, { byAddress: true });
+            });
+
+            itUnlocksLikeExpected(this);
+          });
+
+          describe("» but caller is not spectre's guardian", () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+            });
+
+            it('it reverts', async () => {
+              await expect(unlock(this, { byAddress: true, from: this.signers.others[0] })).to.be.revertedWith('sERC1155: must be guardian to unlock');
+            });
+          });
+        });
+
+        describe('» but spectre is not locked anymore', () => {
+          before(async () => {
+            await setup(this);
+            await spectralize(this);
+            await unlock(this);
+          });
+
+          it('it reverts', async () => {
+            await expect(unlock(this, { byAddress: true })).to.be.revertedWith('sERC1155: spectre is not locked');
+          });
+        });
+      });
+
+      describe('» spectre does not exists', () => {
+        before(async () => {
+          await setup(this);
+        });
+
+        it('it reverts', async () => {
+          await expect(unlock(this, { byAddress: true })).to.be.revertedWith('sERC1155: spectre is not locked');
         });
       });
     });

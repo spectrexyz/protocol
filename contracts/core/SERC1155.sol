@@ -13,7 +13,6 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
-import "hardhat/console.sol";
 
 /**
  * @title sERC1155
@@ -251,7 +250,13 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
   /* #region IERC721Receiver */
     /**
      * @notice Called whenever an NFT is transferred to this contract through IERC721.safeTransferFrom().
-     * @dev - This function extract the spectralization parameters out of the data bytes.
+     * @dev - We do not check that the NFT is not already locked as such a transfer could only be triggered by this
+     *      very contract if the ERC721 contract itself is not malicious. If the ERC721 is malicious, there is nothing
+     *      we can do anyhow.
+     *      - We do not check that the NFT has actually been transferred as this function call should happen only after
+     *      the transfer if the ERC721 contract itself is not malicious. If the ERC721 is malicious, there is nothing
+     *      we can do anyhow.
+     *      - This function extract the spectralization parameters out of the data bytes.
      *      - See `spectralize` natspec for more details on those parameters.
      *      - The data bytes are expected to look like this:
      *        [
@@ -276,13 +281,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         address collection = _msgSender();
         require(collection.supportsInterface(ERC721_ID), "sERC1155: NFT is not ERC721-compliant");
         require(data.length == 192, "sERC1155: invalid spectralization data length");
-        // useless as a locked ERC721 transfer should be triggered by this contract, which is not possible unless the
-        // ERC721 contract is malicious [in which case there is nothing we can do]
-        // require(_locks[collection][tokenId] == 0, "sERC1155: NFT is already locked"); 
-        // useless as we know this function is only called after the transfer is effective, unless the ERC721 contract
-        // is malicious [in which case there is nothing we can do]
-        // require(IERC721(collection).ownerOf(tokenId) == address(this), "sERC1155: NFT has not been transferred");
-        
+
         bytes memory _data = data; // one cannot mload data located in calldata
         bytes32 name;
         bytes32 symbol;
@@ -342,26 +341,25 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         // stolen if it accidentally ends up owned by this contract while un-spectralized.
         require(owner != address(this), "sERC1155: NFT is already owned by sERC1155");
         id = _spectralize(collection, tokenId, name, symbol, cap, admin, guardian);
-
         IERC721(collection).transferFrom(owner, address(this), tokenId);
         emit Lock(id);
     }
 
-    function unlock(uint256 id, address recipient, bytes memory data) external {
+    function unlock(uint256 id, address recipient, bytes calldata data) external {
         Spectre storage spectre = _spectres[id];
 
-        require(spectre.state == SpectreState.Locked, "sERC1155: NFT is not locked");
+        require(spectre.state == SpectreState.Locked, "sERC1155: spectre is not locked");
         require(spectre.guardian == _msgSender(), "sERC1155: must be guardian to unlock");
 
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
 
-    function unlock(address sERC20, address recipient, bytes memory data) external {
+    function unlock(address sERC20, address recipient, bytes calldata data) external {
         uint256 id = sERC20.toId();
         Spectre storage spectre = _spectres[id];
 
-        require(spectre.state == SpectreState.Locked, "sERC1155: spectre does not locked");
-        require(_msgSender() == spectre.guardian, "sERC1155: must be guardian to unlock");
+        require(spectre.state == SpectreState.Locked, "sERC1155: spectre is not locked");
+        require(spectre.guardian == _msgSender(), "sERC1155: must be guardian to unlock");
 
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
@@ -396,23 +394,23 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         emit TransferSingle(operator, from, to, id, amount);
     }
 
-    function unavailableURI() public view returns (string memory) {
-        return _unavailableURI;
-    }
-
-    function unwrappedURI() public view returns (string memory) {
-        return _unwrappedURI;
-    }
-
-    function sERC20Base() public view returns (address) {
+    function sERC20Base() external view returns (address) {
         return _sERC20Base;
     }
 
-    function isLocked(address collection, uint256 tokenId) public view returns (bool) {
+    function unavailableURI() external view returns (string memory) {
+        return _unavailableURI;
+    }
+
+    function unwrappedURI() external view returns (string memory) {
+        return _unwrappedURI;
+    }
+
+    function isLocked(address collection, uint256 tokenId) external view returns (bool) {
         return _locks[collection][tokenId] != 0;
     }
 
-    function lockOf(address collection, uint256 tokenId) public view returns (uint256) {
+    function lockOf(address collection, uint256 tokenId) external view returns (uint256) {
         return _locks[collection][tokenId];
     }
 
@@ -421,7 +419,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @param id The id of the token type whose NFT is queried.
      * @return The NFT associated to the `id` token type.
      */
-    function spectreOf(uint256 id) public view returns (Spectre memory) {
+    function spectreOf(uint256 id) external view returns (Spectre memory) {
         return _spectres[id];
     }
 
@@ -430,7 +428,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @param sERC20 The address of the sERC20 whose NFT is queried.
      * @return The NFT associated to the `sERC20` token.
      */
-    function spectreOf(address sERC20) public view returns (Spectre memory) {
+    function spectreOf(address sERC20) external view returns (Spectre memory) {
         return _spectres[sERC20.toId()];
     }
 
@@ -439,7 +437,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @param id The id of the token type whose sERC20 address is queried.
      * @return The address of the sERC20 associated to the `id` token type.
      */
-    function sERC20Of(uint256 id) public pure returns (address) {
+    function sERC20Of(uint256 id) external pure returns (address) {
         return id.toAddress();
     }
   /* #endregion*/

@@ -23,8 +23,8 @@ const initialize = async (ctx) => {
   ctx.constants = {
     SpectreState: {
       Null: 0,
-      ERC721Locked: 1,
-      ERC721Unlocked: 2,
+      Locked: 1,
+      Unlocked: 2,
     },
     unwrappedURI: 'ipfs://Qm.../unwrapped',
     unavailableURI: 'ipfs://Qm.../unavailable',
@@ -178,6 +178,7 @@ const setup = async (ctx, opts = { approve: true }) => {
 };
 
 const spectralize = async (ctx, opts = {}) => {
+  opts.collection ??= ctx.contracts.sERC721;
   opts.transfer ??= false;
   opts.derrida ??= DERRIDA;
   opts.short ??= false;
@@ -233,7 +234,7 @@ const spectralize = async (ctx, opts = {}) => {
     } else {
       ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(ctx.signers.root);
       ctx.data.tx = await ctx.contracts.sERC1155.spectralize(
-        ctx.contracts.sERC721.address,
+        opts.collection.address,
         ctx.data.tokenId,
         ctx.constants.name,
         ctx.constants.symbol,
@@ -260,11 +261,32 @@ const transfer = {
     ctx.data.tx = await ctx.contracts.sERC20.transfer(opts.to.address, opts.amount);
     ctx.data.receipt = await ctx.data.tx.wait();
   },
+  sERC721: async (ctx, opts = {}) => {
+    opts.from ??= ctx.signers.owners[0];
+    opts.to ??= ctx.contracts.sERC1155;
+
+    ctx.contracts.sERC721 = ctx.contracts.sERC721.connect(opts.from);
+    ctx.data.tx = await ctx.contracts.sERC721.transferFrom(opts.from.address, opts.to.address, ctx.data.tokenId);
+    ctx.data.receipt = await ctx.data.tx.wait();
+  },
 };
 
-const unlock = async (ctx) => {
-  ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(ctx.signers.owners[1]);
-  ctx.data.tx = await ctx.contracts.sERC1155['unlock(uint256,address,bytes)'](ctx.data.id, ctx.signers.owners[2].address, ethers.constants.HashZero);
+const unlock = async (ctx, opts = {}) => {
+  opts.from ??= ctx.signers.owners[1];
+  opts.byAddress ??= false;
+
+  ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(opts.from);
+
+  if (opts.byAddress) {
+    ctx.data.tx = await ctx.contracts.sERC1155['unlock(address,address,bytes)'](
+      ctx.contracts.sERC20.address,
+      ctx.signers.owners[2].address,
+      ethers.constants.HashZero
+    );
+  } else {
+    ctx.data.tx = await ctx.contracts.sERC1155['unlock(uint256,address,bytes)'](ctx.data.id, ctx.signers.owners[2].address, ethers.constants.HashZero);
+  }
+
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
@@ -340,7 +362,7 @@ const itSafeBatchTransfersFromLikeExpected = (ctx, opts = { operator: undefined 
   });
 };
 
-const itSpectralizesLikeExpected = (ctx) => {
+const itSpectralizesLikeExpected = (ctx, opts = {}) => {
   it('it locks ERC721', async () => {
     expect(await ctx.contracts.sERC1155.isLocked(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(true);
     expect(await ctx.contracts.sERC1155.lockOf(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(ctx.data.id);
@@ -361,15 +383,17 @@ const itSpectralizesLikeExpected = (ctx) => {
   });
 
   it('it emits a TransferSingle event as per the ERC1155 standard', async () => {
+    opts.operator = opts.transfer ? ctx.contracts.sERC721 : ctx.signers.root;
+
     await expect(ctx.data.tx)
       .to.emit(ctx.contracts.sERC1155, 'TransferSingle')
-      .withArgs(ctx.signers.root.address, ethers.constants.AddressZero, ethers.constants.AddressZero, ctx.data.id, 0);
+      .withArgs(opts.operator.address, ethers.constants.AddressZero, ethers.constants.AddressZero, ctx.data.id, 0);
   });
 
   it('it registers spectre', async () => {
     const spectre = await ctx.contracts.sERC1155['spectreOf(uint256)'](ctx.data.id);
 
-    expect(spectre.state).to.equal(ctx.constants.SpectreState.ERC721Locked);
+    expect(spectre.state).to.equal(ctx.constants.SpectreState.Locked);
     expect(spectre.collection).to.equal(ctx.contracts.sERC721.address);
     expect(spectre.tokenId).to.equal(ctx.data.tokenId);
     expect(spectre.guardian).to.equal(ctx.signers.owners[1].address);
@@ -379,6 +403,28 @@ const itSpectralizesLikeExpected = (ctx) => {
     await expect(ctx.data.tx)
       .to.emit(ctx.contracts.sERC1155, 'Spectralize')
       .withArgs(ctx.contracts.sERC721.address, ctx.data.tokenId, ctx.data.id, ctx.contracts.sERC20.address, ctx.signers.owners[1].address);
+  });
+};
+
+const itUnlocksLikeExpected = (ctx, opts = {}) => {
+  it('it updates spectre state', async () => {
+    const spectre = await ctx.contracts.sERC1155['spectreOf(uint256)'](ctx.data.id);
+
+    expect(spectre.state).to.equal(ctx.constants.SpectreState.Unlocked);
+  });
+
+  it('it updates NFT lock', async () => {
+    expect(await ctx.contracts.sERC1155.lockOf(ctx.contracts.sERC721.address, ctx.data.id)).to.equal(0);
+  });
+
+  it('it emits an Unlock event', async () => {
+    await expect(ctx.data.tx)
+      .to.emit(ctx.contracts.sERC1155, 'Unlock')
+      .withArgs(ctx.data.id, ctx.signers.owners[2].address);
+  });
+
+  it('it transfers NFT', async () => {
+    expect(await ctx.contracts.sERC721.ownerOf(ctx.data.tokenId)).to.equal(ctx.signers.owners[2].address);
   });
 };
 
@@ -399,6 +445,7 @@ module.exports = {
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
   itSpectralizesLikeExpected,
+  itUnlocksLikeExpected,
   CloneFactory,
   SERC20Splitter,
   SERC20,
