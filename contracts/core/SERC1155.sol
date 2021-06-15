@@ -46,6 +46,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
     // keccak256("Le spectral, ce sont ces autres, jamais présents comme tels, ni vivants ni morts, avec lesquels je m'entretiens");
     bytes32 public constant DERRIDA = 0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce;
     bytes4 private constant ERC721_ID = 0x80ac58cd;
+    bytes4 private constant ERC1155RECEIVER_ID = 0x4e2312e0;
     
     address private _sERC20Base;
     string private _unavailableURI;
@@ -340,8 +341,10 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         // check that this contract does not already own the NFT beforehand to guarantee that such an NFT cannot be
         // stolen if it accidentally ends up owned by this contract while un-spectralized.
         require(owner != address(this), "sERC1155: NFT is already owned by sERC1155");
+        
         id = _spectralize(collection, tokenId, name, symbol, cap, admin, guardian);
         IERC721(collection).transferFrom(owner, address(this), tokenId);
+        
         emit Lock(id);
     }
 
@@ -397,9 +400,19 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
 
         require(_spectres[id].state != SpectreState.Null, "sERC1155: must be sERC20 to use transfer hook");
 
-        // si le contrat implémente le callback ERC1155 il faut faire l'appeler !!
-
         emit TransferSingle(operator, from, to, id, amount);
+
+        if (to.supportsInterface(ERC1155RECEIVER_ID)) {
+            /* solhint-disable indent */
+            try IERC1155Receiver(to).onERC1155Received(operator, from, id, amount, "") returns (bytes4 response) {
+                if (response != IERC1155Receiver(to).onERC1155Received.selector) {
+                    revert("sERC1155: ERC1155Receiver rejected tokens");
+                }
+            } catch Error(string memory reason) {
+                revert(reason);
+            }
+            /* solhint-enable indent */
+        }
     }
 
     function sERC20Base() external view returns (address) {

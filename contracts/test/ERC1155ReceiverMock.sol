@@ -34,7 +34,8 @@ contract ERC1155ReceiverMock is IERC1155Receiver {
         override(IERC165)
         returns (bool)
     {
-        return interfaceId == type(IERC1155Receiver).interfaceId;
+        return interfaceId == type(IERC165).interfaceId
+            || interfaceId == type(IERC1155Receiver).interfaceId;
     }
 
     function onERC1155Received(

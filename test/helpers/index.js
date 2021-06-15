@@ -118,7 +118,8 @@ const mint = {
     opts.amount ??= ctx.constants.balance;
 
     ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(ctx.signers.admin);
-    await ctx.contracts.sERC20.mint(opts.to.address, opts.amount);
+    ctx.data.tx = await ctx.contracts.sERC20.mint(opts.to.address, opts.amount);
+    ctx.data.receipt = await ctx.data.tx.wait();
   },
 };
 

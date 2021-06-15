@@ -939,7 +939,7 @@ describe('sERC1155', () => {
     });
 
     describe('# updateUnavailableURI', () => {
-      describe('# caller has ADMIN_ROLE', () => {
+      describe('» caller has ADMIN_ROLE', () => {
         before(async () => {
           await setup(this);
           this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.root);
@@ -951,7 +951,7 @@ describe('sERC1155', () => {
         });
       });
 
-      describe('# caller does not have ADMIN_ROLE', () => {
+      describe('» caller does not have ADMIN_ROLE', () => {
         before(async () => {
           await setup(this);
           this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.others[0]);
@@ -966,7 +966,7 @@ describe('sERC1155', () => {
     });
 
     describe('# updateUnlockedURI', () => {
-      describe('# caller has ADMIN_ROLE', () => {
+      describe('» caller has ADMIN_ROLE', () => {
         before(async () => {
           await setup(this);
           this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.root);
@@ -978,7 +978,7 @@ describe('sERC1155', () => {
         });
       });
 
-      describe('# caller does not have ADMIN_ROLE', () => {
+      describe('» caller does not have ADMIN_ROLE', () => {
         before(async () => {
           await setup(this);
           this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.others[0]);
@@ -993,9 +993,125 @@ describe('sERC1155', () => {
     });
 
     describe('# onSERC20Transferred', () => {
-      // vérifier que c'est pas appelé quand l'origine du transfer c'est le sERC1155
-      // vérifier qu'un event Transfersingle est émis en cas de mint / burn du ERC20 avec from / to qui vient de la zero address
-      // vérifier qu'un event TransferSingle est émis en cas de transfert au niveau du ERC20
+      describe('» caller is a registered sERC20', () => {
+        describe('» and sERC20s are transferred', () => {
+          describe('» and the receiver is an EOA', () => {
+            before(async () => {
+              await setup(this);
+              await spectralize(this);
+              await mint.sERC20(this, { to: this.signers.holders[0] });
+              await transfer.sERC20(this, { to: this.signers.holders[1] });
+            });
+
+            it('it emits a TransferSingle event', async () => {
+              await expect(this.data.tx)
+                .to.emit(this.contracts.sERC1155, 'TransferSingle')
+                .withArgs(this.contracts.sERC20.address, this.signers.holders[0].address, this.signers.holders[1].address, this.data.id, this.constants.amount);
+            });
+          });
+
+          describe('» and the receiver is a contract', () => {
+            describe('» and the receiver contract implements onERC1155Received', () => {
+              describe('» and the receiver contract returns a valid value', () => {
+                before(async () => {
+                  await setup(this);
+                  await spectralize(this);
+                  await mint.sERC20(this, { to: this.signers.holders[0] });
+                  await mock.deploy.ERC1155Receiver(this);
+                  await transfer.sERC20(this, { to: this.contracts.ERC1155Receiver });
+                });
+
+                it('it emits a TransferSingle event', async () => {
+                  await expect(this.data.tx)
+                    .to.emit(this.contracts.sERC1155, 'TransferSingle')
+                    .withArgs(
+                      this.contracts.sERC20.address,
+                      this.signers.holders[0].address,
+                      this.contracts.ERC1155Receiver.address,
+                      this.data.id,
+                      this.constants.amount
+                    );
+                });
+
+                it('it calls onERC1155Received', async () => {
+                  await expect(this.data.tx)
+                    .to.emit(this.contracts.ERC1155Receiver, 'Received')
+                    .withArgs(this.contracts.sERC20.address, this.signers.holders[0].address, this.data.id, this.constants.amount, '0x');
+                });
+              });
+            });
+
+            describe('» but the receiver contract returns an invalid value', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+                await mint.sERC20(this, { to: this.signers.holders[0] });
+                await mock.deploy.ERC1155Receiver(this, { singleValue: '0x12345678' });
+              });
+
+              it('it reverts', async () => {
+                await expect(transfer.sERC20(this, { to: this.contracts.ERC1155Receiver })).to.be.revertedWith('sERC1155: ERC1155Receiver rejected tokens');
+              });
+            });
+
+            describe('» but the receiver contract reverts', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+                await mint.sERC20(this, { to: this.signers.holders[0] });
+                await mock.deploy.ERC1155Receiver(this, { singleReverts: true });
+              });
+
+              it('it reverts', async () => {
+                await expect(transfer.sERC20(this, { to: this.contracts.ERC1155Receiver })).to.be.revertedWith('ERC1155ReceiverMock: reverting on receive');
+              });
+            });
+
+            describe('» but the receiver contract does not implement onERC1155Received', () => {
+              before(async () => {
+                await setup(this);
+                await spectralize(this);
+                await mint.sERC20(this, { to: this.signers.holders[0] });
+                await mock.deploy.ERC1155Receiver(this);
+                await transfer.sERC20(this, { to: this.contracts.sERC20 });
+              });
+
+              it('it emits a TransferSingle event', async () => {
+                await expect(this.data.tx)
+                  .to.emit(this.contracts.sERC1155, 'TransferSingle')
+                  .withArgs(this.contracts.sERC20.address, this.signers.holders[0].address, this.contracts.sERC20.address, this.data.id, this.constants.amount);
+              });
+            });
+          });
+        });
+
+        describe('» and sERC20s are minted', () => {
+          before(async () => {
+            await setup(this);
+            await spectralize(this);
+            await mint.sERC20(this, { to: this.signers.holders[0] });
+          });
+
+          it('it emits a TransferSingle event', async () => {
+            await expect(this.data.tx)
+              .to.emit(this.contracts.sERC1155, 'TransferSingle')
+              .withArgs(this.contracts.sERC20.address, ethers.constants.AddressZero, this.signers.holders[0].address, this.data.id, this.constants.balance);
+          });
+        });
+      });
+
+      describe('» caller is a not a registered sERC20', () => {
+        before(async () => {
+          await setup(this);
+          this.contracts.sERC1155 = this.contracts.sERC1155.connect(this.signers.others[0]);
+        });
+
+        it('it reverts', async () => {
+          await expect(this.contracts.sERC1155.onSERC20Transferred(ethers.constants.AddressZero, ethers.constants.AddressZero, 0)).to.be.revertedWith(
+            'sERC1155: must be sERC20 to use transfer hook'
+          );
+        });
+      });
     });
   });
 });
