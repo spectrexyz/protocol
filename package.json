@@ -24,6 +24,9 @@
     "solidity-coverage": "^0.7.16"
   },
   "dependencies": {
+    "@balancer-labs/v2-pool-weighted": "^1.0.0",
+    "@balancer-labs/v2-solidity-utils": "^1.0.0",
+    "@balancer-labs/v2-vault": "^1.0.0",
     "@openzeppelin/contracts": "^4.0.0",
     "@openzeppelin/contracts-upgradeable": "^4.0.0"
   }

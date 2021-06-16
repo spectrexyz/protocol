@@ -2,7 +2,7 @@ require('@nomiclabs/hardhat-solhint');
 require('@nomiclabs/hardhat-waffle');
 require('hardhat-docgen');
 require('hardhat-gas-reporter');
-require("solidity-coverage");
+require('solidity-coverage');
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -22,13 +22,26 @@ task('accounts', 'Prints the list of accounts', async () => {
  */
 module.exports = {
   solidity: {
-    version: '0.8.1',
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 2000,
+    compilers: [
+      {
+        version: '0.8.1',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 2000,
+          },
+        },
       },
-    },
+      {
+        version: '0.7.1',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    ],
   },
   docgen: {
     path: './docs',

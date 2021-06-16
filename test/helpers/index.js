@@ -5,6 +5,10 @@ const SERC20Splitter = require('../../artifacts/contracts/utils/SERC20Splitter.s
 const ERC1155Receiver = require('../../artifacts/contracts/test/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json');
 const ERC721Mock = require('../../artifacts/contracts/test/ERC721Mock.sol/ERC721Mock.json');
 const CloneFactory = require('../../artifacts/contracts/test/CloneFactory.sol/CloneFactory.json');
+const WETH = require('../../artifacts/contracts/test/WETH.sol/WETH.json');
+const Vault = require('../../artifacts/@balancer-labs/v2-vault/contracts/Vault.sol/Vault.json');
+const Authorizer = require('../../artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json');
+const SBP = require('../../artifacts/contracts/distribution/SpectralizationBootstrappingPool.sol/SpectralizationBootstrappingPool.json');
 
 const { deployContract } = require('ethereum-waffle');
 const { expect } = require('chai');
@@ -37,6 +41,15 @@ const initialize = async (ctx) => {
     amount1: ethers.BigNumber.from('700'),
     amount2: ethers.BigNumber.from('1250'),
     shares: [ethers.BigNumber.from('300000000000000000'), ethers.BigNumber.from('100000000000000000'), ethers.BigNumber.from('600000000000000000')],
+    pool: {
+      name: 'My SBP Token',
+      symbol: '$SBP',
+      normalizedStartWeight: ethers.BigNumber.from('300000000000000000'),
+      normalizedEndWeight: ethers.BigNumber.from('600000000000000000'),
+      swapFeePercentage: ethers.BigNumber.from('10000000000000000'),
+      pauseWindowDuration: ethers.BigNumber.from('3000'),
+      bufferPeriodDuration: ethers.BigNumber.from('1000'),
+    },
   };
 
   ctx.contracts = {};
@@ -159,7 +172,10 @@ const safeBatchTransferFrom = async (ctx, opts = {}) => {
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
-const setup = async (ctx, opts = { approve: true }) => {
+const setup = async (ctx, opts = {}) => {
+  opts.approve ??= true;
+  opts.balancer ??= false;
+
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
   ctx.contracts.sERC721 = await deployContract(ctx.signers.root, SERC721, ['sERC721 Collection', 'sERC721']);
   ctx.contracts.sERC1155 = await deployContract(ctx.signers.root, SERC1155, [
@@ -175,6 +191,29 @@ const setup = async (ctx, opts = { approve: true }) => {
   if (opts.approve) {
     ctx.contracts.sERC721 = ctx.contracts.sERC721.connect(ctx.signers.owners[0]);
     await (await ctx.contracts.sERC721.approve(ctx.contracts.sERC1155.address, ctx.data.tokenId)).wait();
+  }
+
+  if (opts.balancer) {
+    ctx.contracts.WETH = await deployContract(ctx.signers.root, WETH);
+    ctx.contracts.Authorizer = await deployContract(ctx.signers.root, Authorizer, [ctx.signers.admin.address]);
+    ctx.contracts.Vault = await deployContract(ctx.signers.root, Vault, [ctx.contracts.Authorizer.address, ctx.contracts.WETH.address, 0, 0]);
+    await spectralize(ctx);
+    await mint.sERC20(ctx);
+    ctx.contracts.SBP = await deployContract(ctx.signers.root, SBP, [
+      ctx.contracts.Vault.address,
+      ctx.constants.pool.name,
+      ctx.constants.pool.symbol,
+      ctx.contracts.WETH.address,
+      ctx.contracts.sERC20.address,
+      ctx.constants.pool.normalizedStartWeight,
+      ctx.constants.pool.normalizedEndWeight,
+      ctx.constants.pool.swapFeePercentage,
+      ctx.constants.pool.pauseWindowDuration,
+      ctx.constants.pool.bufferPeriodDuration,
+      false,
+    ]);
+
+    ctx.data.poolId = await ctx.contracts.SBP.getPoolId();
   }
 };
 
