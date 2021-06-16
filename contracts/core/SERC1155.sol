@@ -304,6 +304,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
 
         emit Lock(_spectralize(collection, tokenId, name.toString(), symbol.toString(), cap, admin, guardian));
         
+        
         return IERC721Receiver.onERC721Received.selector; // 0x150b7a02
     }
   /* #endregion */
