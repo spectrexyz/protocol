@@ -10,12 +10,23 @@ const Vault = require('../../artifacts/@balancer-labs/v2-vault/contracts/Vault.s
 const Authorizer = require('../../artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json');
 const SBP = require('../../artifacts/contracts/distribution/SpectralizationBootstrappingPool.sol/SpectralizationBootstrappingPool.json');
 
-const { deployContract } = require('ethereum-waffle');
-const { expect } = require('chai');
-
+// const { deployContract } = require('ethereum-waffle');
+const { waffle } = require('hardhat');
+const { deployContract } = waffle;
+const { expect, Assertion } = require('chai');
+const { ethers } = require('hardhat');
+const Decimal = require('decimal.js');
 const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
 const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
 const DERRIDA = '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce';
+
+Assertion.addMethod('near', function(actual, _epsilon) {
+  const expected = this._obj;
+  const delta = expected.sub(actual).abs();
+  const epsilon = ethers.BigNumber.from(_epsilon);
+
+  this.assert(delta.abs().lte(epsilon), 'expected #{exp} to be near #{act}', 'expected #{exp} to not be near #{act}', expected, actual);
+});
 
 const initialize = async (ctx) => {
   ctx.artifacts = {
@@ -35,11 +46,13 @@ const initialize = async (ctx) => {
     tokenURI: 'ipfs://Qm.../',
     name: 'My Awesome sERC20',
     symbol: 'MAS',
-    cap: ethers.BigNumber.from('1000000000000000'),
-    balance: ethers.BigNumber.from('100000000'),
-    amount: ethers.BigNumber.from('1000'),
-    amount1: ethers.BigNumber.from('700'),
-    amount2: ethers.BigNumber.from('1250'),
+    cap: ethers.utils.parseEther('1000'),
+    balance: ethers.BigNumber.from('100000000000000000000'),
+    pooledETH: ethers.BigNumber.from('2000000000000000000'),
+    pooledSERC20: ethers.BigNumber.from('1000000000000000000'),
+    amount: ethers.BigNumber.from('10000000000000000000'),
+    amount1: ethers.BigNumber.from('70000000000000000000'),
+    amount2: ethers.BigNumber.from('12000000000000000000'),
     shares: [ethers.BigNumber.from('300000000000000000'), ethers.BigNumber.from('100000000000000000'), ethers.BigNumber.from('600000000000000000')],
     pool: {
       name: 'My SBP Token',
@@ -49,6 +62,8 @@ const initialize = async (ctx) => {
       swapFeePercentage: ethers.BigNumber.from('10000000000000000'),
       pauseWindowDuration: ethers.BigNumber.from('3000'),
       bufferPeriodDuration: ethers.BigNumber.from('1000'),
+      ONE: ethers.BigNumber.from('1000000000000000000'),
+      MINIMUM_BPT: ethers.BigNumber.from('1000000'),
     },
   };
 
@@ -78,6 +93,45 @@ const initialize = async (ctx) => {
     ctx.signers.beneficiaries[2],
     ...ctx.signers.others
   ] = await ethers.getSigners();
+};
+
+const computeInvariant = (balances, weights) => {
+  const BASE = new Decimal('1000000000000000000');
+
+  balances[0] = new Decimal(balances[0].toString());
+  balances[1] = new Decimal(balances[1].toString());
+  weights[0] = new Decimal(weights[0].toString());
+  weights[1] = new Decimal(weights[1].toString());
+
+  const invariant = balances[0].pow(weights[0].div(BASE)).mul(balances[1].pow(weights[1].div(BASE)));
+
+  return ethers.BigNumber.from(invariant.truncated().toString());
+};
+
+const join = async (ctx, opts = {}) => {
+  const JOIN_KIND_INIT = 0;
+  const JOIN_EXACT_TOKENS = 1;
+  const JOIN_EXACT_BPT = 2;
+
+  opts.from ??= ctx.signers.holders[0];
+  opts.init ??= false;
+
+  const joinPoolRequest = {
+    assets: [ethers.constants.AddressZero, ctx.contracts.sERC20.address],
+    maxAmountsIn: [ctx.constants.pooledETH, ctx.constants.pooledSERC20],
+    userData: ethers.utils.defaultAbiCoder.encode(
+      ['uint256', 'uint256[]'],
+      [opts.init ? JOIN_KIND_INIT : JOIN_EXACT_TOKENS, [ctx.constants.pooledETH, ctx.constants.pooledSERC20]]
+    ),
+    fromInternalBalance: false,
+  };
+
+  ctx.contracts.Vault = ctx.contracts.Vault.connect(opts.from);
+  ctx.data.tx = await ctx.contracts.Vault.joinPool(ctx.data.poolId, opts.from.address, opts.from.address, joinPoolRequest, {
+    value: ctx.constants.pooledETH,
+  });
+
+  ctx.data.receipt = await ctx.data.tx.wait();
 };
 
 const register = async (ctx, opts = {}) => {
@@ -213,8 +267,21 @@ const setup = async (ctx, opts = {}) => {
       false,
     ]);
 
+    await approve.sERC20(ctx);
+
     ctx.data.poolId = await ctx.contracts.SBP.getPoolId();
   }
+};
+
+const approve = {
+  sERC20: async (ctx, opts = {}) => {
+    opts.from ??= ctx.signers.holders[0];
+    opts.operator ??= ctx.contracts.Vault;
+
+    ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(ctx.signers.holders[0]);
+    ctx.data.tx = await ctx.contracts.sERC20.approve(opts.operator.address, ctx.constants.balance);
+    ctx.data.receipt = await ctx.data.tx.wait();
+  },
 };
 
 const spectralize = async (ctx, opts = {}) => {
@@ -344,6 +411,51 @@ const withdrawBatch = async (ctx, opts = {}) => {
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
+const itJoinsPoolLikeExpected = (ctx, opts = {}) => {
+  opts.init ??= false;
+  opts.old ??= true;
+
+  it('it collects pooled tokens', async () => {
+    const { tokens, balances, lastChangeBlock } = await ctx.contracts.Vault.getPoolTokens(ctx.data.poolId);
+
+    expect(balances[0]).to.equal(ctx.constants.pooledETH);
+    expect(balances[1]).to.equal(ctx.constants.pooledSERC20);
+  });
+
+  if (opts.init) {
+    it('it initializes pool invariant', async () => {
+      const invariant = computeInvariant(
+        [ctx.constants.pooledETH, ctx.constants.pooledSERC20],
+        [ctx.constants.pool.ONE.sub(ctx.constants.pool.normalizedStartWeight), ctx.constants.pool.normalizedStartWeight]
+      );
+      expect(await ctx.contracts.SBP.getLastInvariant()).to.be.near(invariant, 100000);
+      expect(await ctx.contracts.SBP.getInvariant()).to.be.near(invariant, 100000);
+    });
+
+    it('it mints LP tokens', async () => {
+      const invariant = computeInvariant(
+        [ctx.constants.pooledETH, ctx.constants.pooledSERC20],
+        [ctx.constants.pool.ONE.sub(ctx.constants.pool.normalizedStartWeight), ctx.constants.pool.normalizedStartWeight]
+      );
+      expect(await ctx.contracts.SBP.balanceOf(ctx.signers.holders[0].address)).to.be.near(invariant.mul(2).sub(ctx.constants.pool.MINIMUM_BPT), 100000);
+    });
+  }
+
+  if (!opts.init) {
+  }
+
+  if (opts.old) {
+    it('it caches the log of the last invariant', async () => {});
+    it('it caches the total supply', async () => {});
+  } else {
+    it('it does not update the oracle data', async () => {});
+
+    it('it does not cache the log of the last invariant and supply', async () => {});
+
+    it('it does not cache the total supply', async () => {});
+  }
+};
+
 const itSafeTransfersFromLikeExpected = (ctx, opts = {}) => {
   it("it debits sender's balance", async () => {
     expect(await ctx.contracts.sERC20.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount));
@@ -470,6 +582,7 @@ const itUnlocksLikeExpected = (ctx, opts = {}) => {
 
 module.exports = {
   initialize,
+  join,
   register,
   mint,
   mock,
@@ -482,6 +595,7 @@ module.exports = {
   unlock,
   withdraw,
   withdrawBatch,
+  itJoinsPoolLikeExpected,
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
   itSpectralizesLikeExpected,

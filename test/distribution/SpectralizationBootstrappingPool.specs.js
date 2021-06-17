@@ -3,6 +3,7 @@ const { ethers } = require('ethers');
 const { deployContract } = require('ethereum-waffle');
 const {
   initialize,
+  join,
   mint,
   mock,
   safeBatchTransferFrom,
@@ -11,6 +12,8 @@ const {
   setup,
   spectralize,
   unlock,
+  itJoinsPoolLikeExpected,
+
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
   itSpectralizesLikeExpected,
@@ -20,7 +23,7 @@ const {
 
 describe.only('SpectralizationBootstrappingPool', () => {
   before(async () => {
-    await initialize(this);
+    await initialize(this, { ethers });
   });
 
   describe('⇛ constructor', () => {
@@ -31,7 +34,7 @@ describe.only('SpectralizationBootstrappingPool', () => {
             await setup(this, { balancer: true });
           });
 
-          it('# it registers pool', async () => {
+          it('it registers pool', async () => {
             const pool = await this.contracts.Vault.getPool(this.data.poolId);
 
             expect(await this.contracts.SBP.getVault()).to.equal(this.contracts.Vault.address);
@@ -39,7 +42,7 @@ describe.only('SpectralizationBootstrappingPool', () => {
             expect(pool[1]).to.equal(2);
           });
 
-          it('# it initializes pool token', async () => {
+          it('it initializes pool token', async () => {
             expect(await this.contracts.SBP.name()).to.equal(this.constants.pool.name);
             expect(await this.contracts.SBP.symbol()).to.equal(this.constants.pool.symbol);
             // await console.log(await this.contracts.SBP.getMiscData());
@@ -63,6 +66,17 @@ describe.only('SpectralizationBootstrappingPool', () => {
           });
         });
       });
+    });
+  });
+
+  describe.only('# join', () => {
+    before(async () => {
+      await setup(this, { balancer: true });
+      await join(this, { init: true });
+    });
+
+    describe('» when the last change block is an old block', () => {
+      itJoinsPoolLikeExpected(this, { init: true });
     });
   });
 });

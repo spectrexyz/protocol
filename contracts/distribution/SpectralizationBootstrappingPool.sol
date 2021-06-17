@@ -127,14 +127,14 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
       uint256 supply = _sERC20.totalSupply();
       uint256 gamma = delta ** supply;
       // require(gamma / delta == supply, "OVERFLOW");
-      console.log(delta);
-      console.log(gamma);
+      // console.log(delta);
+      // console.log(gamma);
 
       // uint256 sERC20Weight = _sERC20EndWeight.sub((_sERC20EndWeight.sub(_sERC20StartWeight)).mulUp(_sERC20.totalSupply()).divUp(_sERC20.cap()));
       uint256 sERC20Weight = normalizedStartWeight + (gamma / _sERC20.cap());
       uint256 WETHWeight = FixedPoint.ONE.sub(sERC20Weight);
-      console.log(sERC20Weight);
-      console.log(WETHWeight);
+      // console.log(sERC20Weight);
+      // console.log(WETHWeight);
       
       if (_sERC20IsToken0) {
           _normalizedWeight0 = sERC20Weight;
