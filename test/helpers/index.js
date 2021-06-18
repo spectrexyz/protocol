@@ -14,7 +14,7 @@ const SBP = require('../../artifacts/contracts/distribution/SpectralizationBoots
 const { waffle } = require('hardhat');
 const { deployContract } = waffle;
 const { expect, Assertion } = require('chai');
-const { ethers } = require('hardhat');
+const { ethers, network } = require('hardhat');
 const Decimal = require('decimal.js');
 const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
 const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
@@ -27,6 +27,16 @@ Assertion.addMethod('near', function(actual, _epsilon) {
 
   this.assert(delta.abs().lte(epsilon), 'expected #{exp} to be near #{act}', 'expected #{exp} to not be near #{act}', expected, actual);
 });
+
+const currentTimestamp = async () => {
+  const { timestamp } = await network.provider.send('eth_getBlockByNumber', ['latest', true]);
+  return ethers.BigNumber.from(timestamp);
+};
+
+const advanceTime = async (seconds) => {
+  await ethers.provider.send('evm_increaseTime', [parseInt(seconds.toString())]);
+  await ethers.provider.send('evm_mine', []);
+};
 
 const initialize = async (ctx) => {
   ctx.artifacts = {
@@ -48,6 +58,9 @@ const initialize = async (ctx) => {
     symbol: 'MAS',
     cap: ethers.utils.parseEther('1000'),
     balance: ethers.BigNumber.from('100000000000000000000'),
+    // 1000000000000000000000
+    // 100000000000000000000
+    // 1000000000000000000000
     pooledETH: ethers.BigNumber.from('2000000000000000000'),
     pooledSERC20: ethers.BigNumber.from('1000000000000000000'),
     amount: ethers.BigNumber.from('10000000000000000000'),
@@ -64,6 +77,12 @@ const initialize = async (ctx) => {
       bufferPeriodDuration: ethers.BigNumber.from('1000'),
       ONE: ethers.BigNumber.from('1000000000000000000'),
       MINIMUM_BPT: ethers.BigNumber.from('1000000'),
+      TWO_TOKEN_POOL: 2,
+      ORACLE_VARIABLE: {
+        PAIR_PRICE: 0,
+        BPT_PRICE: 1,
+        INVARIANT: 2,
+      },
     },
   };
 
@@ -411,18 +430,28 @@ const withdrawBatch = async (ctx, opts = {}) => {
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
+const itUpdatesOracleData = (ctx, opts = {}) => {
+  //   const previousData = await pool.getMiscData();
+  // await advanceTime(MINUTE * 10); // force index update
+  // await action(await calcLastChangeBlock(lastChangeBlockOffset));
+  // const currentMiscData = await pool.getMiscData();
+  // expect(currentMiscData.oracleIndex).to.equal(previousData.oracleIndex.add(1));
+  // expect(currentMiscData.oracleSampleCreationTimestamp).to.equal(await currentTimestamp());
+};
+const itCachesLogInvariantAndSupply = (ctx, opts = {}) => {};
+
 const itJoinsPoolLikeExpected = (ctx, opts = {}) => {
   opts.init ??= false;
   opts.old ??= true;
 
-  it('it collects pooled tokens', async () => {
-    const { tokens, balances, lastChangeBlock } = await ctx.contracts.Vault.getPoolTokens(ctx.data.poolId);
-
-    expect(balances[0]).to.equal(ctx.constants.pooledETH);
-    expect(balances[1]).to.equal(ctx.constants.pooledSERC20);
-  });
-
   if (opts.init) {
+    it('it collects pooled tokens', async () => {
+      const { tokens, balances, lastChangeBlock } = await ctx.contracts.Vault.getPoolTokens(ctx.data.poolId);
+
+      expect(balances[0]).to.equal(ctx.constants.pooledETH);
+      expect(balances[1]).to.equal(ctx.constants.pooledSERC20);
+    });
+
     it('it initializes pool invariant', async () => {
       const invariant = computeInvariant(
         [ctx.constants.pooledETH, ctx.constants.pooledSERC20],
@@ -445,7 +474,19 @@ const itJoinsPoolLikeExpected = (ctx, opts = {}) => {
   }
 
   if (opts.old) {
-    it('it caches the log of the last invariant', async () => {});
+    it('it caches the log of the last invariant', async () => {
+      //   function getMiscData()
+      // external
+      // view
+      // returns (
+      //     int256 logInvariant,
+      //     int256 logTotalSupply,
+      //     uint256 oracleSampleCreationTimestamp,
+      //     uint256 oracleIndex,
+      //     bool oracleEnabled,
+      //     uint256 swapFeePercentage
+      // )
+    });
     it('it caches the total supply', async () => {});
   } else {
     it('it does not update the oracle data', async () => {});
@@ -582,6 +623,7 @@ const itUnlocksLikeExpected = (ctx, opts = {}) => {
 
 module.exports = {
   initialize,
+  currentTimestamp,
   join,
   register,
   mint,

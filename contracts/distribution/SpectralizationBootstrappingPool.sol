@@ -99,25 +99,73 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
         _normalizedStartWeight = normalizedStartWeight;
         _normalizedEndWeight = normalizedEndWeight;
 
-        _pokeWeights();
-        // find the token index of the maximum weight
-        // _maxWeightTokenIndex = params.normalizedWeight0 >= params.normalizedWeight1 ? 0 : 1; // <=== non ! on le bouge dans _ppokeWeight
+        _updateWeights();
     }
 
-    function update(uint256 weight) external {
-        _normalizedWeight0 = weight;
-    }
 
-    function weight() external view returns (uint256) {
-      return _normalizedWeight0;
-    }
 
-    function pokeWeights() internal {
+    function pokeWeights() external {
         _pokeWeights();
     }
 
     function _pokeWeights() internal {
-      // we know that :
+        if (totalSupply() > 0) {
+            (, uint256[] memory balances, uint256 lastChangeBlock) = getVault().getPoolTokens(getPoolId());
+            _updateOracle(lastChangeBlock, balances[0], balances[1]);
+        }
+
+        _updateWeights();
+
+        if (totalSupply() > 0) {
+            _cacheInvariantAndSupply();
+        }
+
+    }
+
+    function _updateWeights() private {
+      uint256 normalizedStartWeight= _normalizedStartWeight;
+      uint256 delta = _normalizedEndWeight - normalizedStartWeight; // > 0
+      uint256 supply = _sERC20.totalSupply();
+      uint256 gamma = delta * supply;
+      require(gamma / delta == supply, "OVERFLOW");
+      // console.log(delta);
+      // console.log(gamma);
+
+      // uint256 sERC20Weight = _sERC20EndWeight.sub((_sERC20EndWeight.sub(_sERC20StartWeight)).mulUp(_sERC20.totalSupply()).divUp(_sERC20.cap()));
+        uint256 sWeight = normalizedStartWeight + (gamma / _sERC20.cap());
+        uint256 eWeight = FixedPoint.ONE.sub(sWeight);
+
+        if (_sERC20IsToken0) {
+            _normalizedWeight0 = sWeight;
+            _normalizedWeight1 = eWeight;
+        } else {
+            _normalizedWeight0 = eWeight;
+            _normalizedWeight1 = sWeight;
+        }
+
+        console.log("== poked ==");
+        console.log(supply);
+        console.log(_sERC20.totalSupply());
+
+        console.log(gamma);
+        console.log(eWeight);
+        console.log(_normalizedWeight0);
+        console.log("===========");
+
+
+        if (sWeight >= eWeight) {
+            _maxWeightTokenIndex = _sERC20IsToken0 ? 0 : 1;
+        } else {
+            _maxWeightTokenIndex = _sERC20IsToken0 ? 1 : 0;
+        }
+
+      // _maxWeightTokenIndex = _normalizedWeight0 >= _normalizedWeight1 ? 0 : 1;
+
+        // emit Weights();
+    }
+
+    function _weights() internal view returns (uint256 sERC20Weight, uint256 WETHWeight) {
+        // we know that :
       // 1. cap > 0 as per the SERC20 contract
       // 2. normalizedEndWeight > normalizedStartWeigth > 0
       // 3. totalSupply <= cap
@@ -131,25 +179,8 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
       // console.log(gamma);
 
       // uint256 sERC20Weight = _sERC20EndWeight.sub((_sERC20EndWeight.sub(_sERC20StartWeight)).mulUp(_sERC20.totalSupply()).divUp(_sERC20.cap()));
-      uint256 sERC20Weight = normalizedStartWeight + (gamma / _sERC20.cap());
-      uint256 WETHWeight = FixedPoint.ONE.sub(sERC20Weight);
-      // console.log(sERC20Weight);
-      // console.log(WETHWeight);
-      
-      if (_sERC20IsToken0) {
-          _normalizedWeight0 = sERC20Weight;
-          _normalizedWeight1 = WETHWeight;
-      } else {
-          _normalizedWeight0 = WETHWeight;
-          _normalizedWeight1 = sERC20Weight;
-      }
-      
-      // // can optimize to avoid re-reading state
-      // _maxWeightTokenIndex = _normalizedWeight0 >= _normalizedWeight1 ? 0 : 1;
-
-      // update Invariant ?
-      // udpate Oracle ?
-
+        sERC20Weight = normalizedStartWeight + (gamma / _sERC20.cap());
+        WETHWeight = FixedPoint.ONE.sub(sERC20Weight);
     }
 
     function onSwap(
@@ -157,19 +188,131 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
         uint256 balanceTokenIn,
         uint256 balanceTokenOut
     ) external override whenNotPaused onlyVault(request.poolId) returns (uint256) {
-        if (request.userData[0] == 0x01) {
+            bool tokenInIsToken0 = request.tokenIn == _token0;
 
+            uint256 scalingFactorTokenIn = _scalingFactor(tokenInIsToken0);
+            uint256 scalingFactorTokenOut = _scalingFactor(!tokenInIsToken0);
+
+            uint256 normalizedWeightIn = _normalizedWeights(tokenInIsToken0);
+            uint256 normalizedWeightOut = _normalizedWeights(!tokenInIsToken0);
+
+            // All token amounts are upscaled.
+            balanceTokenIn = _upscale(balanceTokenIn, scalingFactorTokenIn);
+            balanceTokenOut = _upscale(balanceTokenOut, scalingFactorTokenOut);
+
+            // Update price oracle with the pre-swap balances
+            _updateOracle(
+                request.lastChangeBlock,
+                tokenInIsToken0 ? balanceTokenIn : balanceTokenOut,
+                tokenInIsToken0 ? balanceTokenOut : balanceTokenIn
+            );
+
+        if (request.userData[0] == 0x77) {
+            console.log('MINT');
+
+            uint256 _mintFee = 5e16; // 5%
+
+            require(_sERC20IsToken0 && tokenInIsToken0 || !_sERC20IsToken0 && !tokenInIsToken0, "SBP: can only mint against ETH");
+
+            if (request.kind == IVault.SwapKind.GIVEN_IN) {
+                                uint256 feeAmount = request.amount.mulUp(getSwapFeePercentage());
+                request.amount = _upscale(request.amount.sub(feeAmount), scalingFactorTokenIn);
+
+                uint256 amountOut = _onSwapGivenIn_(
+                    request,
+                    balanceTokenIn,
+                    balanceTokenOut,
+                    normalizedWeightIn,
+                    normalizedWeightOut
+                );
+
+                // what we need is to send part of the ETH received
+
+                  // ETH -> fixed
+                // return the amount of tokens exiting the pool: always 
+                // return the amount of tokens existing the pool: always 0
+                // amountOut tokens are exiting the Pool, so we round down.
+                return _downscaleDown(amountOut, scalingFactorTokenOut);
+            } else {
+                // return the amount of ETH entering the pool
+            }
         } else {
-          // WeightedPool2Tokens.onSwap(request, balanceTokenIn, balanceTokenOut);
+            // does exactly the same as WeightedPool2Tokens.onSwap
+        
+            if (request.kind == IVault.SwapKind.GIVEN_IN) {
+                // Fees are subtracted before scaling, to reduce the complexity of the rounding direction analysis.
+                // This is amount - fee amount, so we round up (favoring a higher fee amount).
+                uint256 feeAmount = request.amount.mulUp(getSwapFeePercentage());
+                request.amount = _upscale(request.amount.sub(feeAmount), scalingFactorTokenIn);
+
+                uint256 amountOut = _onSwapGivenIn_(
+                    request,
+                    balanceTokenIn,
+                    balanceTokenOut,
+                    normalizedWeightIn,
+                    normalizedWeightOut
+                );
+
+                // amountOut tokens are exiting the Pool, so we round down.
+                return _downscaleDown(amountOut, scalingFactorTokenOut);
+            } else {
+                request.amount = _upscale(request.amount, scalingFactorTokenOut);
+
+                uint256 amountIn = _onSwapGivenOut_(
+                    request,
+                    balanceTokenIn,
+                    balanceTokenOut,
+                    normalizedWeightIn,
+                    normalizedWeightOut
+                );
+
+                // amountIn tokens are entering the Pool, so we round up.
+                amountIn = _downscaleUp(amountIn, scalingFactorTokenIn);
+
+                // Fees are added after scaling happens, to reduce the complexity of the rounding direction analysis.
+                // This is amount + fee amount, so we round up (favoring a higher fee amount).
+                return amountIn.divUp(getSwapFeePercentage().complement());
+            }
+
+              // WeightedPool2Tokens.onSwap(request, balanceTokenIn, balanceTokenOut);
         }
     }
 
-    //     function _normalizedWeights() internal view override returns (uint256[] memory) {
-    //     uint256[] memory normalizedWeights = new uint256[](2);
-    //     normalizedWeights[0] = _normalizedWeights(true);
-    //     normalizedWeights[1] = _normalizedWeights(false);
-    //     return normalizedWeights;
-    // }
+    function _onSwapGivenIn_(
+        SwapRequest memory swapRequest,
+        uint256 currentBalanceTokenIn,
+        uint256 currentBalanceTokenOut,
+        uint256 normalizedWeightIn,
+        uint256 normalizedWeightOut
+    ) private pure returns (uint256) {
+        // Swaps are disabled while the contract is paused.
+        return
+            WeightedMath._calcOutGivenIn(
+                currentBalanceTokenIn,
+                normalizedWeightIn,
+                currentBalanceTokenOut,
+                normalizedWeightOut,
+                swapRequest.amount
+            );
+    }
+
+    function _onSwapGivenOut_(
+        SwapRequest memory swapRequest,
+        uint256 currentBalanceTokenIn,
+        uint256 currentBalanceTokenOut,
+        uint256 normalizedWeightIn,
+        uint256 normalizedWeightOut
+    ) private pure returns (uint256) {
+        // Swaps are disabled while the contract is paused.
+        return
+            WeightedMath._calcInGivenOut(
+                currentBalanceTokenIn,
+                normalizedWeightIn,
+                currentBalanceTokenOut,
+                normalizedWeightOut,
+                swapRequest.amount
+            );
+    }
 
     // hack_ : we need to override this function to SLOAD the overloaded _normalizedWeights* storage data - and not the inherited immutable one
     function _normalizedWeights(bool token0) internal view override returns (uint256) {
