@@ -1,8 +1,9 @@
-const { expect } = require('chai');
+const { expect, Assertion } = require('chai');
 const { ethers } = require('ethers');
 const { deployContract } = require('ethereum-waffle');
 const {
   initialize,
+  computeInvariant,
   currentTimestamp,
   join,
   mint,
@@ -21,6 +22,33 @@ const {
   itUnlocksLikeExpected,
   transfer,
 } = require('../helpers');
+
+const Decimal = require('decimal.js');
+
+const { waffle } = require('hardhat');
+const MAX_RELATIVE_ERROR = 0.00005;
+Assertion.addMethod('near', function(actual, relativeError) {
+  const expected = new Decimal(this._obj.toString());
+  const delta = new Decimal(actual.toString())
+    .dividedBy(expected)
+    .sub(1)
+    .abs();
+  // const delta = expected.sub(new Deciactual()).abs();
+  // const epsilon = ethers.BigNumber.from(_epsilon);
+
+  this.assert(
+    delta.lte(new Decimal(relativeError)),
+    'expected #{exp} to be near #{act}',
+    'expected #{exp} not to be near #{act}',
+    expected.toString(),
+    actual.toString()
+  );
+});
+
+const advanceTime = async (seconds) => {
+  await waffle.provider.send('evm_increaseTime', [parseInt(seconds.toString())]);
+  await waffle.provider.send('evm_mine', []);
+};
 
 describe.only('SpectralizationBootstrappingPool', () => {
   before(async () => {
@@ -123,27 +151,86 @@ describe.only('SpectralizationBootstrappingPool', () => {
 
       // this.data.tx = await this.contracts.Vault.swap(singleSwap, fundManagement, 0, timestamp, { value: ethers.BigNumber.from('10000000') });
       // this.data.receipt = await this.data.tx.wait();
-      this.data.lastPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
-      console.log((await this.contracts.SBP.getNormalizedWeights())[0].toString());
-      console.log('Supply: ' + (await this.contracts.sERC20.totalSupply()).toString());
-      console.log('Cap: ' + (await this.contracts.sERC20.cap()).toString());
-      console.log('Mint');
-      await mint.sERC20(this, { amount: ethers.utils.parseEther('900') });
-      console.log('Cap: ' + (await this.contracts.sERC20.cap()).toString());
-      console.log('Supply: ' + (await this.contracts.sERC20.totalSupply()).toString());
-      await this.contracts.SBP.pokeWeights();
-      console.log((await this.contracts.SBP.getNormalizedWeights())[0].toString());
 
-      console.log(this.data.lastPrice.toString());
+      await (await this.contracts.SBP.pokeWeights()).wait();
+
+      this.data.previousPairPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
+      this.data.previousBPTPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
+      this.data.previousInvariant = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
+      this.data.previousPoolData = await this.contracts.SBP.getMiscData();
+
+      const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
+      const weights = await this.contracts.SBP.getNormalizedWeights();
+      this.data.previousExpectedInvariant = computeInvariant([balances[0], balances[1]], [weights[0], weights[1]]);
+
+      // move time forward to create a new oracle sample
+      await advanceTime(ethers.BigNumber.from('180'));
+
+      await mint.sERC20(this, { amount: ethers.utils.parseEther('900') });
+      await (await this.contracts.SBP.pokeWeights()).wait();
+      this.data.currentTimestamp = await currentTimestamp();
+
+      this.data.lastPairPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
+      this.data.lastBPTPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
+      this.data.lastInvariant = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
+      this.data.lastPoolData = await this.contracts.SBP.getMiscData();
+
+      // await mint.sERC20(this, { amount: ethers.utils.parseEther('900') });
+      // console.log('Cap: ' + (await this.contracts.sERC20.cap()).toString());
+      // console.log('Supply: ' + (await this.contracts.sERC20.totalSupply()).toString());
+      // console.log((await this.contracts.SBP.getNormalizedWeights())[0].toString());
+
+      // console.log(this.data.lastPrice.toString());
+
+      // this.data.sample = await this.contracts.SBP.getOracleSample();
     });
 
     it('it does something', async () => {
-      console.log((await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE)).toString());
-
-      await join(this);
-
-      console.log((await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE)).toString());
+      // console.log((await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE)).toString());
+      // await join(this);
+      // console.log((await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE)).toString());
     });
+
+    it('it updates the oracle data', async () => {
+      expect(this.data.lastPoolData.oracleIndex).to.equal(this.data.previousPoolData.oracleIndex.add(1));
+      expect(this.data.lastPoolData.oracleSampleCreationTimestamp).to.equal(this.data.currentTimestamp);
+    });
+
+    it('it caches the log of the last invariant', async () => {
+      // const expectedPreviousInvariant =
+
+      // const invariant = computeInvariant(
+      //   [ctx.constants.pooledETH, ctx.constants.pooledSERC20],
+      //   [ctx.constants.pool.ONE.sub(ctx.constants.pool.normalizedStartWeight), ctx.constants.pool.normalizedStartWeight]
+      // );
+      // expect(await ctx.contracts.SBP.getLastInvariant()).to.be.near(invariant, 100000);
+      // 3182145935019611022;
+      // 3182286615916142423;
+      // const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
+      // const weights = await this.contracts.SBP.getNormalizedWeights();
+      // const invariant = computeInvariant([balances[0], balances[1]], [weights[0], weights[1]]);
+
+      // console.log('Invariant computed ' + invariant.toString());
+      // console.log('Current invariant ' + this.data.currentInvariant.toString());
+      // console.log('Misc data invariant  ' + this.data.currentPoolData.logInvariant.toString());
+
+      // console.log('Previous invariant ' + this.data.lastInvariant.toString());
+
+      // 3182286615916142423;
+      // 3182286615916142423;
+      // console.log((await this.contracts.SBP.getInvariant()).toString());
+      // console.log((await this.contracts.SBP.getLastInvariant()).toString());
+      console.log(this.data.lastInvariant.toString());
+      console.log(this.data.previousExpectedInvariant.toString());
+      expect(this.data.lastInvariant).to.be.near(this.data.previousExpectedInvariant, MAX_RELATIVE_ERROR);
+      // expect(10000).to.be.near(10, 0.000000001);
+    });
+
+    it('it caches the total supply', async () => {});
+
+    it('it updates pair price', async () => {});
+
+    it('it updates BPT price', async () => {});
   });
 
   describe('# mint', () => {

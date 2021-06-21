@@ -9,6 +9,7 @@ const WETH = require('../../artifacts/contracts/test/WETH.sol/WETH.json');
 const Vault = require('../../artifacts/@balancer-labs/v2-vault/contracts/Vault.sol/Vault.json');
 const Authorizer = require('../../artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json');
 const SBP = require('../../artifacts/contracts/distribution/SpectralizationBootstrappingPool.sol/SpectralizationBootstrappingPool.json');
+const OracleMock = require('../../artifacts/contracts/test/OracleMock.sol/OracleMock.json');
 
 // const { deployContract } = require('ethereum-waffle');
 const { waffle } = require('hardhat');
@@ -257,6 +258,7 @@ const setup = async (ctx, opts = {}) => {
     ctx.constants.unlockedURI,
   ]);
   ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
+  ctx.contracts.OracleMock = await deployContract(ctx.signers.root, OracleMock);
 
   ctx.data.receipt = await (await ctx.contracts.sERC721.mint(ctx.signers.owners[0].address, ctx.constants.tokenURI)).wait();
   ctx.data.tokenId = ctx.data.receipt.events[0].args.tokenId.toString();
@@ -623,6 +625,7 @@ const itUnlocksLikeExpected = (ctx, opts = {}) => {
 
 module.exports = {
   initialize,
+  computeInvariant,
   currentTimestamp,
   join,
   register,
