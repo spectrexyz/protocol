@@ -72,6 +72,7 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
     function _pokeWeights() internal {
         uint256[] memory balances;
         uint256 lastChangeBlock;
+        bool isOpened = totalSupply() > 0;
 
         if (totalSupply() > 0) {
             (, balances, lastChangeBlock) = getVault().getPoolTokens(getPoolId());

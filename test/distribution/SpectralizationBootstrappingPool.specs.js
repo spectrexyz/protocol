@@ -162,6 +162,7 @@ describe.only('SpectralizationBootstrappingPool', () => {
       const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
       const weights = await this.contracts.SBP.getNormalizedWeights();
       this.data.previousExpectedInvariant = computeInvariant([balances[0], balances[1]], [weights[0], weights[1]]);
+      /// take with from getInvariant instead
 
       // move time forward to create a new oracle sample
       await advanceTime(ethers.BigNumber.from('180'));
