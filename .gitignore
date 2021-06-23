@@ -11,8 +11,5 @@ artifacts
 coverage
 coverage.json
 
-# doc
-docs
-
 # macOS
 .DS_Store

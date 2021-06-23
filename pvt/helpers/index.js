@@ -267,7 +267,6 @@ const setup = async (ctx, opts = {}) => {
     ctx.contracts.sERC721 = ctx.contracts.sERC721.connect(ctx.signers.owners[0]);
     await (await ctx.contracts.sERC721.approve(ctx.contracts.sERC1155.address, ctx.data.tokenId)).wait();
   }
-
   if (opts.balancer) {
     ctx.contracts.WETH = await deployContract(ctx.signers.root, WETH);
     ctx.contracts.Authorizer = await deployContract(ctx.signers.root, Authorizer, [ctx.signers.admin.address]);
@@ -276,6 +275,7 @@ const setup = async (ctx, opts = {}) => {
     await mint.sERC20(ctx);
     console.log(ctx.contracts.WETH.address);
     console.log(ctx.contracts.sERC20.address);
+    console.log('SBP');
     ctx.contracts.SBP = await deployContract(ctx.signers.root, SBP, [
       ctx.contracts.Vault.address,
       ctx.constants.pool.name,
