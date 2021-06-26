@@ -275,14 +275,12 @@ const setup = async (ctx, opts = {}) => {
     await mint.sERC20(ctx);
     console.log(ctx.contracts.WETH.address);
     console.log(ctx.contracts.sERC20.address);
-    console.log('SBP');
     ctx.contracts.SBP = await deployContract(ctx.signers.root, SBP, [
       ctx.contracts.Vault.address,
       ctx.constants.pool.name,
       ctx.constants.pool.symbol,
       ctx.contracts.sERC20.address,
       ctx.contracts.WETH.address,
-
       ctx.constants.pool.normalizedStartWeight,
       ctx.constants.pool.normalizedEndWeight,
       ctx.constants.pool.swapFeePercentage,
@@ -290,8 +288,6 @@ const setup = async (ctx, opts = {}) => {
       ctx.constants.pool.bufferPeriodDuration,
       true,
     ]);
-
-    console.log('after');
 
     await approve.sERC20(ctx);
 

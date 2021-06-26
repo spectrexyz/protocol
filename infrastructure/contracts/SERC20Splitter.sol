@@ -20,10 +20,11 @@ contract SERC20Splitter is Context, AccessControlEnumerable {
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     uint256 public constant PCT_BASE = 1 ether; // 0% = 0 | 100% = 10^18 | 10% = 10^17
 
+    mapping (address => Split) _splits;
+
     event Register(address indexed sERC20, address[] beneficiaries, uint256[] shares);
     event Withdraw(address indexed sERC20, address indexed beneficiary, uint256 amount);
 
-    mapping (address => Split) _splits;
 
     constructor(address registrar) { 
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
