@@ -26,6 +26,13 @@ module.exports = {
       },
     ],
   },
+  networks: {
+    hardhat: {
+      accounts: {
+        count: 50,
+      },
+    },
+  },
   gasReporter: {
     enabled: process.env.REPORT_GAS ? true : false,
   },

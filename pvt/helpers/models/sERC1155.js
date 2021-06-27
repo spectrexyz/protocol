@@ -14,6 +14,8 @@ class sERC1155 {
     this.unavaibleURI = this.contract.unavaibleURI;
     this.unlockedURI = this.contract.unlockedURI;
     this.balanceOf = this.contract.balanceOf;
+    this.balanceOfBatch = this.contract.balanceOfBatch;
+    this.isApprovedForAll = this.contract.isApprovedForAll;
   }
 
   static async deploy(ctx) {
@@ -24,6 +26,39 @@ class sERC1155 {
     ]);
 
     ctx.sERC1155 = new sERC1155(ctx);
+  }
+
+  async setApprovalForAll(opts = {}) {
+    opts.from ??= this.ctx.signers.holders[0];
+    opts.operator ??= this.ctx.signers.sERC1155.operator;
+    opts.approve ??= true;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).setApprovalForAll(opts.operator.address, opts.approve);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async safeTransferFrom(opts = {}) {
+    opts.from = opts.from ? opts.from : this.ctx.signers.holders[0];
+    opts.operator = opts.operator ? opts.operator : opts.from;
+    opts.to = opts.to ? opts.to : this.ctx.signers.others[0];
+    opts.id = opts.id ? opts.id : this.ctx.data.id;
+    opts.amount = opts.amount ? opts.amount : this.ctx.params.sERC1155.amount;
+    opts.data = opts.data ? opts.data : ethers.constants.HashZero;
+
+    this.ctx.data.tx = await this.contract.connect(opts.operator).safeTransferFrom(opts.from.address, opts.to.address, opts.id, opts.amount, opts.data);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async safeBatchTransferFrom(opts = {}) {
+    opts.from ??= this.ctx.signers.holders[0];
+    opts.operator ??= opts.from;
+    opts.to ??= this.ctx.signers.others[0];
+    opts.ids ??= [this.ctx.data.id1, this.ctx.data.id2];
+    opts.amounts ??= [this.ctx.params.sERC1155.amount1, this.ctx.params.sERC1155.amount2];
+    opts.data ??= ethers.constants.HashZero;
+
+    this.ctx.data.tx = await this.contract.connect(opts.operator).safeBatchTransferFrom(opts.from.address, opts.to.address, opts.ids, opts.amounts, opts.data);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async spectralize(opts = {}) {
@@ -41,7 +76,7 @@ class sERC1155 {
         this.ctx.params.sERC20.symbol,
         this.ctx.params.sERC20.cap,
         this.ctx.signers.sERC20.admin.address,
-        this.ctx.signers.sERC20.guardian.address
+        this.ctx.signers.sERC1155.guardian.address
       );
 
       this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -59,7 +94,7 @@ class sERC1155 {
           this.ctx.params.sERC20.symbol,
           this.ctx.params.sERC20.cap,
           this.ctx.signers.sERC20.admin.address,
-          this.ctx.signers.sERC20.guardian.address
+          this.ctx.signers.sERC1155.guardian.address
         );
 
         this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -80,14 +115,14 @@ class sERC1155 {
           ethers.utils.formatBytes32String(this.ctx.params.sERC20.symbol),
           ethers.utils.defaultAbiCoder.encode(['uint256'], [this.ctx.params.sERC20.cap]),
           ethers.utils.defaultAbiCoder.encode(['address'], [this.ctx.signers.sERC20.admin.address]),
-          ethers.utils.defaultAbiCoder.encode(['address'], [this.ctx.signers.sERC20.guardian.address]),
+          ethers.utils.defaultAbiCoder.encode(['address'], [this.ctx.signers.sERC1155.guardian.address]),
         ])
       : ethers.utils.concat([
           ethers.utils.formatBytes32String(this.ctx.constants.name),
           ethers.utils.formatBytes32String(this.ctx.constants.symbol),
           ethers.utils.defaultAbiCoder.encode(['uint256'], [this.ctx.constants.cap]),
           ethers.utils.defaultAbiCoder.encode(['address'], [this.ctx.signers.sERC20.admin.address]),
-          ethers.utils.defaultAbiCoder.encode(['address'], [this.ctx.signers.sERC20.guardian.address]),
+          ethers.utils.defaultAbiCoder.encode(['address'], [this.ctx.signers.sERC1155.guardian.address]),
           ethers.utils.defaultAbiCoder.encode(['bytes32'], [opts.derrida]),
         ]);
   }
