@@ -1,6 +1,5 @@
 const { expect } = require('chai');
-const { ethers } = require('ethers');
-const { deployContract } = require('ethereum-waffle');
+// const { ethers } = require('ethers');
 const {
   initialize,
   mint,
@@ -11,14 +10,17 @@ const {
   setup,
   spectralize,
   unlock,
+  transfer,
+} = require('@spectrexyz/protocol-helpers');
+
+const {
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
   itSpectralizesLikeExpected,
   itUnlocksLikeExpected,
-  transfer,
-} = require('@spectrexyz/protocol-helpers');
+} = require('./behaviors/sERC1155.behavior');
 
-describe('sERC1155', () => {
+describe.only('sERC1155', () => {
   before(async () => {
     await initialize(this);
   });
@@ -26,85 +28,94 @@ describe('sERC1155', () => {
   describe('⇛ constructor', () => {
     describe('» sERC20 base address is not the zero address', () => {
       before(async () => {
-        await setup(this);
+        await setup(this, { spectralize: false });
       });
 
-      it('# it initializes sERC1155', async () => {
-        expect(await this.contracts.sERC1155.sERC20Base()).to.equal(this.contracts.sERC20Base.address);
-        expect(await this.contracts.sERC1155.unavailableURI()).to.equal(this.constants.unavailableURI);
-        expect(await this.contracts.sERC1155.unlockedURI()).to.equal(this.constants.unlockedURI);
+      it('# it sets sERC20 base address ', async () => {
+        expect(await this.sERC1155.sERC20Base()).to.equal(this.contracts.sERC20Base.address);
+      });
+
+      it('# it sets unavailableURI ', async () => {
+        expect(await this.sERC1155.unavailableURI()).to.equal(this.params.sERC1155.unavailableURI);
+      });
+
+      it('# it sets unlockedURI', async () => {
+        expect(await this.sERC1155.unlockedURI()).to.equal(this.params.sERC1155.unlockedURI);
       });
 
       it('# it sets up admin permissions', async () => {
-        expect(await this.contracts.sERC1155.hasRole(await this.contracts.sERC1155.ADMIN_ROLE(), this.signers.root.address)).to.equal(true);
-        expect(await this.contracts.sERC1155.getRoleAdmin(await this.contracts.sERC1155.ADMIN_ROLE())).to.equal(await this.contracts.sERC1155.ADMIN_ROLE());
+        expect(await this.sERC1155.hasRole(this.constants.sERC1155.ADMIN_ROLE, this.signers.sERC1155.admin.address)).to.equal(true);
+        expect(await this.sERC1155.getRoleAdmin(this.constants.sERC1155.ADMIN_ROLE)).to.equal(this.constants.sERC1155.ADMIN_ROLE);
       });
     });
 
     describe('» sERC20 base address is the zero address', () => {
       it('it reverts', async () => {
-        await expect(deployContract(this.signers.root, this.artifacts.SERC1155, [ethers.constants.AddressZero, this.constants.unlockedURI])).to.be.revertedWith(
-          'sERC1155: sERC20 base cannot be the zero address'
-        );
+        await expect(
+          waffle.deployContract(this.signers.sERC1155.admin, this.artifacts.SERC1155, [
+            ethers.constants.AddressZero,
+            this.params.sERC1155.unavailableURI,
+            this.params.sERC1155.unlockedURI,
+          ])
+        ).to.be.revertedWith('sERC1155: sERC20 base cannot be the zero address');
       });
     });
   });
 
   describe('⇛ ERC165', () => {
     before(async () => {
-      await setup(this);
+      await setup(this, { spectralize: false });
     });
 
     it('it supports ERC165 interface', async () => {
-      expect(await this.contracts.sERC1155.supportsInterface(0x01ffc9a7)).to.equal(true);
+      expect(await this.sERC1155.supportsInterface(0x01ffc9a7)).to.equal(true);
     });
 
     it('it supports AccessControlEnumerable interface', async () => {
-      expect(await this.contracts.sERC1155.supportsInterface(0x5a05180f)).to.equal(true);
+      expect(await this.sERC1155.supportsInterface(0x5a05180f)).to.equal(true);
     });
 
     it('it supports ERC1155 interface', async () => {
-      expect(await this.contracts.sERC1155.supportsInterface(0xd9b67a26)).to.equal(true);
+      expect(await this.sERC1155.supportsInterface(0xd9b67a26)).to.equal(true);
     });
 
     it('it supports ERC1155MetadataURI interface', async () => {
-      expect(await this.contracts.sERC1155.supportsInterface(0x0e89341c)).to.equal(true);
+      expect(await this.sERC1155.supportsInterface(0x0e89341c)).to.equal(true);
     });
 
     it('it supports ERC721TokenReceiver interface', async () => {
-      expect(await this.contracts.sERC1155.supportsInterface(0x150b7a02)).to.equal(true);
+      expect(await this.sERC1155.supportsInterface(0x150b7a02)).to.equal(true);
     });
 
     it('it does not support ERC1155TokenReceiver interface', async () => {
-      expect(await this.contracts.sERC1155.supportsInterface(0x4e2312e0)).to.equal(false);
+      expect(await this.sERC1155.supportsInterface(0x4e2312e0)).to.equal(false);
     });
   });
 
   describe('⇛ ERC1155', () => {
-    describe('# balanceOf', () => {
+    describe.only('# balanceOf', () => {
       describe('» the queried address is not the zero address', () => {
         describe('» and the queried token type exists', () => {
           before(async () => {
             await setup(this);
-            await spectralize(this);
-            await mint.sERC20(this, { to: this.signers.holders[0], amount: '1000' });
-            await mint.sERC20(this, { to: this.signers.holders[1], amount: '1500' });
+            await this.sERC20.mint({ to: this.signers.holders[0], amount: '1000' });
+            await this.sERC20.mint({ to: this.signers.holders[1], amount: '1500' });
           });
 
           it('it returns the amount of tokens owned by the queried address', async () => {
-            expect(await this.contracts.sERC1155.balanceOf(this.signers.holders[0].address, this.data.id)).to.equal(1000);
-            expect(await this.contracts.sERC1155.balanceOf(this.signers.holders[1].address, this.data.id)).to.equal(1500);
-            expect(await this.contracts.sERC1155.balanceOf(this.signers.holders[2].address, this.data.id)).to.equal(0);
+            expect(await this.sERC1155.balanceOf(this.signers.holders[0].address, this.data.id)).to.equal(1000);
+            expect(await this.sERC1155.balanceOf(this.signers.holders[1].address, this.data.id)).to.equal(1500);
+            expect(await this.sERC1155.balanceOf(this.signers.holders[2].address, this.data.id)).to.equal(0);
           });
         });
 
         describe('# but the queried token type does not exist', () => {
           before(async () => {
-            await setup(this);
+            await setup(this, { spectralize: false });
           });
 
           it('it returns zero', async () => {
-            expect(await this.contracts.sERC1155.balanceOf(this.signers.holders[0].address, '123456789')).to.equal(0);
+            expect(await this.sERC1155.balanceOf(this.signers.holders[0].address, '123456789')).to.equal(0);
           });
         });
       });
@@ -112,13 +123,10 @@ describe('sERC1155', () => {
       describe('» the queried address is the zero address', () => {
         before(async () => {
           await setup(this);
-          await spectralize(this);
         });
 
         it('it reverts', async () => {
-          await expect(this.contracts.sERC1155.balanceOf(ethers.constants.AddressZero, this.data.id)).to.be.revertedWith(
-            'sERC1155: balance query for the zero address'
-          );
+          await expect(this.sERC1155.balanceOf(ethers.constants.AddressZero, this.data.id)).to.be.revertedWith('sERC1155: balance query for the zero address');
         });
       });
     });

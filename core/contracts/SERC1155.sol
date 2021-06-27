@@ -316,12 +316,12 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      *      - sERC20-related parameters are checked in SERC20.initialize().
      *      - This contract is open to re-entrancy for it would be harmless.
      * @param collection The address of the ERC721 contract the NFT to spectralize belongs to.
-     * @param tokenId The tokenId of the NFT to spectralize.
-     * @param name The name of the sERC20 to spectralize the NFT into.
-     * @param symbol The symbol of the sERC20 to spectralize the NFT into.
-     * @param cap The supply cap of the sERC20 to spectralize the NFT into.
-     * @param admin The admin of the sERC20 to spectralize the NFT into [can manage its roles and permissions].
-     * @param guardian The guardian of the spectre to create [can unlock it and release its NFT].
+     * @param tokenId    The tokenId of the NFT to spectralize.
+     * @param name       The name of the sERC20 to spectralize the NFT into.
+     * @param symbol     The symbol of the sERC20 to spectralize the NFT into.
+     * @param cap        The supply cap of the sERC20 to spectralize the NFT into.
+     * @param admin      The admin of the sERC20 to spectralize the NFT into [can manage its roles and permissions].
+     * @param guardian   The guardian of the spectre to create [can unlock it and release its NFT].
      */
     function spectralize(
         address collection,

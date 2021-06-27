@@ -11,15 +11,19 @@ const Authorizer = require('@spectrexyz/protocol-spectralization-bootstrapping-p
 const SBP = require('@spectrexyz/protocol-spectralization-bootstrapping-pool/artifacts/contracts/SpectralizationBootstrappingPool.sol/SpectralizationBootstrappingPool.json');
 const OracleMock = require('@spectrexyz/protocol-spectralization-bootstrapping-pool/artifacts/contracts/test/OracleMock.sol/OracleMock.json');
 
-// const { deployContract } = require('ethereum-waffle');
-const { waffle } = require('hardhat');
-const { deployContract } = waffle;
-const { expect, Assertion } = require('chai');
+const { deployContract } = require('ethereum-waffle');
+
+const { expect, Assertion, assert } = require('chai');
 const { ethers, network } = require('hardhat');
 const Decimal = require('decimal.js');
+// const sERC20 = require('../../core/test/helpers/models/sERC20');
 const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
 const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
 const DERRIDA = '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce';
+
+const sERC20 = require('./models/sERC20');
+const sERC721 = require('./models/sERC721');
+const sERC1155 = require('./models/sERC1155');
 
 Assertion.addMethod('near', function(actual, _epsilon) {
   const expected = this._obj;
@@ -29,16 +33,6 @@ Assertion.addMethod('near', function(actual, _epsilon) {
   this.assert(delta.abs().lte(epsilon), 'expected #{exp} to be near #{act}', 'expected #{exp} to not be near #{act}', expected, actual);
 });
 
-const currentTimestamp = async () => {
-  const { timestamp } = await network.provider.send('eth_getBlockByNumber', ['latest', true]);
-  return ethers.BigNumber.from(timestamp);
-};
-
-const advanceTime = async (seconds) => {
-  await ethers.provider.send('evm_increaseTime', [parseInt(seconds.toString())]);
-  await ethers.provider.send('evm_mine', []);
-};
-
 const initialize = async (ctx) => {
   ctx.artifacts = {
     SERC20,
@@ -46,7 +40,36 @@ const initialize = async (ctx) => {
     SERC1155,
   };
 
+  ctx.params = {
+    sERC20: {
+      cap: ethers.utils.parseEther('1000'),
+      name: 'My Awesome sERC20',
+      symbol: 'MAS',
+      cap: ethers.utils.parseEther('1000'),
+      balance: ethers.BigNumber.from('100000000000000000000'),
+    },
+    sERC721: {
+      name: 'sERC721 Collection',
+      symbol: 'SERC721',
+      tokenURI: 'ipfs://Qm.../',
+    },
+    sERC1155: {
+      unlockedURI: 'ipfs://Qm.../unwrapped',
+      unavailableURI: 'ipfs://Qm.../unavailable',
+    },
+  };
+
   ctx.constants = {
+    sERC20: {
+      BURNER_ROLE: ethers.BigNumber.from('0x3c11d16cbaffd01df69ce1c404f6340ee057498f5f00246190ea54220576a848'),
+      MINTER_ROLE: ethers.BigNumber.from('0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6'),
+      PAUSER_ROLE: ethers.BigNumber.from('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a'),
+      SNAPSHOTER_ROLE: ethers.BigNumber.from('0xe81b7fde06adf1242da26197bd147d2a1b7c0c31ac749e1d4b2c4a883f986140'),
+    },
+    sERC1155: {
+      DERRIDA: '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce',
+      ADMIN_ROLE: ethers.BigNumber.from('0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775'),
+    },
     SpectreState: {
       Null: 0,
       Locked: 1,
@@ -92,6 +115,9 @@ const initialize = async (ctx) => {
   ctx.data = {};
 
   ctx.signers = {
+    sERC20: {},
+    sERC721: { owners: [] },
+    sERC1155: {},
     holders: [],
     owners: [],
     beneficiaries: [],
@@ -111,6 +137,14 @@ const initialize = async (ctx) => {
     ctx.signers.beneficiaries[0],
     ctx.signers.beneficiaries[1],
     ctx.signers.beneficiaries[2],
+    ctx.signers.sERC1155.admin,
+    ctx.signers.sERC20.admin,
+    ctx.signers.sERC20.guardian,
+    ctx.signers.sERC20.burner,
+    ctx.signers.sERC20.minter,
+    ctx.signers.sERC20.pauser,
+    ctx.signers.sERC20.snapshoter,
+    ctx.signers.sERC721.owners[0],
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
@@ -201,11 +235,13 @@ const mint = {
     }
   },
   sERC20: async (ctx, opts = {}) => {
+    console.log();
+
+    opts.from ??= ctx.signers.sERC20.minter;
     opts.to ??= ctx.signers.holders[0];
     opts.amount ??= ctx.constants.balance;
 
-    ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(ctx.signers.admin);
-    ctx.data.tx = await ctx.contracts.sERC20.mint(opts.to.address, opts.amount);
+    ctx.data.tx = await ctx.contracts.sERC20.connect(opts.from).mint(opts.to.address, opts.amount);
     ctx.data.receipt = await ctx.data.tx.wait();
   },
 };
@@ -249,24 +285,17 @@ const safeBatchTransferFrom = async (ctx, opts = {}) => {
 const setup = async (ctx, opts = {}) => {
   opts.approve ??= true;
   opts.balancer ??= false;
+  opts.spectralize ??= true;
 
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
-  ctx.contracts.sERC721 = await deployContract(ctx.signers.root, SERC721, ['sERC721 Collection', 'sERC721']);
-  ctx.contracts.sERC1155 = await deployContract(ctx.signers.root, SERC1155, [
-    ctx.contracts.sERC20Base.address,
-    ctx.constants.unavailableURI,
-    ctx.constants.unlockedURI,
-  ]);
-  ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
-  ctx.contracts.OracleMock = await deployContract(ctx.signers.root, OracleMock);
 
-  ctx.data.receipt = await (await ctx.contracts.sERC721.mint(ctx.signers.owners[0].address, ctx.constants.tokenURI)).wait();
-  ctx.data.tokenId = ctx.data.receipt.events[0].args.tokenId.toString();
+  await sERC721.deploy(ctx);
+  await sERC1155.deploy(ctx);
+  await ctx.sERC721.mint(opts);
 
-  if (opts.approve) {
-    ctx.contracts.sERC721 = ctx.contracts.sERC721.connect(ctx.signers.owners[0]);
-    await (await ctx.contracts.sERC721.approve(ctx.contracts.sERC1155.address, ctx.data.tokenId)).wait();
-  }
+  // ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
+  // ctx.contracts.OracleMock = await deployContract(ctx.signers.root, OracleMock);
+
   if (opts.balancer) {
     ctx.contracts.WETH = await deployContract(ctx.signers.root, WETH);
     ctx.contracts.Authorizer = await deployContract(ctx.signers.root, Authorizer, [ctx.signers.admin.address]);
@@ -293,6 +322,32 @@ const setup = async (ctx, opts = {}) => {
 
     ctx.data.poolId = await ctx.contracts.SBP.getPoolId();
   }
+
+  if (opts.spectralize) {
+    await ctx.sERC1155.spectralize();
+  }
+};
+
+const _throw = (msg) => {
+  throw new Error(msg);
+};
+
+const grantRole = {
+  sERC20: async (ctx, opts = {}) => {
+    // console.log(opts.account);
+    opts.account ?? _throw('sERC20 » grantRole » account required');
+    opts.role ?? _throw('sERC20 » grantRole » role required');
+
+    opts.from ??= ctx.signers.sERC20.admin;
+    opts.role = opts.role + '_ROLE';
+
+    console.log(opts.role);
+    console.log(await ctx.contracts.sERC20[opts.role]());
+    console.log(await ctx.contracts.sERC20.MINTER_ROLE());
+
+    ctx.data.tx = await ctx.contracts.sERC20.connect(opts.from).grantRole(await ctx.contracts.sERC20[opts.role](), opts.account.address);
+    ctx.data.receipt = await ctx.data.tx.wait();
+  },
 };
 
 const approve = {
@@ -336,14 +391,14 @@ const spectralize = async (ctx, opts = {}) => {
             ethers.utils.formatBytes32String(ctx.constants.name),
             ethers.utils.formatBytes32String(ctx.constants.symbol),
             ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
-            ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
+            ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.sERC20.admin.address]),
             ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
           ])
         : ethers.utils.concat([
             ethers.utils.formatBytes32String(ctx.constants.name),
             ethers.utils.formatBytes32String(ctx.constants.symbol),
             ethers.utils.defaultAbiCoder.encode(['uint256'], [ctx.constants.cap]),
-            ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.admin.address]),
+            ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.sERC20.admin.address]),
             ethers.utils.defaultAbiCoder.encode(['address'], [ctx.signers.owners[1].address]),
             ethers.utils.defaultAbiCoder.encode(['bytes32'], [opts.derrida]),
           ]);
@@ -368,7 +423,7 @@ const spectralize = async (ctx, opts = {}) => {
         ctx.constants.name,
         ctx.constants.symbol,
         ctx.constants.cap,
-        ctx.signers.admin.address,
+        ctx.signers.sERC20.admin.address,
         ctx.signers.owners[1].address
       );
       ctx.data.receipt = await ctx.data.tx.wait();
@@ -376,8 +431,12 @@ const spectralize = async (ctx, opts = {}) => {
       ctx.contracts.sERC20 = new ethers.Contract(await ctx.contracts.sERC1155.sERC20Of(ctx.data.id), SERC20.abi, ctx.signers.root);
     }
   }
-  ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(ctx.signers.admin);
-  await await ctx.contracts.sERC20.grantRole(await ctx.contracts.sERC20.MINTER_ROLE(), ctx.signers.admin.address);
+
+  await await ctx.contracts.sERC20.connect(ctx.signers.sERC20.admin).grantRole(await ctx.contracts.sERC20.MINTER_ROLE(), ctx.signers.sERC20.minter.address);
+
+  // ctx.sERC20 = new sERC20(ctx);
+
+  ctx.sERC20 = await sERC20.at(ctx, await ctx.contracts.sERC1155.sERC20Of(ctx.data.id));
 };
 
 const transfer = {
@@ -500,134 +559,9 @@ const itJoinsPoolLikeExpected = (ctx, opts = {}) => {
   }
 };
 
-const itSafeTransfersFromLikeExpected = (ctx, opts = {}) => {
-  it("it debits sender's balance", async () => {
-    expect(await ctx.contracts.sERC20.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount));
-    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.holders[0].address, ctx.data.id)).to.equal(ctx.constants.balance.sub(ctx.constants.amount));
-  });
-
-  it("it credits receiver's balance", async () => {
-    opts.to = opts.mock ? ctx.contracts.ERC1155Receiver : ctx.signers.others[0];
-
-    expect(await ctx.contracts.sERC20.balanceOf(opts.to.address)).to.equal(ctx.constants.amount);
-    expect(await ctx.contracts.sERC1155.balanceOf(opts.to.address, ctx.data.id)).to.equal(ctx.constants.amount);
-  });
-
-  it('it emits one TransferSingle event', async () => {
-    opts.operator = opts.operator ? ctx.signers.operator : ctx.signers.holders[0];
-    opts.to = opts.mock ? ctx.contracts.ERC1155Receiver : ctx.signers.others[0];
-
-    expect(ctx.data.receipt.events.filter((event) => event.event === 'TransferSingle').length).to.equal(1);
-    await expect(ctx.data.tx)
-      .to.emit(ctx.contracts.sERC1155, 'TransferSingle')
-      .withArgs(opts.operator.address, ctx.signers.holders[0].address, opts.to.address, ctx.data.id, ctx.constants.amount);
-  });
-};
-
-const itSafeBatchTransfersFromLikeExpected = (ctx, opts = { operator: undefined }) => {
-  it("it debits sender's balance", async () => {
-    expect(await ctx.data.sERC201.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount1));
-    expect(await ctx.data.sERC202.balanceOf(ctx.signers.holders[0].address)).to.equal(ctx.constants.balance.sub(ctx.constants.amount2));
-    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.holders[0].address, ctx.data.id1)).to.equal(ctx.constants.balance.sub(ctx.constants.amount1));
-    expect(await ctx.contracts.sERC1155.balanceOf(ctx.signers.holders[0].address, ctx.data.id2)).to.equal(ctx.constants.balance.sub(ctx.constants.amount2));
-  });
-
-  it("it credits receiver's balance", async () => {
-    opts.to = opts.mock ? ctx.contracts.ERC1155Receiver : ctx.signers.others[0];
-
-    expect(await ctx.data.sERC201.balanceOf(opts.to.address)).to.equal(ctx.constants.amount1);
-    expect(await ctx.data.sERC202.balanceOf(opts.to.address)).to.equal(ctx.constants.amount2);
-    expect(await ctx.contracts.sERC1155.balanceOf(opts.to.address, ctx.data.id1)).to.equal(ctx.constants.amount1);
-    expect(await ctx.contracts.sERC1155.balanceOf(opts.to.address, ctx.data.id2)).to.equal(ctx.constants.amount2);
-  });
-
-  it('it emits one TransferBatch event', async () => {
-    opts.operator = opts.operator ? ctx.signers.operator : ctx.signers.holders[0];
-    opts.to = opts.mock ? ctx.contracts.ERC1155Receiver : ctx.signers.others[0];
-
-    expect(ctx.data.receipt.events.filter((event) => event.event === 'TransferBatch').length).to.equal(1);
-    await expect(ctx.data.tx)
-      .to.emit(ctx.contracts.sERC1155, 'TransferBatch')
-      .withArgs(
-        opts.operator.address,
-        ctx.signers.holders[0].address,
-        opts.to.address,
-        [ctx.data.id1, ctx.data.id2],
-        [ctx.constants.amount1, ctx.constants.amount2]
-      );
-  });
-};
-
-const itSpectralizesLikeExpected = (ctx, opts = {}) => {
-  it('it locks ERC721', async () => {
-    expect(await ctx.contracts.sERC1155.isLocked(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(true);
-    expect(await ctx.contracts.sERC1155.lockOf(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(ctx.data.id);
-    expect(await ctx.contracts.sERC721.ownerOf(ctx.data.tokenId)).to.equal(ctx.contracts.sERC1155.address);
-  });
-
-  it('it emits a Lock event', async () => {
-    await expect(ctx.data.tx)
-      .to.emit(ctx.contracts.sERC1155, 'Lock')
-      .withArgs(ctx.data.id);
-  });
-
-  it('it clones and initializes sERC20', async () => {
-    expect(await ctx.contracts.sERC20.name()).to.equal(ctx.constants.name);
-    expect(await ctx.contracts.sERC20.symbol()).to.equal(ctx.constants.symbol);
-    expect(await ctx.contracts.sERC20.cap()).to.equal(ctx.constants.cap);
-    expect(await ctx.contracts.sERC20.hasRole(await ctx.contracts.sERC20.DEFAULT_ADMIN_ROLE(), ctx.signers.admin.address)).to.equal(true);
-  });
-
-  it('it emits a TransferSingle event as per the ERC1155 standard', async () => {
-    opts.operator = opts.transfer ? ctx.contracts.sERC721 : ctx.signers.root;
-
-    await expect(ctx.data.tx)
-      .to.emit(ctx.contracts.sERC1155, 'TransferSingle')
-      .withArgs(opts.operator.address, ethers.constants.AddressZero, ethers.constants.AddressZero, ctx.data.id, 0);
-  });
-
-  it('it registers spectre', async () => {
-    const spectre = await ctx.contracts.sERC1155['spectreOf(uint256)'](ctx.data.id);
-
-    expect(spectre.state).to.equal(ctx.constants.SpectreState.Locked);
-    expect(spectre.collection).to.equal(ctx.contracts.sERC721.address);
-    expect(spectre.tokenId).to.equal(ctx.data.tokenId);
-    expect(spectre.guardian).to.equal(ctx.signers.owners[1].address);
-  });
-
-  it('it emits a Spectralize event', async () => {
-    await expect(ctx.data.tx)
-      .to.emit(ctx.contracts.sERC1155, 'Spectralize')
-      .withArgs(ctx.contracts.sERC721.address, ctx.data.tokenId, ctx.data.id, ctx.contracts.sERC20.address, ctx.signers.owners[1].address);
-  });
-};
-
-const itUnlocksLikeExpected = (ctx, opts = {}) => {
-  it('it updates spectre state', async () => {
-    const spectre = await ctx.contracts.sERC1155['spectreOf(uint256)'](ctx.data.id);
-
-    expect(spectre.state).to.equal(ctx.constants.SpectreState.Unlocked);
-  });
-
-  it('it updates NFT lock', async () => {
-    expect(await ctx.contracts.sERC1155.lockOf(ctx.contracts.sERC721.address, ctx.data.id)).to.equal(0);
-  });
-
-  it('it emits an Unlock event', async () => {
-    await expect(ctx.data.tx)
-      .to.emit(ctx.contracts.sERC1155, 'Unlock')
-      .withArgs(ctx.data.id, ctx.signers.owners[2].address);
-  });
-
-  it('it transfers NFT', async () => {
-    expect(await ctx.contracts.sERC721.ownerOf(ctx.data.tokenId)).to.equal(ctx.signers.owners[2].address);
-  });
-};
-
 module.exports = {
   initialize,
   computeInvariant,
-  currentTimestamp,
   join,
   register,
   mint,
@@ -642,12 +576,7 @@ module.exports = {
   withdraw,
   withdrawBatch,
   itJoinsPoolLikeExpected,
-  itSafeBatchTransfersFromLikeExpected,
-  itSafeTransfersFromLikeExpected,
-  itSpectralizesLikeExpected,
-  itUnlocksLikeExpected,
-  // CloneFactory,
-  // SERC20Splitter,
+
   SERC20,
   SERC721,
   SERC1155,

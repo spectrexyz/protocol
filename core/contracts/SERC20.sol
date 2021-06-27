@@ -30,32 +30,29 @@ contract SERC20 is
     ERC20SnapshotUpgradeable,
     ERC20PermitUpgradeable
 {
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant SNAPSHOT_ROLE = keccak256("SNAPSHOT_ROLE");
-    bytes32 public constant MINTER_ADMIN_ROLE = keccak256("MINTER_ADMIN_ROLE");
-    bytes32 public constant PAUSER_ADMIN_ROLE = keccak256("PAUSER_ADMIN_ROLE");
-    bytes32 public constant SNAPSHOT_ADMIN_ROLE = keccak256("SNAPSHOT_ADMIN_ROLE");
+    bytes32 public constant BURNER_ROLE     = keccak256("BURNER_ROLE");
+    bytes32 public constant MINTER_ROLE     = keccak256("MINTER_ROLE");
+    bytes32 public constant PAUSER_ROLE     = keccak256("PAUSER_ROLE");
+    bytes32 public constant SNAPSHOTER_ROLE = keccak256("SNAPSHOTER_ROLE");
 
     address private _sERC1155;
-    bool private _hook;
+    bool    private _hook;
 
     /**
      * @notice sERC20 constructor.
-     * @dev This contract is meant to be used as the implementation contract of EIP1167 minimal proxies.
-     * The initializer modifier prevents the base implementation of being actually initialized.
-     * See https://eips.ethereum.org/EIPS/eip-1167.
+     * @dev - This contract is meant to be used as the implementation contract of EIP-1167 minimal proxies.
+     *      - The initializer modifier prevents the base implementation of being actually initialized.
+     *      - See https://eips.ethereum.org/EIPS/eip-1167.
      */
     constructor() initializer {
     }
 
     /**
      * @notice Initializes sERC20.
-     * @dev Remarks:
-     *        - `name_` is left unchecked as per the ERC20 standard.
-     *        - `symbol_` is left unchecked as per the ERC20 standard.
-     *        - `cap_` > 0 is checked in __ERC20Capped_init().
-     *        - `admin` can be set to the zero address to neutralize its privileges.
+     * @dev - `name_` is left unchecked as per the ERC20 standard.
+     *      - `symbol_` is left unchecked as per the ERC20 standard.
+     *      - `cap_` > 0 is checked in __ERC20Capped_init().
+     *      - `admin` can be set to the zero address to neutralize its privileges.
      * @param name_ The name of the sERC20.
      * @param symbol_ The symbol of the sERC20.
      * @param cap_ The supply cap of the sERC20.
@@ -82,7 +79,7 @@ contract SERC20 is
     }
 
     /**
-     * @notice Pauses token transfers.
+     * @notice Pauses token transfers, mints and burns.
      */
     function pause() external {
         require(hasRole(PAUSER_ROLE, _msgSender()), "sERC20: must have pauser role to pause");
@@ -90,7 +87,7 @@ contract SERC20 is
     }
 
     /**
-     * @notice Unpauses token transfers.
+     * @notice Unpauses token transfers, mints and burns.
      */
     function unpause() external {
         require(hasRole(PAUSER_ROLE, _msgSender()), "sERC20: must have pauser role to unpause");
@@ -103,7 +100,7 @@ contract SERC20 is
     }
 
     /**
-     * @notice Mint `amount` new tokens for `to`.
+     * @notice Mints `amount` new tokens for `to`.
      * @param to The recipient of the tokens to mint.
      * @param amount The amount of tokens to mint.
      */
@@ -120,7 +117,7 @@ contract SERC20 is
      * transfers for them. That's the reason why this function is protected by the SNAPSHOT_ROLE.
      */
     function snapshot() external returns (uint256) {
-        require(hasRole(SNAPSHOT_ROLE, _msgSender()), "sERC20: must have snapshot role to snapshot");
+        require(hasRole(SNAPSHOTER_ROLE, _msgSender()), "sERC20: must have snapshot role to snapshot");
         return _snapshot();
     }
 
