@@ -8,7 +8,7 @@ const MAX_RELATIVE_ERROR = 0.00005;
 
 chai.use(near);
 
-describe('SpectralizationBootstrappingPool', () => {
+describe('sBootstrappingPool', () => {
   before(async () => {
     await initialize(this);
   });
@@ -84,75 +84,30 @@ describe('SpectralizationBootstrappingPool', () => {
   describe.only('# pokeWeights', () => {
     before(async () => {
       await setup(this, { balancer: true });
-      console.log('Join 1');
-      await join(this, { init: true });
-      console.log('Join 2');
+      await this.sBootstrappingPool.join({ init: true });
+      await this.sBootstrappingPool.join();
+      await this.sBootstrappingPool.pokeWeights();
 
-      await join(this);
-
-      console.log('joined');
-
-      // const singleSwap = {
-      //   poolId: this.data.poolId,
-      //   kind: 0, // GIVEN_IN
-      //   assetIn: ethers.constants.AddressZero,
-      //   assetOut: this.contracts.sERC20.address,
-      //   amount: ethers.BigNumber.from('10000000'),
-      //   userData: '0x77', //ethers.utils.defaultAbiCoder.encode(['bool'], [false]),
-      // };
-
-      // const fundManagement = {
-      //   sender: this.signers.holders[0].address,
-      //   fromInternalBalance: false,
-      //   recipient: this.signers.holders[0].address,
-      //   toInternalBalance: false,
-      // };
-
-      // const HOUR = ethers.BigNumber.from('3600');
-
-      // const timestamp = (await currentTimestamp()).add(HOUR);
-
-      // this.data.tx = await this.contracts.Vault.swap(singleSwap, fundManagement, 0, timestamp, { value: ethers.BigNumber.from('10000000') });
-      // this.data.receipt = await this.data.tx.wait();
-
-      await (await this.contracts.SBP.pokeWeights()).wait();
-
-      this.data.previousPairPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
-      this.data.previousBPTPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
-      this.data.previousInvariant = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
-      this.data.previousPoolData = await this.contracts.SBP.getMiscData();
+      this.data.previousPairPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
+      this.data.previousBPTPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
+      this.data.previousInvariant = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
+      this.data.previousPoolData = await this.sBootstrappingPool.getMiscData();
 
       const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
-      const weights = await this.contracts.SBP.getNormalizedWeights();
-      this.data.previousExpectedInvariant = computeInvariant([balances[0], balances[1]], [weights[0], weights[1]]);
-      /// take with from getInvariant instead
+      const weights = await this.sBootstrappingPool.getNormalizedWeights();
+      this.data.previousExpectedInvariant = await this.sBootstrappingPool.getInvariant();
 
       // move time forward to create a new oracle sample
       await advanceTime(ethers.BigNumber.from('180'));
 
       await this.sERC20.mint(this, { amount: ethers.utils.parseEther('900') });
-      await (await this.contracts.SBP.pokeWeights()).wait();
+      await this.sBootstrappingPool.pokeWeights();
       this.data.currentTimestamp = await currentTimestamp();
 
-      this.data.lastPairPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
-      this.data.lastBPTPrice = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
-      this.data.lastInvariant = await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
-      this.data.lastPoolData = await this.contracts.SBP.getMiscData();
-
-      // await mint.sERC20(this, { amount: ethers.utils.parseEther('900') });
-      // console.log('Cap: ' + (await this.contracts.sERC20.cap()).toString());
-      // console.log('Supply: ' + (await this.contracts.sERC20.totalSupply()).toString());
-      // console.log((await this.contracts.SBP.getNormalizedWeights())[0].toString());
-
-      // console.log(this.data.lastPrice.toString());
-
-      // this.data.sample = await this.contracts.SBP.getOracleSample();
-    });
-
-    it('it does something', async () => {
-      // console.log((await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE)).toString());
-      // await join(this);
-      // console.log((await this.contracts.SBP.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE)).toString());
+      this.data.lastPairPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
+      this.data.lastBPTPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
+      this.data.lastInvariant = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
+      this.data.lastPoolData = await this.sBootstrappingPool.getMiscData();
     });
 
     it('it updates the oracle data', async () => {

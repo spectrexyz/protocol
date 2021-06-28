@@ -1,15 +1,7 @@
 const SERC20 = require('@spectrexyz/protocol-core/artifacts/contracts/SERC20.sol/sERC20.json');
-const SERC721 = require('@spectrexyz/protocol-core/artifacts/contracts/SERC721.sol/sERC721.json');
-const SERC1155 = require('@spectrexyz/protocol-core/artifacts/contracts/SERC1155.sol/sERC1155.json');
-const SERC20Splitter = require('@spectrexyz/protocol-infrastructure/artifacts/contracts/SERC20Splitter.sol/SERC20Splitter.json');
 const ERC1155Receiver = require('@spectrexyz/protocol-core/artifacts/contracts/test/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json');
 const ERC721Mock = require('@spectrexyz/protocol-core/artifacts/contracts/test/ERC721Mock.sol/ERC721Mock.json');
-// const CloneFactory = require('../../artifacts/contracts/test/CloneFactory.sol/CloneFactory.json');
-const WETH = require('@spectrexyz/protocol-spectralization-bootstrapping-pool/artifacts/contracts/test/WETH.sol/WETH.json');
-const Vault = require('@spectrexyz/protocol-spectralization-bootstrapping-pool/artifacts/@balancer-labs/v2-vault/contracts/Vault.sol/Vault.json');
-const Authorizer = require('@spectrexyz/protocol-spectralization-bootstrapping-pool/artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json');
-const SBP = require('@spectrexyz/protocol-spectralization-bootstrapping-pool/artifacts/contracts/SpectralizationBootstrappingPool.sol/SpectralizationBootstrappingPool.json');
-const OracleMock = require('@spectrexyz/protocol-spectralization-bootstrapping-pool/artifacts/contracts/test/OracleMock.sol/OracleMock.json');
+const OracleMock = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/test/OracleMock.sol/OracleMock.json');
 
 const { deployContract } = require('ethereum-waffle');
 
@@ -20,19 +12,12 @@ const Decimal = require('decimal.js');
 // const sERC20 = require('../../core/test/helpers/models/sERC20');
 const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
 const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
-const DERRIDA = '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce';
 
-const sERC20 = require('./models/sERC20');
 const sERC721 = require('./models/sERC721');
 const sERC1155 = require('./models/sERC1155');
+const sBootstrappingPool = require('./models/sBootstrappingPool');
 
 const initialize = async (ctx) => {
-  ctx.artifacts = {
-    SERC20,
-    SERC721,
-    SERC1155,
-  };
-
   ctx.params = {
     sERC20: {
       cap: ethers.utils.parseEther('1000'),
@@ -52,6 +37,12 @@ const initialize = async (ctx) => {
       amount: ethers.BigNumber.from('10000000000000000000'),
       amount1: ethers.BigNumber.from('70000000000000000000'),
       amount2: ethers.BigNumber.from('12000000000000000000'),
+    },
+    sBootstrappingPool: {
+      pooled: {
+        ETH: ethers.BigNumber.from('2000000000000000000'),
+        sERC20: ethers.BigNumber.from('1000000000000000000'),
+      },
     },
   };
 
@@ -158,43 +149,6 @@ const computeInvariant = (balances, weights) => {
   return ethers.BigNumber.from(invariant.truncated().toString());
 };
 
-const join = async (ctx, opts = {}) => {
-  const JOIN_KIND_INIT = 0;
-  const JOIN_EXACT_TOKENS = 1;
-  const JOIN_EXACT_BPT = 2;
-
-  opts.from ??= ctx.signers.holders[0];
-  opts.init ??= false;
-
-  let token0, token1;
-
-  if (ethers.BigNumber.from(ctx.contracts.WETH.address).lte(ethers.BigNumber.from(ctx.contracts.sERC20.address))) {
-    token0 = ethers.constants.AddressZero;
-    token1 = ctx.contracts.sERC20.address;
-  } else {
-    token0 = ctx.contracts.sERC20.address;
-    token1 = ethers.constants.AddressZero;
-  }
-
-  // update amount accordingly to the order of the tokens
-  const joinPoolRequest = {
-    assets: [token0, token1],
-    maxAmountsIn: [ctx.constants.pooledSERC20, ctx.constants.pooledETH],
-    userData: ethers.utils.defaultAbiCoder.encode(
-      ['uint256', 'uint256[]'],
-      [opts.init ? JOIN_KIND_INIT : JOIN_EXACT_TOKENS, [ctx.constants.pooledSERC20, ctx.constants.pooledETH]]
-    ),
-    fromInternalBalance: false,
-  };
-
-  ctx.contracts.Vault = ctx.contracts.Vault.connect(opts.from);
-  ctx.data.tx = await ctx.contracts.Vault.joinPool(ctx.data.poolId, opts.from.address, opts.from.address, joinPoolRequest, {
-    value: ctx.constants.pooledETH,
-  });
-
-  ctx.data.receipt = await ctx.data.tx.wait();
-};
-
 const register = async (ctx, opts = {}) => {
   opts.from ??= ctx.signers.admin;
   opts.beneficiaries ??= [ctx.signers.beneficiaries[0], ctx.signers.beneficiaries[1], ctx.signers.beneficiaries[2]];
@@ -202,7 +156,7 @@ const register = async (ctx, opts = {}) => {
 
   ctx.contracts.SERC20Splitter = ctx.contracts.SERC20Splitter.connect(opts.from);
   ctx.data.tx = await ctx.contracts.SERC20Splitter.register(
-    ctx.contracts.sERC20.address,
+    ctx.contracts.sERC20.address,Queried Index
     opts.beneficiaries.map((beneficiary) => beneficiary.address),
     opts.shares
   );
@@ -248,46 +202,43 @@ const setup = async (ctx, opts = {}) => {
   }
 
   if (opts.balancer) {
-    let token0, token1, sERC20IsToken0;
+    // let token0, token1, sERC20IsToken0;
 
-    ctx.contracts.WETH = await deployContract(ctx.signers.root, WETH);
-    ctx.contracts.Authorizer = await deployContract(ctx.signers.root, Authorizer, [ctx.signers.admin.address]);
-    ctx.contracts.Vault = await deployContract(ctx.signers.root, Vault, [ctx.contracts.Authorizer.address, ctx.contracts.WETH.address, 0, 0]);
+    await sBootstrappingPool.deploy(ctx, opts);
+    // // ctx.contracts.WETH = await deployContract(ctx.signers.root, WETH);
+    // // ctx.contracts.Authorizer = await deployContract(ctx.signers.root, Authorizer, [ctx.signers.admin.address]);
+    // // ctx.contracts.Vault = await deployContract(ctx.signers.root, Vault, [ctx.contracts.Authorizer.address, ctx.contracts.WETH.address, 0, 0]);
 
-    if (!opts.spectralize) await ctx.sERC1155.spectralize();
-    await ctx.sERC20.mint();
+    // if (!opts.spectralize) await ctx.sERC1155.spectralize();
+    // await ctx.sERC20.mint();
 
-    if (ethers.BigNumber.from(ctx.contracts.WETH.address).lte(ethers.BigNumber.from(ctx.contracts.sERC20.address))) {
-      token0 = ctx.contracts.WETH.address;
-      token1 = ctx.contracts.sERC20.address;
-      sERC20IsToken0 = false;
-    } else {
-      token0 = ctx.contracts.sERC20.address;
-      token1 = ctx.contracts.WETH.address;
-      sERC20IsToken0 = true;
-    }
-    console.log(ethers.BigNumber.from(ctx.contracts.WETH.address).toString());
-    console.log(ethers.BigNumber.from(ctx.contracts.sERC20.address).toString());
+    // if (ethers.BigNumber.from(ctx.contracts.WETH.address).lte(ethers.BigNumber.from(ctx.contracts.sERC20.address))) {
+    //   token0 = ctx.contracts.WETH.address;
+    //   token1 = ctx.contracts.sERC20.address;
+    //   sERC20IsToken0 = false;
+    // } else {
+    //   token0 = ctx.contracts.sERC20.address;
+    //   token1 = ctx.contracts.WETH.address;
+    //   sERC20IsToken0 = true;
+    // }
 
-    console.log(ctx.contracts.WETH.address);
-    console.log(ctx.contracts.sERC20.address);
-    ctx.contracts.SBP = await deployContract(ctx.signers.root, SBP, [
-      ctx.contracts.Vault.address,
-      ctx.constants.pool.name,
-      ctx.constants.pool.symbol,
-      token0,
-      token1,
-      ctx.constants.pool.normalizedStartWeight,
-      ctx.constants.pool.normalizedEndWeight,
-      ctx.constants.pool.swapFeePercentage,
-      ctx.constants.pool.pauseWindowDuration,
-      ctx.constants.pool.bufferPeriodDuration,
-      sERC20IsToken0,
-    ]);
+    // ctx.contracts.SBP = await deployContract(ctx.signers.root, SBP, [
+    //   ctx.contracts.Vault.address,
+    //   ctx.constants.pool.name,
+    //   ctx.constants.pool.symbol,
+    //   token0,
+    //   token1,
+    //   ctx.constants.pool.normalizedStartWeight,
+    //   ctx.constants.pool.normalizedEndWeight,
+    //   ctx.constants.pool.swapFeePercentage,
+    //   ctx.constants.pool.pauseWindowDuration,
+    //   ctx.constants.pool.bufferPeriodDuration,
+    //   sERC20IsToken0,
+    // ]);
 
-    await ctx.sERC20.approve();
+    // await ctx.sERC20.approve();
 
-    ctx.data.poolId = await ctx.contracts.SBP.getPoolId();
+    ctx.data.poolId = await ctx.sBootstrappingPool.getPoolId();
   }
 };
 
@@ -414,7 +365,6 @@ const itJoinsPoolLikeExpected = (ctx, opts = {}) => {
 module.exports = {
   initialize,
   computeInvariant,
-  join,
   register,
   mock,
   setup,
@@ -423,7 +373,4 @@ module.exports = {
   withdraw,
   withdrawBatch,
   itJoinsPoolLikeExpected,
-  SERC20,
-  SERC721,
-  SERC1155,
 };

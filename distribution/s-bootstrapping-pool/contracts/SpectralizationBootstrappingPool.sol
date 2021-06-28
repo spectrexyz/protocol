@@ -70,41 +70,33 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
     }
 
     function _pokeWeights() internal {
+        bool             isOpened = totalSupply() > 0;
+        uint256          lastChangeBlock;
         uint256[] memory balances;
-        uint256 lastChangeBlock;
-        bool isOpened = totalSupply() > 0;
 
-        if (totalSupply() > 0) {
+        if (isOpened) {
             (, balances, lastChangeBlock) = getVault().getPoolTokens(getPoolId());
             _updateOracle(lastChangeBlock, balances[0], balances[1]);
         }
 
         uint256[] memory weights = _updateWeights();
 
-        if (totalSupply() > 0) {
+        if (isOpened) {
             _lastInvariant = WeightedMath._calculateInvariant(weights, balances);
-            console.log("Invariant");
-           console.log(_lastInvariant);
-            console.log("Invariant Log");
-            console.log(WeightedOracleMath._fromLowResLog(WeightedOracleMath._toLowResLog(_lastInvariant)));
-            console.logInt(WeightedOracleMath._toLowResLog(_lastInvariant));
-
             _cacheInvariantAndSupply();
         }
-
     }
 
     function _updateWeights() private returns (uint256[] memory weights){
-      uint256 normalizedStartWeight= _normalizedStartWeight;
-      uint256 delta = _normalizedEndWeight - normalizedStartWeight; // > 0
-      uint256 supply = _sERC20.totalSupply();
-      uint256 gamma = delta * supply;
-      require(gamma / delta == supply, "OVERFLOW");
-      // console.log(delta);
-      // console.log(gamma);
+        // save gas costs
+        uint256 normalizedStartWeight = _normalizedStartWeight;
+        // compute intermediary value
+        uint256 delta  = _normalizedEndWeight - normalizedStartWeight; // > 0
+        uint256 supply = _sERC20.totalSupply();
+        uint256 gamma  = delta * supply;
+        require(gamma / delta == supply, "sBootstrappingPool: math overflow");
 
-      // uint256 sERC20Weight = _sERC20EndWeight.sub((_sERC20EndWeight.sub(_sERC20StartWeight)).mulUp(_sERC20.totalSupply()).divUp(_sERC20.cap()));
-        uint256 sWeight = normalizedStartWeight + (gamma / _sERC20.cap());
+        uint256 sWeight = normalizedStartWeight.add(gamma / _sERC20.cap());
         uint256 eWeight = FixedPoint.ONE.sub(sWeight);
 
         weights = new uint256[](2);
@@ -112,9 +104,6 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
         if (_sERC20IsToken0) {
             _normalizedWeight0 = sWeight;
             _normalizedWeight1 = eWeight;
-            // weights.push(sWeight);
-            // weights.push(eWeight);
-
             weights[0] = sWeight;
             weights[1] = eWeight;
 
@@ -125,14 +114,14 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
             weights[0] = eWeight;
         }
 
-        console.log("== poked ==");
-        console.log(supply);
-        console.log(_sERC20.totalSupply());
+        // console.log("== poked ==");
+        // console.log(supply);
+        // console.log(_sERC20.totalSupply());
 
-        console.log(gamma);
-        console.log(eWeight);
-        console.log(_normalizedWeight0);
-        console.log("===========");
+        // console.log(gamma);
+        // console.log(eWeight);
+        // console.log(_normalizedWeight0);
+        // console.log("===========");
 
 
         if (sWeight >= eWeight) {
@@ -140,31 +129,6 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
         } else {
             _maxWeightTokenIndex = _sERC20IsToken0 ? 1 : 0;
         }
-
-        // return _sERC20IsToken0 ? [sWeight, eWeight] : [eWeight, sWeight];
-
-      // _maxWeightTokenIndex = _normalizedWeight0 >= _normalizedWeight1 ? 0 : 1;
-
-        // emit Weights();
-    }
-
-    function _weights() internal view returns (uint256 sERC20Weight, uint256 WETHWeight) {
-        // we know that :
-      // 1. cap > 0 as per the SERC20 contract
-      // 2. normalizedEndWeight > normalizedStartWeigth > 0
-      // 3. totalSupply <= cap
-      // so we don't need to check for overflow excepts for the multiplication
-      uint256 normalizedStartWeight= _normalizedStartWeight;
-      uint256 delta = _normalizedEndWeight - normalizedStartWeight; // > 0
-      uint256 supply = _sERC20.totalSupply();
-      uint256 gamma = delta ** supply;
-      // require(gamma / delta == supply, "OVERFLOW");
-      // console.log(delta);
-      // console.log(gamma);
-
-      // uint256 sERC20Weight = _sERC20EndWeight.sub((_sERC20EndWeight.sub(_sERC20StartWeight)).mulUp(_sERC20.totalSupply()).divUp(_sERC20.cap()));
-        sERC20Weight = normalizedStartWeight + (gamma / _sERC20.cap());
-        WETHWeight = FixedPoint.ONE.sub(sERC20Weight);
     }
 
     // function onSwap(

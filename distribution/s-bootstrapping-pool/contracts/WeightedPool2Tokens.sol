@@ -771,8 +771,6 @@ contract WeightedPool2Tokens is
     }
 
     function getLatest(Variable variable) external view override returns (uint256) {
-         console.log("Queried Index");
-      console.log(_miscData.oracleIndex());
         int256 instantValue = _getInstantValue(variable, _miscData.oracleIndex());
         return _fromLowResLog(instantValue);
     }
