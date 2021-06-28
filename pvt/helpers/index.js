@@ -156,7 +156,7 @@ const register = async (ctx, opts = {}) => {
 
   ctx.contracts.SERC20Splitter = ctx.contracts.SERC20Splitter.connect(opts.from);
   ctx.data.tx = await ctx.contracts.SERC20Splitter.register(
-    ctx.contracts.sERC20.address,Queried Index
+    ctx.contracts.sERC20.address,
     opts.beneficiaries.map((beneficiary) => beneficiary.address),
     opts.shares
   );
