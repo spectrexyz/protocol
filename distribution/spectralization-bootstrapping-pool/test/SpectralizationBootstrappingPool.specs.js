@@ -1,54 +1,12 @@
-const { expect, Assertion } = require('chai');
-const { ethers } = require('ethers');
-const { deployContract } = require('ethereum-waffle');
-const {
-  initialize,
-  computeInvariant,
-  currentTimestamp,
-  join,
-  mint,
-  mock,
-  safeBatchTransferFrom,
-  safeTransferFrom,
-  setApprovalForAll,
-  setup,
-  spectralize,
-  unlock,
-  itJoinsPoolLikeExpected,
+const { expect } = require('chai');
+const { initialize, computeInvariant, join, setup, itJoinsPoolLikeExpected } = require('@spectrexyz/protocol-helpers');
+const { near } = require('@spectrexyz/protocol-helpers/chai');
+const { advanceTime, currentTimestamp } = require('@spectrexyz/protocol-helpers/time');
+const chai = require('chai');
 
-  itSafeBatchTransfersFromLikeExpected,
-  itSafeTransfersFromLikeExpected,
-  itSpectralizesLikeExpected,
-  itUnlocksLikeExpected,
-  transfer,
-} = require('@spectrexyz/protocol-helpers');
-
-const Decimal = require('decimal.js');
-
-const { waffle } = require('hardhat');
 const MAX_RELATIVE_ERROR = 0.00005;
-Assertion.addMethod('near', function(actual, relativeError) {
-  const expected = new Decimal(this._obj.toString());
-  const delta = new Decimal(actual.toString())
-    .dividedBy(expected)
-    .sub(1)
-    .abs();
-  // const delta = expected.sub(new Deciactual()).abs();
-  // const epsilon = ethers.BigNumber.from(_epsilon);
 
-  this.assert(
-    delta.lte(new Decimal(relativeError)),
-    'expected #{exp} to be near #{act}',
-    'expected #{exp} not to be near #{act}',
-    expected.toString(),
-    actual.toString()
-  );
-});
-
-const advanceTime = async (seconds) => {
-  await waffle.provider.send('evm_increaseTime', [parseInt(seconds.toString())]);
-  await waffle.provider.send('evm_mine', []);
-};
+chai.use(near);
 
 describe('SpectralizationBootstrappingPool', () => {
   before(async () => {
@@ -132,6 +90,8 @@ describe('SpectralizationBootstrappingPool', () => {
 
       await join(this);
 
+      console.log('joined');
+
       // const singleSwap = {
       //   poolId: this.data.poolId,
       //   kind: 0, // GIVEN_IN
@@ -170,7 +130,7 @@ describe('SpectralizationBootstrappingPool', () => {
       // move time forward to create a new oracle sample
       await advanceTime(ethers.BigNumber.from('180'));
 
-      await mint.sERC20(this, { amount: ethers.utils.parseEther('900') });
+      await this.sERC20.mint(this, { amount: ethers.utils.parseEther('900') });
       await (await this.contracts.SBP.pokeWeights()).wait();
       this.data.currentTimestamp = await currentTimestamp();
 

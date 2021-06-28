@@ -56,6 +56,15 @@ class sERC20 {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
+  async approve(opts = {}) {
+    opts.from ??= this.ctx.signers.holders[0];
+    opts.spender ??= this.ctx.contracts.Vault;
+    opts.amount ??= this.ctx.params.sERC20.cap;
+
+    this.ctx.data.tx = await this.ctx.contracts.sERC20.connect(opts.from).approve(opts.spender.address, opts.amount);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
   async mint(opts = {}) {
     opts.from ??= this.ctx.signers.sERC20.minter;
     opts.to ??= this.ctx.signers.holders[0];

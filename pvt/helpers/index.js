@@ -14,6 +14,7 @@ const OracleMock = require('@spectrexyz/protocol-spectralization-bootstrapping-p
 const { deployContract } = require('ethereum-waffle');
 
 const { expect, Assertion, assert } = require('chai');
+
 const { ethers, network } = require('hardhat');
 const Decimal = require('decimal.js');
 // const sERC20 = require('../../core/test/helpers/models/sERC20');
@@ -24,14 +25,6 @@ const DERRIDA = '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f
 const sERC20 = require('./models/sERC20');
 const sERC721 = require('./models/sERC721');
 const sERC1155 = require('./models/sERC1155');
-
-Assertion.addMethod('near', function(actual, _epsilon) {
-  const expected = this._obj;
-  const delta = expected.sub(actual).abs();
-  const epsilon = ethers.BigNumber.from(_epsilon);
-
-  this.assert(delta.abs().lte(epsilon), 'expected #{exp} to be near #{act}', 'expected #{exp} to not be near #{act}', expected, actual);
-});
 
 const initialize = async (ctx) => {
   ctx.artifacts = {
@@ -173,8 +166,19 @@ const join = async (ctx, opts = {}) => {
   opts.from ??= ctx.signers.holders[0];
   opts.init ??= false;
 
+  let token0, token1;
+
+  if (ethers.BigNumber.from(ctx.contracts.WETH.address).lte(ethers.BigNumber.from(ctx.contracts.sERC20.address))) {
+    token0 = ethers.constants.AddressZero;
+    token1 = ctx.contracts.sERC20.address;
+  } else {
+    token0 = ctx.contracts.sERC20.address;
+    token1 = ethers.constants.AddressZero;
+  }
+
+  // update amount accordingly to the order of the tokens
   const joinPoolRequest = {
-    assets: [ctx.contracts.sERC20.address, ethers.constants.AddressZero],
+    assets: [token0, token1],
     maxAmountsIn: [ctx.constants.pooledSERC20, ctx.constants.pooledETH],
     userData: ethers.utils.defaultAbiCoder.encode(
       ['uint256', 'uint256[]'],
@@ -239,36 +243,51 @@ const setup = async (ctx, opts = {}) => {
 
   // ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
   // ctx.contracts.OracleMock = await deployContract(ctx.signers.root, OracleMock);
+  if (opts.spectralize) {
+    await ctx.sERC1155.spectralize();
+  }
 
   if (opts.balancer) {
+    let token0, token1, sERC20IsToken0;
+
     ctx.contracts.WETH = await deployContract(ctx.signers.root, WETH);
     ctx.contracts.Authorizer = await deployContract(ctx.signers.root, Authorizer, [ctx.signers.admin.address]);
     ctx.contracts.Vault = await deployContract(ctx.signers.root, Vault, [ctx.contracts.Authorizer.address, ctx.contracts.WETH.address, 0, 0]);
-    await ctx.sERC1155.spectralize();
+
+    if (!opts.spectralize) await ctx.sERC1155.spectralize();
     await ctx.sERC20.mint();
+
+    if (ethers.BigNumber.from(ctx.contracts.WETH.address).lte(ethers.BigNumber.from(ctx.contracts.sERC20.address))) {
+      token0 = ctx.contracts.WETH.address;
+      token1 = ctx.contracts.sERC20.address;
+      sERC20IsToken0 = false;
+    } else {
+      token0 = ctx.contracts.sERC20.address;
+      token1 = ctx.contracts.WETH.address;
+      sERC20IsToken0 = true;
+    }
+    console.log(ethers.BigNumber.from(ctx.contracts.WETH.address).toString());
+    console.log(ethers.BigNumber.from(ctx.contracts.sERC20.address).toString());
+
     console.log(ctx.contracts.WETH.address);
     console.log(ctx.contracts.sERC20.address);
     ctx.contracts.SBP = await deployContract(ctx.signers.root, SBP, [
       ctx.contracts.Vault.address,
       ctx.constants.pool.name,
       ctx.constants.pool.symbol,
-      ctx.contracts.sERC20.address,
-      ctx.contracts.WETH.address,
+      token0,
+      token1,
       ctx.constants.pool.normalizedStartWeight,
       ctx.constants.pool.normalizedEndWeight,
       ctx.constants.pool.swapFeePercentage,
       ctx.constants.pool.pauseWindowDuration,
       ctx.constants.pool.bufferPeriodDuration,
-      true,
+      sERC20IsToken0,
     ]);
 
     await ctx.sERC20.approve();
 
     ctx.data.poolId = await ctx.contracts.SBP.getPoolId();
-  }
-
-  if (opts.spectralize) {
-    await ctx.sERC1155.spectralize();
   }
 };
 
