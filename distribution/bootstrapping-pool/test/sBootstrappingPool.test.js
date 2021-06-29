@@ -82,8 +82,6 @@ describe('sBootstrappingPool', () => {
   });
 
   describe.only('# pokeWeights', () => {
-    // cache invariant => miscData => logInvariant & logTotalSupply
-    // update oracle => miscData => logSpotPrice & logBTPPrice & oracleIndex & oracleTimestamp
     describe('» oracle', () => {
       before(async () => {
         await setup(this, { balancer: true });
@@ -92,12 +90,12 @@ describe('sBootstrappingPool', () => {
 
         this.data.previousPoolData = await this.sBootstrappingPool.getMiscData();
         this.data.previousInvariant = await this.sBootstrappingPool.getInvariant();
-        this.data.previousPairPrice = await this.sBootstrappingPool.spotPrice();
+        this.data.previousPairPrice = await this.sBootstrappingPool.pairPrice();
         this.data.previousBTPPrice = await this.sBootstrappingPool.BTPPrice();
 
         // move time forward to create a new oracle sample
         await advanceTime(ethers.BigNumber.from('180'));
-        await this.sERC20.mint(this, { amount: ethers.utils.parseEther('900') });
+        await this.sERC20.mint(this, { amount: this.params.sERC20.cap });
         await this.sBootstrappingPool.pokeWeights();
         this.data.currentTimestamp = await currentTimestamp();
 

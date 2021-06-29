@@ -99,7 +99,7 @@ class sBootstrappingPool {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
-  async spotPrice() {
+  async pairPrice() {
     const BASE = new Decimal(10).pow(new Decimal(18));
     const { balances } = await this.ctx.contracts.Vault.getPoolTokens(this.ctx.data.poolId);
     const weights = await this.ctx.sBootstrappingPool.getNormalizedWeights();
@@ -130,13 +130,6 @@ class sBootstrappingPool {
         .toFixed(0)
         .toString()
     );
-    // return bn(
-    //   toFp(
-    //     fromFp(fpBalance)
-    //       .div(fromFp(fpWeight))
-    //       .div(fromFp(totalSupply))
-    //   ).toFixed(0)
-    // );
   }
 
   _decimal(number) {
