@@ -20,7 +20,7 @@ import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
  *      financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
  *      sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
  */
-contract SBPMinter is Context, AccessControlEnumerable {
+contract sMinter is Context, AccessControlEnumerable {
     address                      private _bank;
     address                      private _splitter;
     mapping (address => address) private _pools;

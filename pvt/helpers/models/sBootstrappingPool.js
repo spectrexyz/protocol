@@ -1,6 +1,6 @@
 const _Authorizer_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json');
 const _OracleMock_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/test/OracleMock.sol/OracleMock.json');
-const _sBootstrappingPool_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/SpectralizationBootstrappingPool.sol/SpectralizationBootstrappingPool.json');
+const _sBootstrappingPool_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/sBootstrappingPool.sol/sBootstrappingPool.json');
 const _Vault_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/@balancer-labs/v2-vault/contracts/Vault.sol/Vault.json');
 const _WETH_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/test/WETH.sol/WETH.json');
 const Decimal = require('decimal.js');
@@ -141,6 +141,12 @@ class sBootstrappingPool {
     const eWeight = ONE.sub(sWeight);
 
     return this.sERC20IsToken0 ? [this._bn(sWeight), this._bn(eWeight)] : [this._bn(eWeight), this._bn(sWeight)];
+  }
+
+  async expectedMaxWeightTokenIndex() {
+    const weights = await this.getNormalizedWeights();
+
+    return weights[0].gte(weights[1]) ? 0 : 1;
   }
 
   _decimal(number) {

@@ -153,7 +153,7 @@ describe('sBootstrappingPool', () => {
         });
 
         it('it updates maxWeightTokenIndex accordingly', async () => {
-          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(this.sBootstrappingPool.sERC20IsToken0 ? 1 : 0);
+          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(await this.sBootstrappingPool.expectedMaxWeightTokenIndex());
         });
       });
 
@@ -174,7 +174,7 @@ describe('sBootstrappingPool', () => {
         });
 
         it('it updates maxWeightTokenIndex accordingly', async () => {
-          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(this.sBootstrappingPool.sERC20IsToken0 ? 1 : 0);
+          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(await this.sBootstrappingPool.expectedMaxWeightTokenIndex());
         });
       });
 
@@ -195,7 +195,7 @@ describe('sBootstrappingPool', () => {
         });
 
         it('it updates maxWeightTokenIndex accordingly', async () => {
-          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(this.sBootstrappingPool.sERC20IsToken0 ? 0 : 1);
+          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(await this.sBootstrappingPool.expectedMaxWeightTokenIndex());
         });
       });
     });

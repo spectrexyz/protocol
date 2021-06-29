@@ -2,7 +2,6 @@
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
-
 import "@balancer-labs/v2-solidity-utils/contracts/math/FixedPoint.sol";
 import "@balancer-labs/v2-solidity-utils/contracts/helpers/InputHelpers.sol";
 import "@balancer-labs/v2-solidity-utils/contracts/helpers/TemporarilyPausable.sol";
@@ -21,9 +20,6 @@ import "@balancer-labs/v2-pool-weighted/contracts/WeightedPoolUserDataHelpers.so
 import "@balancer-labs/v2-pool-weighted/contracts/oracle/PoolPriceOracle.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/oracle/Buffer.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/IPriceOracle.sol";
-
-import "./interfaces/ISERC20.sol";
-import "hardhat/console.sol";
 
 contract WeightedPool2Tokens is
     IMinimalSwapInfoPool,

@@ -2,17 +2,17 @@
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
-import "./interfaces/ISERC20.sol";
-import "./WeightedPool2Tokens.sol";
+import "./interfaces/sIERC20.sol";
+import "./base/WeightedPool2Tokens.sol";
 import "hardhat/console.sol";
 
-contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
+contract sBootstrappingPool is WeightedPool2Tokens {
     using FixedPoint for uint256;
     using WeightedPoolUserDataHelpers for bytes;
     using WeightedPool2TokensMiscData for bytes32;
 
     bool internal /*immutable*/ _sERC20IsToken0;
-    ISERC20 internal /*immutable*/ _sERC20;
+    sIERC20 internal /*immutable*/ _sERC20;
 
     uint256 internal /*immutable*/ _normalizedStartWeight;
     uint256 internal /*immutable*/ _normalizedEndWeight;
@@ -51,7 +51,7 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
 
 
         _sERC20IsToken0 = sERC20IsToken0;
-        _sERC20 = sERC20IsToken0 ? ISERC20(address(token0)) : ISERC20(address(token1));
+        _sERC20 = sERC20IsToken0 ? sIERC20(address(token0)) : sIERC20(address(token1));
 
         _require(normalizedStartWeight >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
         _require(normalizedEndWeight >= _MIN_WEIGHT, Errors.MIN_WEIGHT); //FixedPoint.ONE.sub(normalizedEndWeight) >= _MIN_WEIGHT
