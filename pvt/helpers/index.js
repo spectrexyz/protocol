@@ -1,7 +1,6 @@
 const SERC20 = require('@spectrexyz/protocol-core/artifacts/contracts/SERC20.sol/sERC20.json');
 const ERC1155Receiver = require('@spectrexyz/protocol-core/artifacts/contracts/test/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json');
 const ERC721Mock = require('@spectrexyz/protocol-core/artifacts/contracts/test/ERC721Mock.sol/ERC721Mock.json');
-const OracleMock = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/test/OracleMock.sol/OracleMock.json');
 
 const { deployContract } = require('ethereum-waffle');
 
@@ -202,42 +201,7 @@ const setup = async (ctx, opts = {}) => {
   }
 
   if (opts.balancer) {
-    // let token0, token1, sERC20IsToken0;
-
     await sBootstrappingPool.deploy(ctx, opts);
-    // // ctx.contracts.WETH = await deployContract(ctx.signers.root, WETH);
-    // // ctx.contracts.Authorizer = await deployContract(ctx.signers.root, Authorizer, [ctx.signers.admin.address]);
-    // // ctx.contracts.Vault = await deployContract(ctx.signers.root, Vault, [ctx.contracts.Authorizer.address, ctx.contracts.WETH.address, 0, 0]);
-
-    // if (!opts.spectralize) await ctx.sERC1155.spectralize();
-    // await ctx.sERC20.mint();
-
-    // if (ethers.BigNumber.from(ctx.contracts.WETH.address).lte(ethers.BigNumber.from(ctx.contracts.sERC20.address))) {
-    //   token0 = ctx.contracts.WETH.address;
-    //   token1 = ctx.contracts.sERC20.address;
-    //   sERC20IsToken0 = false;
-    // } else {
-    //   token0 = ctx.contracts.sERC20.address;
-    //   token1 = ctx.contracts.WETH.address;
-    //   sERC20IsToken0 = true;
-    // }
-
-    // ctx.contracts.SBP = await deployContract(ctx.signers.root, SBP, [
-    //   ctx.contracts.Vault.address,
-    //   ctx.constants.pool.name,
-    //   ctx.constants.pool.symbol,
-    //   token0,
-    //   token1,
-    //   ctx.constants.pool.normalizedStartWeight,
-    //   ctx.constants.pool.normalizedEndWeight,
-    //   ctx.constants.pool.swapFeePercentage,
-    //   ctx.constants.pool.pauseWindowDuration,
-    //   ctx.constants.pool.bufferPeriodDuration,
-    //   sERC20IsToken0,
-    // ]);
-
-    // await ctx.sERC20.approve();
-
     ctx.data.poolId = await ctx.sBootstrappingPool.getPoolId();
   }
 };

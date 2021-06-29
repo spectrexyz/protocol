@@ -24,7 +24,6 @@
     "ethereum-waffle": "^3.2.2",
     "ethers": "^5.0.30",
     "hardhat": "^2.0.8",
-    "hardhat-docgen": "^1.0.3",
     "hardhat-gas-reporter": "^1.0.4",
     "solidity-coverage": "^0.7.16"
   },

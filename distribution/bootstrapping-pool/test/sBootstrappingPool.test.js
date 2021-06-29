@@ -1,8 +1,8 @@
+const chai = require('chai');
 const { expect } = require('chai');
 const { initialize, computeInvariant, join, setup, itJoinsPoolLikeExpected } = require('@spectrexyz/protocol-helpers');
 const { near } = require('@spectrexyz/protocol-helpers/chai');
 const { advanceTime, currentTimestamp } = require('@spectrexyz/protocol-helpers/time');
-const chai = require('chai');
 
 const MAX_RELATIVE_ERROR = 0.00005;
 
@@ -82,74 +82,62 @@ describe('sBootstrappingPool', () => {
   });
 
   describe.only('# pokeWeights', () => {
-    before(async () => {
-      await setup(this, { balancer: true });
-      await this.sBootstrappingPool.join({ init: true });
-      await this.sBootstrappingPool.join();
-      await this.sBootstrappingPool.pokeWeights();
+    // cache invariant => miscData => logInvariant & logTotalSupply
+    // update oracle => miscData => logSpotPrice & logBTPPrice & oracleIndex & oracleTimestamp
+    describe('» oracle', () => {
+      before(async () => {
+        await setup(this, { balancer: true });
+        await this.sBootstrappingPool.join({ init: true });
+        await this.sBootstrappingPool.join();
 
-      this.data.previousPairPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
-      this.data.previousBPTPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
-      this.data.previousInvariant = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
-      this.data.previousPoolData = await this.sBootstrappingPool.getMiscData();
+        this.data.previousPoolData = await this.sBootstrappingPool.getMiscData();
+        this.data.previousInvariant = await this.sBootstrappingPool.getInvariant();
+        this.data.previousPairPrice = await this.sBootstrappingPool.spotPrice();
+        this.data.previousBTPPrice = await this.sBootstrappingPool.BTPPrice();
 
-      const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
-      const weights = await this.sBootstrappingPool.getNormalizedWeights();
-      this.data.previousExpectedInvariant = await this.sBootstrappingPool.getInvariant();
+        // move time forward to create a new oracle sample
+        await advanceTime(ethers.BigNumber.from('180'));
+        await this.sERC20.mint(this, { amount: ethers.utils.parseEther('900') });
+        await this.sBootstrappingPool.pokeWeights();
+        this.data.currentTimestamp = await currentTimestamp();
 
-      // move time forward to create a new oracle sample
-      await advanceTime(ethers.BigNumber.from('180'));
+        this.data.latestCachedPairPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
+        this.data.latestCachedBPTPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
+        this.data.latestCachedInvariant = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
+        this.data.latestInvariant = await this.sBootstrappingPool.getLastInvariant();
+        this.data.latestPoolData = await this.sBootstrappingPool.getMiscData();
+        this.data.currentInvariant = await this.sBootstrappingPool.getInvariant();
+      });
 
-      await this.sERC20.mint(this, { amount: ethers.utils.parseEther('900') });
-      await this.sBootstrappingPool.pokeWeights();
-      this.data.currentTimestamp = await currentTimestamp();
+      it('it updates the oracle index and timestamp', async () => {
+        expect(this.data.latestPoolData.oracleIndex).to.equal(this.data.previousPoolData.oracleIndex.add(1));
+        expect(this.data.latestPoolData.oracleSampleCreationTimestamp).to.equal(this.data.currentTimestamp);
+      });
 
-      this.data.lastPairPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
-      this.data.lastBPTPrice = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
-      this.data.lastInvariant = await this.sBootstrappingPool.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
-      this.data.lastPoolData = await this.sBootstrappingPool.getMiscData();
+      it('stores the pre-poke spot price', async () => {
+        expect(this.data.latestCachedPairPrice).to.be.near(this.data.previousPairPrice, MAX_RELATIVE_ERROR);
+      });
+
+      it('stores the pre-poke BTP price', async () => {
+        expect(this.data.latestCachedBPTPrice).to.be.near(this.data.previousBTPPrice, MAX_RELATIVE_ERROR * 2);
+      });
+
+      it('stores the pre-poke invariant', async () => {
+        expect(this.data.latestCachedInvariant).to.be.near(this.data.previousInvariant, MAX_RELATIVE_ERROR);
+      });
+
+      it('it caches the current invariant', async () => {
+        expect(this.data.latestInvariant).to.equal(this.data.currentInvariant);
+        expect(await this.contracts.OracleMock.fromLowResLog(this.data.latestPoolData.logInvariant)).to.be.near(this.data.currentInvariant, MAX_RELATIVE_ERROR);
+      });
+
+      it('it caches the current supply', async () => {
+        expect(await this.contracts.OracleMock.fromLowResLog(this.data.latestPoolData.logTotalSupply)).to.be.near(
+          await this.sBootstrappingPool.totalSupply(),
+          MAX_RELATIVE_ERROR
+        );
+      });
     });
-
-    it('it updates the oracle data', async () => {
-      expect(this.data.lastPoolData.oracleIndex).to.equal(this.data.previousPoolData.oracleIndex.add(1));
-      expect(this.data.lastPoolData.oracleSampleCreationTimestamp).to.equal(this.data.currentTimestamp);
-    });
-
-    it('it caches the log of the last invariant', async () => {
-      // const expectedPreviousInvariant =
-
-      // const invariant = computeInvariant(
-      //   [ctx.constants.pooledETH, ctx.constants.pooledSERC20],
-      //   [ctx.constants.pool.ONE.sub(ctx.constants.pool.normalizedStartWeight), ctx.constants.pool.normalizedStartWeight]
-      // );
-      // expect(await ctx.contracts.SBP.getLastInvariant()).to.be.near(invariant, 100000);
-      // 3182145935019611022;
-      // 3182286615916142423;
-      // const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
-      // const weights = await this.contracts.SBP.getNormalizedWeights();
-      // const invariant = computeInvariant([balances[0], balances[1]], [weights[0], weights[1]]);
-
-      // console.log('Invariant computed ' + invariant.toString());
-      // console.log('Current invariant ' + this.data.currentInvariant.toString());
-      // console.log('Misc data invariant  ' + this.data.currentPoolData.logInvariant.toString());
-
-      // console.log('Previous invariant ' + this.data.lastInvariant.toString());
-
-      // 3182286615916142423;
-      // 3182286615916142423;
-      // console.log((await this.contracts.SBP.getInvariant()).toString());
-      // console.log((await this.contracts.SBP.getLastInvariant()).toString());
-      console.log(this.data.lastInvariant.toString());
-      console.log(this.data.previousExpectedInvariant.toString());
-      expect(this.data.lastInvariant).to.be.near(this.data.previousExpectedInvariant, MAX_RELATIVE_ERROR);
-      // expect(10000).to.be.near(10, 0.000000001);
-    });
-
-    it('it caches the total supply', async () => {});
-
-    it('it updates pair price', async () => {});
-
-    it('it updates BPT price', async () => {});
   });
 
   describe.skip('# mint', () => {

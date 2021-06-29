@@ -1,7 +1,9 @@
 const _Authorizer_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json');
+const _OracleMock_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/test/OracleMock.sol/OracleMock.json');
 const _sBootstrappingPool_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/SpectralizationBootstrappingPool.sol/SpectralizationBootstrappingPool.json');
 const _Vault_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/@balancer-labs/v2-vault/contracts/Vault.sol/Vault.json');
 const _WETH_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/test/WETH.sol/WETH.json');
+const Decimal = require('decimal.js');
 
 class sBootstrappingPool {
   constructor(ctx) {
@@ -10,15 +12,18 @@ class sBootstrappingPool {
 
     this.getPoolId = this.contract.getPoolId;
     this.getInvariant = this.contract.getInvariant;
+    this.getLastInvariant = this.contract.getLastInvariant;
     this.getLatest = this.contract.getLatest;
     this.getMiscData = this.contract.getMiscData;
     this.getNormalizedWeights = this.contract.getNormalizedWeights;
+    this.totalSupply = this.contract.totalSupply;
   }
 
   static async deploy(ctx, opts) {
     let token0, token1, sERC20IsToken0;
 
     ctx.contracts.Authorizer = await waffle.deployContract(ctx.signers.root, _Authorizer_, [ctx.signers.root.address]);
+    ctx.contracts.OracleMock = await waffle.deployContract(ctx.signers.root, _OracleMock_);
     ctx.contracts.WETH = await waffle.deployContract(ctx.signers.root, _WETH_);
     ctx.contracts.Vault = await waffle.deployContract(ctx.signers.root, _Vault_, [ctx.contracts.Authorizer.address, ctx.contracts.WETH.address, 0, 0]);
 
@@ -92,6 +97,50 @@ class sBootstrappingPool {
       value: this.ctx.params.sBootstrappingPool.pooled.ETH,
     });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async spotPrice() {
+    const BASE = new Decimal(10).pow(new Decimal(18));
+    const { balances } = await this.ctx.contracts.Vault.getPoolTokens(this.ctx.data.poolId);
+    const weights = await this.ctx.sBootstrappingPool.getNormalizedWeights();
+
+    const numerator = this._decimal(balances[0]).div(this._decimal(weights[0]).div(BASE));
+    const denominator = this._decimal(balances[1]).div(this._decimal(weights[1]).div(BASE));
+
+    return ethers.BigNumber.from(
+      numerator
+        .mul(BASE)
+        .div(denominator)
+        .toFixed(0)
+        .toString()
+    );
+  }
+
+  async BTPPrice() {
+    const BASE = new Decimal(10).pow(new Decimal(18));
+    const { balances } = await this.ctx.contracts.Vault.getPoolTokens(this.ctx.data.poolId);
+    const weights = await this.ctx.sBootstrappingPool.getNormalizedWeights();
+    const totalSupply = await this.totalSupply();
+
+    return ethers.BigNumber.from(
+      this._decimal(balances[0])
+        .mul(BASE)
+        .div(this._decimal(weights[0]).div(BASE))
+        .div(this._decimal(totalSupply))
+        .toFixed(0)
+        .toString()
+    );
+    // return bn(
+    //   toFp(
+    //     fromFp(fpBalance)
+    //       .div(fromFp(fpWeight))
+    //       .div(fromFp(totalSupply))
+    //   ).toFixed(0)
+    // );
+  }
+
+  _decimal(number) {
+    return new Decimal(number.toString());
   }
 }
 
