@@ -42,6 +42,21 @@ const initialize = async (ctx) => {
         ETH: ethers.BigNumber.from('2000000000000000000'),
         sERC20: ethers.BigNumber.from('1000000000000000000'),
       },
+      name: 'My SBP Token',
+      symbol: '$SBP',
+      normalizedStartWeight: ethers.BigNumber.from('300000000000000000'),
+      normalizedEndWeight: ethers.BigNumber.from('600000000000000000'),
+      swapFeePercentage: ethers.BigNumber.from('10000000000000000'),
+      pauseWindowDuration: ethers.BigNumber.from('3000'),
+      bufferPeriodDuration: ethers.BigNumber.from('1000'),
+      ONE: ethers.BigNumber.from('1000000000000000000'),
+      MINIMUM_BPT: ethers.BigNumber.from('1000000'),
+      TWO_TOKEN_POOL: 2,
+      ORACLE_VARIABLE: {
+        PAIR_PRICE: 0,
+        BPT_PRICE: 1,
+        INVARIANT: 2,
+      },
     },
   };
 
@@ -55,6 +70,16 @@ const initialize = async (ctx) => {
     sERC1155: {
       DERRIDA: '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce',
       ADMIN_ROLE: ethers.BigNumber.from('0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775'),
+    },
+    sBootstrappingPool: {
+      ONE: ethers.BigNumber.from('1000000000000000000'),
+      MINIMUM_BPT: ethers.BigNumber.from('1000000'),
+      TWO_TOKEN_POOL: 2,
+      ORACLE_VARIABLE: {
+        PAIR_PRICE: 0,
+        BPT_PRICE: 1,
+        INVARIANT: 2,
+      },
     },
     SpectreState: {
       Null: 0,
@@ -77,23 +102,6 @@ const initialize = async (ctx) => {
     amount1: ethers.BigNumber.from('70000000000000000000'),
     amount2: ethers.BigNumber.from('12000000000000000000'),
     shares: [ethers.BigNumber.from('300000000000000000'), ethers.BigNumber.from('100000000000000000'), ethers.BigNumber.from('600000000000000000')],
-    pool: {
-      name: 'My SBP Token',
-      symbol: '$SBP',
-      normalizedStartWeight: ethers.BigNumber.from('300000000000000000'),
-      normalizedEndWeight: ethers.BigNumber.from('600000000000000000'),
-      swapFeePercentage: ethers.BigNumber.from('10000000000000000'),
-      pauseWindowDuration: ethers.BigNumber.from('3000'),
-      bufferPeriodDuration: ethers.BigNumber.from('1000'),
-      ONE: ethers.BigNumber.from('1000000000000000000'),
-      MINIMUM_BPT: ethers.BigNumber.from('1000000'),
-      TWO_TOKEN_POOL: 2,
-      ORACLE_VARIABLE: {
-        PAIR_PRICE: 0,
-        BPT_PRICE: 1,
-        INVARIANT: 2,
-      },
-    },
   };
 
   ctx.contracts = {};
@@ -193,9 +201,8 @@ const setup = async (ctx, opts = {}) => {
   await sERC721.deploy(ctx);
   await sERC1155.deploy(ctx);
   await ctx.sERC721.mint(opts);
-
   // ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
-  // ctx.contracts.OracleMock = await deployContract(ctx.signers.root, OracleMock);
+
   if (opts.spectralize) {
     await ctx.sERC1155.spectralize();
   }
@@ -258,16 +265,6 @@ const withdrawBatch = async (ctx, opts = {}) => {
   ctx.data.tx = await ctx.contracts.SERC20Splitter.withdrawBatch([ctx.data.sERC201.address, ctx.data.sERC202.address], opts.from.address);
   ctx.data.receipt = await ctx.data.tx.wait();
 };
-
-const itUpdatesOracleData = (ctx, opts = {}) => {
-  //   const previousData = await pool.getMiscData();
-  // await advanceTime(MINUTE * 10); // force index update
-  // await action(await calcLastChangeBlock(lastChangeBlockOffset));
-  // const currentMiscData = await pool.getMiscData();
-  // expect(currentMiscData.oracleIndex).to.equal(previousData.oracleIndex.add(1));
-  // expect(currentMiscData.oracleSampleCreationTimestamp).to.equal(await currentTimestamp());
-};
-const itCachesLogInvariantAndSupply = (ctx, opts = {}) => {};
 
 const itJoinsPoolLikeExpected = (ctx, opts = {}) => {
   opts.init ??= false;
@@ -336,5 +333,4 @@ module.exports = {
   unlock,
   withdraw,
   withdrawBatch,
-  itJoinsPoolLikeExpected,
 };
