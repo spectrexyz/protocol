@@ -114,21 +114,15 @@ contract SpectralizationBootstrappingPool is WeightedPool2Tokens {
             weights[0] = eWeight;
         }
 
-        // console.log("== poked ==");
-        // console.log(supply);
-        // console.log(_sERC20.totalSupply());
-
-        // console.log(gamma);
-        // console.log(eWeight);
-        // console.log(_normalizedWeight0);
-        // console.log("===========");
-
-
         if (sWeight >= eWeight) {
             _maxWeightTokenIndex = _sERC20IsToken0 ? 0 : 1;
         } else {
             _maxWeightTokenIndex = _sERC20IsToken0 ? 1 : 0;
         }
+    }
+
+    function maxWeightTokenIndex() external view returns (uint256) {
+        return _maxWeightTokenIndex;
     }
 
     // function onSwap(

@@ -150,9 +150,10 @@ describe('sBootstrappingPool', () => {
         it('it updates weights accordingly', async () => {
           expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
           expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
+        });
 
-          console.log(this.data.weights[0].toString());
-          console.log(this.data.weights[1].toString());
+        it('it updates maxWeightTokenIndex accordingly', async () => {
+          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(this.sBootstrappingPool.sERC20IsToken0 ? 1 : 0);
         });
       });
 
@@ -170,9 +171,10 @@ describe('sBootstrappingPool', () => {
         it('it updates weights accordingly', async () => {
           expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
           expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
+        });
 
-          console.log(this.data.weights[0].toString());
-          console.log(this.data.weights[1].toString());
+        it('it updates maxWeightTokenIndex accordingly', async () => {
+          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(this.sBootstrappingPool.sERC20IsToken0 ? 1 : 0);
         });
       });
 
@@ -190,9 +192,10 @@ describe('sBootstrappingPool', () => {
         it('it updates weights accordingly', async () => {
           expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
           expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
+        });
 
-          console.log(this.data.weights[0].toString());
-          console.log(this.data.weights[1].toString());
+        it('it updates maxWeightTokenIndex accordingly', async () => {
+          expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(this.sBootstrappingPool.sERC20IsToken0 ? 0 : 1);
         });
       });
     });

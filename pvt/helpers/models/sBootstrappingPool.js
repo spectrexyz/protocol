@@ -18,6 +18,7 @@ class sBootstrappingPool {
     this.getLatest = this.contract.getLatest;
     this.getMiscData = this.contract.getMiscData;
     this.getNormalizedWeights = this.contract.getNormalizedWeights;
+    this.maxWeightTokenIndex = this.contract.maxWeightTokenIndex;
     this.totalSupply = this.contract.totalSupply;
   }
 
