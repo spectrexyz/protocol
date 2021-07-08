@@ -49,14 +49,6 @@ const initialize = async (ctx) => {
       swapFeePercentage: ethers.BigNumber.from('10000000000000000'),
       pauseWindowDuration: ethers.BigNumber.from('3000'),
       bufferPeriodDuration: ethers.BigNumber.from('1000'),
-      ONE: ethers.BigNumber.from('1000000000000000000'),
-      MINIMUM_BPT: ethers.BigNumber.from('1000000'),
-      TWO_TOKEN_POOL: 2,
-      ORACLE_VARIABLE: {
-        PAIR_PRICE: 0,
-        BPT_PRICE: 1,
-        INVARIANT: 2,
-      },
     },
   };
 

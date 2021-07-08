@@ -13,50 +13,58 @@ describe('sBootstrappingPool', () => {
     await initialize(this);
   });
 
-  describe('⇛ constructor', () => {
+  describe.only('⇛ constructor', () => {
     describe('» start weight is valid', () => {
       describe('» and end weight is valid', () => {
         describe('» and swap fee is valid', () => {
           before(async () => {
-            await setup(this, { balancer: true });
+            await setup(this, { balancer: true, mint: false });
           });
 
           it('it sets the pool name', async () => {
-            expect(await this.contracts.SBP.name()).to.equal(this.constants.pool.name);
+            expect(await this.sBootstrappingPool.name()).to.equal(this.params.sBootstrappingPool.name);
           });
 
           it('it sets the pool symbol', async () => {
-            expect(await this.contracts.SBP.symbol()).to.equal(this.constants.pool.symbol);
+            expect(await this.sBootstrappingPool.symbol()).to.equal(this.params.sBootstrappingPool.symbol);
           });
 
           it('it sets the pool decimals', async () => {
-            expect(await this.contracts.SBP.decimals()).to.equal(18);
+            expect(await this.sBootstrappingPool.decimals()).to.equal(18);
           });
 
           it('it sets the vault', async () => {
-            expect(await this.contracts.SBP.getVault()).to.equal(this.contracts.Vault.address);
+            expect(await this.sBootstrappingPool.getVault()).to.equal(this.contracts.Vault.address);
           });
 
-          it('# it set swap fee', async () => {
-            expect(await this.contracts.SBP.getSwapFeePercentage()).to.equal(this.constants.pool.swapFeePercentage);
+          it('it sets the swap fee', async () => {
+            expect(await this.sBootstrappingPool.getSwapFeePercentage()).to.equal(this.params.sBootstrappingPool.swapFeePercentage);
+          });
+
+          it('it sets the authorizer', async () => {
+            expect(await this.sBootstrappingPool.getAuthorizer()).to.equal(this.contracts.Authorizer.address);
+          });
+
+          it('it sets no owner', async () => {
+            expect(await this.sBootstrappingPool.getOwner()).to.equal('0x0000000000000000000000000000000000000000');
           });
 
           it('it starts with no BPT', async () => {
-            expect(await this.contracts.SBP.totalSupply()).to.equal(0);
+            expect(await this.sBootstrappingPool.totalSupply()).to.equal(0);
           });
 
           it('it initializes tokens weights', async () => {
-            const weights = await this.contracts.SBP.getNormalizedWeights();
+            const weights = await this.sBootstrappingPool.getNormalizedWeights();
 
-            expect(weights[0]).to.equal(ethers.BigNumber.from('1000000000000000000').sub(this.constants.pool.normalizedStartWeight));
-            expect(weights[1]).to.equal(this.constants.pool.normalizedStartWeight);
+            expect(weights[0]).to.equal(this.constants.sBootstrappingPool.ONE.sub(this.params.sBootstrappingPool.normalizedStartWeight));
+            expect(weights[1]).to.equal(this.params.sBootstrappingPool.normalizedStartWeight);
           });
 
           it('it registers the pool in the vault', async () => {
             const pool = await this.contracts.Vault.getPool(this.data.poolId);
 
-            expect(pool[0]).to.equal(this.contracts.SBP.address);
-            expect(pool[1]).to.equal(this.constants.pool.TWO_TOKEN_POOL);
+            expect(pool[0]).to.equal(this.sBootstrappingPool.contract.address);
+            expect(pool[1]).to.equal(this.constants.sBootstrappingPool.TWO_TOKEN_POOL);
           });
 
           it('it registers tokens in the Vault', async () => {
@@ -66,6 +74,10 @@ describe('sBootstrappingPool', () => {
             expect(tokens[1]).to.equal(this.contracts.sERC20.address);
             expect(balances[0]).to.equal(0);
             expect(balances[1]).to.equal(0);
+          });
+
+          it('it enables the oracle', async () => {
+            expect((await this.sBootstrappingPool.getMiscData()).oracleEnabled).to.equal(true);
           });
 
           it('it disable asset managers', async () => {
@@ -81,7 +93,7 @@ describe('sBootstrappingPool', () => {
     });
   });
 
-  describe.only('# pokeWeights', () => {
+  describe('# pokeWeights', () => {
     describe('» oracle', () => {
       before(async () => {
         await setup(this, { balancer: true });

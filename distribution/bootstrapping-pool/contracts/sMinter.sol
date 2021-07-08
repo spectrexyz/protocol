@@ -13,13 +13,6 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
-/**
- * @title sERC1155
- * @notice sERC1155 token wrapping ERC721s into sERC20s.
- * @dev sERC1155 does not implement mint nor burn in an effort to maintain some separation of concerns between
- *      financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
- *      sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
- */
 contract sMinter is Context, AccessControlEnumerable {
     address                      private _bank;
     address                      private _splitter;

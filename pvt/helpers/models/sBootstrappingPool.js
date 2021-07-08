@@ -12,6 +12,9 @@ class sBootstrappingPool {
     this.contract = ctx.contracts.sBootstrappingPool;
     this.sERC20IsToken0 = sERC20IsToken0;
 
+    this.name = this.contract.name;
+    this.symbol = this.contract.symbol;
+    this.decimals = this.contract.decimals;
     this.getPoolId = this.contract.getPoolId;
     this.getInvariant = this.contract.getInvariant;
     this.getLastInvariant = this.contract.getLastInvariant;
@@ -20,6 +23,10 @@ class sBootstrappingPool {
     this.getNormalizedWeights = this.contract.getNormalizedWeights;
     this.maxWeightTokenIndex = this.contract.maxWeightTokenIndex;
     this.totalSupply = this.contract.totalSupply;
+    this.getVault = this.contract.getVault;
+    this.getOwner = this.contract.getOwner;
+    this.getAuthorizer = this.contract.getAuthorizer;
+    this.getSwapFeePercentage = this.contract.getSwapFeePercentage;
   }
 
   static async deploy(ctx, opts) {
@@ -120,12 +127,7 @@ class sBootstrappingPool {
     const weights = await this.getNormalizedWeights();
     const totalSupply = await this.totalSupply();
 
-    return this._bn(
-      this._decimal(balances[0])
-        .mul(BASE)
-        .div(this._decimal(weights[0]).div(BASE))
-        .div(this._decimal(totalSupply))
-    );
+    return this._bn(this._decimal(balances[0]).mul(BASE).div(this._decimal(weights[0]).div(BASE)).div(this._decimal(totalSupply)));
   }
 
   async expectedWeights(pct) {

@@ -3,19 +3,18 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./interfaces/sIERC20.sol";
-import "./base/WeightedPool2Tokens.sol";
+import "./balancer/WeightedPool2Tokens.sol";
 import "hardhat/console.sol";
 
 contract sBootstrappingPool is WeightedPool2Tokens {
     using FixedPoint for uint256;
-    using WeightedPoolUserDataHelpers for bytes;
-    using WeightedPool2TokensMiscData for bytes32;
+    // using WeightedPoolUserDataHelpers for bytes;
+    // using WeightedPool2TokensMiscData for bytes32;
 
-    bool internal /*immutable*/ _sERC20IsToken0;
-    sIERC20 internal /*immutable*/ _sERC20;
-
-    uint256 internal /*immutable*/ _normalizedStartWeight;
-    uint256 internal /*immutable*/ _normalizedEndWeight;
+    sIERC20 internal _sERC20;
+    uint256 internal _sERC20MinWeight;
+    uint256 internal _delta;
+    bool    internal _sERC20IsToken0;
 
     constructor(
         IVault vault,
@@ -23,55 +22,51 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         string memory symbol,
         IERC20 token0,
         IERC20 token1,
-        uint256 normalizedStartWeight,
-        uint256 normalizedEndWeight,
+        uint256 sERC20MinWeight,
+        uint256 sERC20MaxWeight,
         uint256 swapFeePercentage,
         uint256 pauseWindowDuration,
         uint256 bufferPeriodDuration,
         bool sERC20IsToken0
     )
-        WeightedPool2Tokens(
-          NewPoolParams(
-              vault,
-              name,
-              symbol,
-              token0,
-              token1,
-              _MIN_WEIGHT,
-              FixedPoint.ONE.sub(_MIN_WEIGHT),
-              swapFeePercentage,
-              pauseWindowDuration,
-              bufferPeriodDuration,
-              true,
-              address(0)
-          )
-        )
+        Authentication(bytes32(uint256(msg.sender)))
+        BalancerPoolToken(name, symbol)
+        BasePoolAuthorization(address(0))
+        TemporarilyPausable(pauseWindowDuration, bufferPeriodDuration)
+        WeightedPool2Tokens()
     {
+        _require(sERC20MinWeight >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
+        _require(FixedPoint.ONE.sub(sERC20MaxWeight) >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
+        require(sERC20MaxWeight > sERC20MinWeight, "sBootstrappingPool: sERC20 max weigth must be superior to sERC20 min weight");
 
+        _setOracleEnabled(true);
+        _setSwapFeePercentage(swapFeePercentage);
 
+        bytes32 poolId = vault.registerPool(IVault.PoolSpecialization.TWO_TOKEN);
 
+        // pass in zero addresses for asset managers
+        IERC20[] memory tokens = new IERC20[](2);
+        tokens[0] = token0;
+        tokens[1] = token1;
+        vault.registerTokens(poolId, tokens, new address[](2));
+
+        _vault = vault;
+        _poolId = poolId;
+        _token0 = token0;
+        _token1 = token1;
+        _sERC20MinWeight = sERC20MinWeight;
+        _delta = sERC20MaxWeight.sub(sERC20MinWeight);
         _sERC20IsToken0 = sERC20IsToken0;
         _sERC20 = sERC20IsToken0 ? sIERC20(address(token0)) : sIERC20(address(token1));
+        _scalingFactor0 = _computeScalingFactor(token0);
+        _scalingFactor1 = _computeScalingFactor(token1);
 
-        _require(normalizedStartWeight >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
-        _require(normalizedEndWeight >= _MIN_WEIGHT, Errors.MIN_WEIGHT); //FixedPoint.ONE.sub(normalizedEndWeight) >= _MIN_WEIGHT
-        require(normalizedEndWeight > normalizedStartWeight, "SBP: end weigth must be superior to start weight");
-
-        _normalizedStartWeight = normalizedStartWeight;
-        _normalizedEndWeight = normalizedEndWeight;
-
-        // _updateWeights();
+        _updateWeights();
     }
-
-
 
     function pokeWeights() external {
-        _pokeWeights();
-    }
-
-    function _pokeWeights() internal {
-        bool             isOpened = totalSupply() > 0;
-        uint256          lastChangeBlock;
+        bool isOpened = totalSupply() > 0;
+        uint256 lastChangeBlock;
         uint256[] memory balances;
 
         if (isOpened) {
@@ -88,15 +83,12 @@ contract sBootstrappingPool is WeightedPool2Tokens {
     }
 
     function _updateWeights() private returns (uint256[] memory weights){
-        // save gas costs
-        uint256 normalizedStartWeight = _normalizedStartWeight;
-        // compute intermediary value
-        uint256 delta  = _normalizedEndWeight - normalizedStartWeight; // > 0
         uint256 supply = _sERC20.totalSupply();
+        uint256 delta = _delta;
         uint256 gamma  = delta * supply;
         require(gamma / delta == supply, "sBootstrappingPool: math overflow");
 
-        uint256 sWeight = normalizedStartWeight.add(gamma / _sERC20.cap());
+        uint256 sWeight = _sERC20MinWeight.add(gamma / _sERC20.cap()); // cap is always > 0
         uint256 eWeight = FixedPoint.ONE.sub(sWeight);
 
         weights = new uint256[](2);
@@ -110,8 +102,8 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         } else {
             _normalizedWeight0 = eWeight;
             _normalizedWeight1 = sWeight;
-            weights[1] = sWeight;
             weights[0] = eWeight;
+            weights[1] = sWeight;
         }
 
         if (sWeight >= eWeight) {

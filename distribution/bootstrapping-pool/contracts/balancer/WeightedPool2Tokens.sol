@@ -21,7 +21,7 @@ import "@balancer-labs/v2-pool-weighted/contracts/oracle/PoolPriceOracle.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/oracle/Buffer.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/IPriceOracle.sol";
 
-contract WeightedPool2Tokens is
+abstract contract WeightedPool2Tokens is
     IMinimalSwapInfoPool,
     IPriceOracle,
     BasePoolAuthorization,
@@ -52,17 +52,17 @@ contract WeightedPool2Tokens is
     // Since these Pools will register tokens only once, we can assume this index will be constant.
     uint256 internal _maxWeightTokenIndex;
 
-    IVault internal immutable _vault;
-    bytes32 internal immutable _poolId;
+    IVault internal _vault;
+    bytes32 internal _poolId;
 
-    IERC20 internal immutable _token0;
-    IERC20 internal immutable _token1;
+    IERC20 internal _token0;
+    IERC20 internal _token1;
 
     // All token balances are normalized to behave as if the token had 18 decimals. We assume a token's decimals will
     // not change throughout its lifetime, and store the corresponding scaling factor for each at construction time.
     // These factors are always greater than or equal to one: tokens with more than 18 decimals are not supported.
-    uint256 internal immutable _scalingFactor0;
-    uint256 internal immutable _scalingFactor1;
+    uint256 internal _scalingFactor0;
+    uint256 internal _scalingFactor1;
 
     event OracleEnabledChanged(bool enabled);
     event SwapFeePercentageChanged(uint256 swapFeePercentage);
@@ -88,49 +88,49 @@ contract WeightedPool2Tokens is
         address owner;
     }
 
-    constructor(NewPoolParams memory params)
+    constructor()
         // Base Pools are expected to be deployed using factories. By using the factory address as the action
         // disambiguator, we make all Pools deployed by the same factory share action identifiers. This allows for
         // simpler management of permissions (such as being able to manage granting the 'set fee percentage' action in
         // any Pool created by the same factory), while still making action identifiers unique among different factories
         // if the selectors match, preventing accidental errors.
-        Authentication(bytes32(uint256(msg.sender)))
-        BalancerPoolToken(params.name, params.symbol)
-        BasePoolAuthorization(params.owner)
-        TemporarilyPausable(params.pauseWindowDuration, params.bufferPeriodDuration)
+        // Authentication(bytes32(uint256(msg.sender)))
+        // BalancerPoolToken(params.name, params.symbol)
+        // BasePoolAuthorization(params.owner)
+        // TemporarilyPausable(params.pauseWindowDuration, params.bufferPeriodDuration)
     {
-        _setOracleEnabled(params.oracleEnabled);
-        _setSwapFeePercentage(params.swapFeePercentage);
+        // _setOracleEnabled(params.oracleEnabled);
+        // _setSwapFeePercentage(params.swapFeePercentage);
 
-        bytes32 poolId = params.vault.registerPool(IVault.PoolSpecialization.TWO_TOKEN);
+        // bytes32 poolId = params.vault.registerPool(IVault.PoolSpecialization.TWO_TOKEN);
 
-        // Pass in zero addresses for Asset Managers
-        IERC20[] memory tokens = new IERC20[](2);
-        tokens[0] = params.token0;
-        tokens[1] = params.token1;
-        params.vault.registerTokens(poolId, tokens, new address[](2));
+        // // Pass in zero addresses for Asset Managers
+        // IERC20[] memory tokens = new IERC20[](2);
+        // tokens[0] = params.token0;
+        // tokens[1] = params.token1;
+        // params.vault.registerTokens(poolId, tokens, new address[](2));
 
-        // Set immutable state variables - these cannot be read from during construction
-        _vault = params.vault;
-        _poolId = poolId;
+        // // Set immutable state variables - these cannot be read from during construction
+        // _vault = params.vault;
+        // _poolId = poolId;
 
-        _token0 = params.token0;
-        _token1 = params.token1;
+        // _token0 = params.token0;
+        // _token1 = params.token1;
 
-        _scalingFactor0 = _computeScalingFactor(params.token0);
-        _scalingFactor1 = _computeScalingFactor(params.token1);
+        // _scalingFactor0 = _computeScalingFactor(params.token0);
+        // _scalingFactor1 = _computeScalingFactor(params.token1);
 
-        // Ensure each normalized weight is above them minimum and find the token index of the maximum weight
-        _require(params.normalizedWeight0 >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
-        _require(params.normalizedWeight1 >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
+        // // Ensure each normalized weight is above them minimum and find the token index of the maximum weight
+        // _require(params.normalizedWeight0 >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
+        // _require(params.normalizedWeight1 >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
 
-        // Ensure that the normalized weights sum to ONE
-        uint256 normalizedSum = params.normalizedWeight0.add(params.normalizedWeight1);
-        _require(normalizedSum == FixedPoint.ONE, Errors.NORMALIZED_WEIGHT_INVARIANT);
+        // // Ensure that the normalized weights sum to ONE
+        // uint256 normalizedSum = params.normalizedWeight0.add(params.normalizedWeight1);
+        // _require(normalizedSum == FixedPoint.ONE, Errors.NORMALIZED_WEIGHT_INVARIANT);
 
-        _normalizedWeight0 = params.normalizedWeight0;
-        _normalizedWeight1 = params.normalizedWeight1;
-        _maxWeightTokenIndex = params.normalizedWeight0 >= params.normalizedWeight1 ? 0 : 1;
+        // _normalizedWeight0 = params.normalizedWeight0;
+        // _normalizedWeight1 = params.normalizedWeight1;
+        // _maxWeightTokenIndex = params.normalizedWeight0 >= params.normalizedWeight1 ? 0 : 1;
     }
 
     // Getters / Setters
@@ -173,7 +173,7 @@ contract WeightedPool2Tokens is
         _setSwapFeePercentage(swapFeePercentage);
     }
 
-    function _setSwapFeePercentage(uint256 swapFeePercentage) private {
+    function _setSwapFeePercentage(uint256 swapFeePercentage) internal{
         _require(swapFeePercentage >= _MIN_SWAP_FEE_PERCENTAGE, Errors.MIN_SWAP_FEE_PERCENTAGE);
         _require(swapFeePercentage <= _MAX_SWAP_FEE_PERCENTAGE, Errors.MAX_SWAP_FEE_PERCENTAGE);
 
@@ -1008,7 +1008,7 @@ contract WeightedPool2Tokens is
      * @dev Returns a scaling factor that, when multiplied to a token amount for `token`, normalizes its balance as if
      * it had 18 decimals.
      */
-    function _computeScalingFactor(IERC20 token) private view returns (uint256) {
+    function _computeScalingFactor(IERC20 token) internal view returns (uint256) {
         // Tokens that don't implement the `decimals` method are not supported.
         uint256 tokenDecimals = ERC20(address(token)).decimals();
 
