@@ -8,13 +8,15 @@ import "hardhat/console.sol";
 
 contract sBootstrappingPool is WeightedPool2Tokens {
     using FixedPoint for uint256;
-    // using WeightedPoolUserDataHelpers for bytes;
+    using WeightedPoolUserDataHelpers for bytes;
     // using WeightedPool2TokensMiscData for bytes32;
 
     sIERC20 internal _sERC20;
     uint256 internal _sERC20MinWeight;
     uint256 internal _delta;
     bool    internal _sERC20IsToken0;
+
+    uint256 internal constant JOIN_REWARD = 3;
 
     constructor(
         IVault vault,
@@ -116,6 +118,33 @@ contract sBootstrappingPool is WeightedPool2Tokens {
 
     function maxWeightTokenIndex() external view returns (uint256) {
         return _maxWeightTokenIndex;
+    }
+
+    function _doJoin(
+        uint256[] memory balances,
+        uint256[] memory normalizedWeights,
+        bytes memory userData
+    ) internal view override returns (uint256, uint256[] memory) {
+        BaseWeightedPool.JoinKind kind;
+        uint256 kind_ = abi.decode(userData, (uint256));
+        bool isReward = kind_ == JOIN_REWARD;
+        if (!isReward) kind = BaseWeightedPool.JoinKind(kind_);
+
+        if (isReward) {
+            uint256[] memory amountsIn;
+            (, amountsIn) = abi.decode(userData, (uint256, uint256[]));
+            console.log(amountsIn[0]);
+            console.log(amountsIn[1]);
+            return (0, amountsIn);
+        } else {
+            if (kind == BaseWeightedPool.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT) {
+                return _joinExactTokensInForBPTOut(balances, normalizedWeights, userData);
+            } else if (kind == BaseWeightedPool.JoinKind.TOKEN_IN_FOR_EXACT_BPT_OUT) {
+                return _joinTokenInForExactBPTOut(balances, normalizedWeights, userData);
+            } else {
+                _revert(Errors.UNHANDLED_JOIN_KIND);
+            }
+        }
     }
 
     // function onSwap(

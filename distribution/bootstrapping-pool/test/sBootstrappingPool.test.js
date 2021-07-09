@@ -13,7 +13,7 @@ describe('sBootstrappingPool', () => {
     await initialize(this);
   });
 
-  describe.only('⇛ constructor', () => {
+  describe('⇛ constructor', () => {
     describe('» start weight is valid', () => {
       describe('» and end weight is valid', () => {
         describe('» and swap fee is valid', () => {
@@ -243,6 +243,36 @@ describe('sBootstrappingPool', () => {
           expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(await this.sBootstrappingPool.expectedMaxWeightTokenIndex());
         });
       });
+    });
+  });
+
+  describe.only('# join ⇌ reward', () => {
+    before(async () => {
+      await setup(this, { balancer: true });
+      await this.sBootstrappingPool.join({ init: true });
+      await this.sBootstrappingPool.join();
+
+      this.data.previousTotalSupply = await this.sBootstrappingPool.totalSupply();
+      this.data.previousBalances = (await this.contracts.Vault.getPoolTokens(this.data.poolId)).balances;
+      this.data.previousBTPPrice = await this.sBootstrappingPool.BTPPrice();
+
+      await this.sBootstrappingPool.join({ reward: true });
+      this.data.latestTotalSupply = await this.sBootstrappingPool.totalSupply();
+      this.data.latestBalances = (await this.contracts.Vault.getPoolTokens(this.data.poolId)).balances;
+      this.data.latestBTPPrice = await this.sBootstrappingPool.BTPPrice();
+    });
+
+    it('it sets the pool name', async () => {
+      console.log(this.data.previousTotalSupply.toString());
+      console.log((await this.sBootstrappingPool.totalSupply()).toString());
+
+      console.log(this.data.previousBalances[0].toString());
+      console.log(this.data.previousBalances[1].toString());
+      console.log(this.data.latestBalances[0].toString());
+      console.log(this.data.latestBalances[1].toString());
+
+      console.log(this.data.previousBTPPrice.toString());
+      console.log(this.data.latestBTPPrice.toString());
     });
   });
 

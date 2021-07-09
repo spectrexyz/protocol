@@ -109,28 +109,38 @@ class sBootstrappingPool {
     const JOIN_KIND_INIT = 0;
     const JOIN_EXACT_TOKENS = 1;
     const JOIN_EXACT_BPT = 2;
+    const JOIN_REWARD = 3;
 
     opts.from ??= this.ctx.signers.holders[0];
     opts.init ??= false;
+    opts.reward ??= false;
 
     let token0, token1, amount0, amount1;
 
     if (ethers.BigNumber.from(this.ctx.contracts.WETH.address).lte(ethers.BigNumber.from(this.ctx.contracts.sERC20.address))) {
       token0 = ethers.constants.AddressZero;
       token1 = this.ctx.contracts.sERC20.address;
-      amount0 = this.ctx.params.sBootstrappingPool.pooled.ETH;
+      amount0 = opts.reward ? 0 : this.ctx.params.sBootstrappingPool.pooled.ETH;
       amount1 = this.ctx.params.sBootstrappingPool.pooled.sERC20;
     } else {
       token0 = this.ctx.contracts.sERC20.address;
       token1 = ethers.constants.AddressZero;
       amount0 = this.ctx.params.sBootstrappingPool.pooled.sERC20;
-      amount1 = this.ctx.params.sBootstrappingPool.pooled.ETH;
+      amount1 = opts.reward ? 0 : this.ctx.params.sBootstrappingPool.pooled.ETH;
+    }
+
+    if (opts.init) {
+      opts.joinKind = JOIN_KIND_INIT;
+    } else if (opts.reward) {
+      opts.joinKind = JOIN_REWARD;
+    } else {
+      opts.joinKind = JOIN_EXACT_TOKENS;
     }
 
     const joinPoolRequest = {
       assets: [token0, token1],
       maxAmountsIn: [amount0, amount1],
-      userData: ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256[]'], [opts.init ? JOIN_KIND_INIT : JOIN_EXACT_TOKENS, [amount0, amount1]]),
+      userData: ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256[]'], [opts.joinKind, [amount0, amount1]]),
       fromInternalBalance: false,
     };
 
@@ -157,7 +167,11 @@ class sBootstrappingPool {
     const weights = await this.getNormalizedWeights();
     const totalSupply = await this.totalSupply();
 
-    return this._bn(this._decimal(balances[0]).mul(BASE).div(this._decimal(weights[0]).div(BASE)).div(this._decimal(totalSupply)));
+    if (this.sERC20IsToken0) {
+      return this._bn(this._decimal(balances[0]).mul(BASE).div(this._decimal(weights[0]).div(BASE)).div(this._decimal(totalSupply)));
+    } else {
+      return this._bn(this._decimal(balances[1]).mul(BASE).div(this._decimal(weights[1]).div(BASE)).div(this._decimal(totalSupply)));
+    }
   }
 
   async expectedWeights(pct) {
