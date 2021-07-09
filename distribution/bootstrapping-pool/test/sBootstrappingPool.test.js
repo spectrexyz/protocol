@@ -246,7 +246,7 @@ describe('sBootstrappingPool', () => {
     });
   });
 
-  describe.only('# join ⇌ reward', () => {
+  describe('# join ⇌ reward', () => {
     before(async () => {
       await setup(this, { balancer: true });
       await this.sBootstrappingPool.join({ init: true });
@@ -254,12 +254,12 @@ describe('sBootstrappingPool', () => {
 
       this.data.previousTotalSupply = await this.sBootstrappingPool.totalSupply();
       this.data.previousBalances = (await this.contracts.Vault.getPoolTokens(this.data.poolId)).balances;
-      this.data.previousBTPPrice = await this.sBootstrappingPool.BTPPrice();
+      this.data.previousBTPPrice = await this.sBootstrappingPool.BTPPrice({ sERC20: true });
 
       await this.sBootstrappingPool.join({ reward: true });
       this.data.latestTotalSupply = await this.sBootstrappingPool.totalSupply();
       this.data.latestBalances = (await this.contracts.Vault.getPoolTokens(this.data.poolId)).balances;
-      this.data.latestBTPPrice = await this.sBootstrappingPool.BTPPrice();
+      this.data.latestBTPPrice = await this.sBootstrappingPool.BTPPrice({ sERC20: true });
     });
 
     it('it sets the pool name', async () => {

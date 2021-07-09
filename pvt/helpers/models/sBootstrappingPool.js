@@ -161,16 +161,22 @@ class sBootstrappingPool {
     return this._bn(numerator.mul(BASE).div(denominator));
   }
 
-  async BTPPrice() {
+  async BTPPrice(opts = {}) {
+    opts.sERC20 ??= false;
+
     const BASE = new Decimal(10).pow(new Decimal(18));
     const { balances } = await this.ctx.contracts.Vault.getPoolTokens(this.ctx.data.poolId);
     const weights = await this.getNormalizedWeights();
     const totalSupply = await this.totalSupply();
 
-    if (this.sERC20IsToken0) {
-      return this._bn(this._decimal(balances[0]).mul(BASE).div(this._decimal(weights[0]).div(BASE)).div(this._decimal(totalSupply)));
+    if (opts.sERC20) {
+      if (this.sERC20IsToken0) {
+        return this._bn(this._decimal(balances[0]).mul(BASE).div(this._decimal(weights[0]).div(BASE)).div(this._decimal(totalSupply)));
+      } else {
+        return this._bn(this._decimal(balances[1]).mul(BASE).div(this._decimal(weights[1]).div(BASE)).div(this._decimal(totalSupply)));
+      }
     } else {
-      return this._bn(this._decimal(balances[1]).mul(BASE).div(this._decimal(weights[1]).div(BASE)).div(this._decimal(totalSupply)));
+      return this._bn(this._decimal(balances[0]).mul(BASE).div(this._decimal(weights[0]).div(BASE)).div(this._decimal(totalSupply)));
     }
   }
 
