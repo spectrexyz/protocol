@@ -51,15 +51,45 @@ class sBootstrappingPool {
       sERC20IsToken0 = true;
     }
 
+    if (opts.invalidStartWeight) {
+      if (opts.tooBig) {
+        opts.startWeight = ctx.constants.sBootstrappingPool.ONE;
+      } else {
+        opts.startWeight = 0;
+      }
+    } else {
+      opts.startWeight = ctx.params.sBootstrappingPool.normalizedStartWeight;
+    }
+
+    if (opts.invalidEndWeight) {
+      if (opts.tooBig) {
+        opts.endWeight = ctx.constants.sBootstrappingPool.ONE;
+      } else {
+        opts.endWeight = 0;
+      }
+    } else {
+      opts.endWeight = ctx.params.sBootstrappingPool.normalizedEndWeight;
+    }
+
+    if (opts.invalidSwapFee) {
+      if (opts.tooBig) {
+        opts.swapFeePercentage = ethers.BigNumber.from('500000000000000001');
+      } else {
+        opts.swapFeePercentage = 0;
+      }
+    } else {
+      opts.swapFeePercentage = ctx.params.sBootstrappingPool.swapFeePercentage;
+    }
+
     ctx.contracts.sBootstrappingPool = await waffle.deployContract(ctx.signers.root, _sBootstrappingPool_, [
       ctx.contracts.Vault.address,
       ctx.params.sBootstrappingPool.name,
       ctx.params.sBootstrappingPool.symbol,
       token0,
       token1,
-      ctx.params.sBootstrappingPool.normalizedStartWeight,
-      ctx.params.sBootstrappingPool.normalizedEndWeight,
-      ctx.params.sBootstrappingPool.swapFeePercentage,
+      opts.startWeight,
+      opts.endWeight,
+      opts.swapFeePercentage,
       ctx.params.sBootstrappingPool.pauseWindowDuration,
       ctx.params.sBootstrappingPool.bufferPeriodDuration,
       sERC20IsToken0,

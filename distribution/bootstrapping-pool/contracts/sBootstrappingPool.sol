@@ -35,7 +35,8 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         TemporarilyPausable(pauseWindowDuration, bufferPeriodDuration)
         WeightedPool2Tokens()
     {
-        _require(sERC20MinWeight >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
+        _require(sERC20MinWeight >= _MIN_WEIGHT && sERC20MinWeight <= FixedPoint.ONE.sub(_MIN_WEIGHT), Errors.MIN_WEIGHT);
+
         _require(FixedPoint.ONE.sub(sERC20MaxWeight) >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
         require(sERC20MaxWeight > sERC20MinWeight, "sBootstrappingPool: sERC20 max weigth must be superior to sERC20 min weight");
 

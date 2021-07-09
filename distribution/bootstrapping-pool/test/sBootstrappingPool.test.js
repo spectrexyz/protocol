@@ -58,6 +58,7 @@ describe('sBootstrappingPool', () => {
 
             expect(weights[0]).to.equal(this.constants.sBootstrappingPool.ONE.sub(this.params.sBootstrappingPool.normalizedStartWeight));
             expect(weights[1]).to.equal(this.params.sBootstrappingPool.normalizedStartWeight);
+            expect(await this.sBootstrappingPool.maxWeightTokenIndex()).to.equal(this.sBootstrappingPool.sERC20IsToken0 ? 1 : 0);
           });
 
           it('it registers the pool in the vault', async () => {
@@ -67,7 +68,7 @@ describe('sBootstrappingPool', () => {
             expect(pool[1]).to.equal(this.constants.sBootstrappingPool.TWO_TOKEN_POOL);
           });
 
-          it('it registers tokens in the Vault', async () => {
+          it('it registers tokens in the vault', async () => {
             const { tokens, balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
 
             expect(tokens[0]).to.equal(this.contracts.WETH.address);
@@ -89,6 +90,38 @@ describe('sBootstrappingPool', () => {
             );
           });
         });
+
+        describe('» but swap fee is invalid', () => {
+          it('it reverts [swap fee too big]', async () => {
+            await expect(setup(this, { balancer: true, mint: false, invalidSwapFee: true, tooBig: true })).to.be.revertedWith('BAL#202');
+          });
+
+          it('it reverts [swap fee too small]', async () => {
+            await expect(setup(this, { balancer: true, mint: false, invalidSwapFee: true })).to.be.revertedWith('BAL#203');
+          });
+        });
+      });
+
+      describe('» but end weight is invalid', () => {
+        it('it reverts [sERC20EndWeight too big]', async () => {
+          await expect(setup(this, { balancer: true, mint: false, invalidEndWeight: true, tooBig: true })).to.be.revertedWith('BAL#302');
+        });
+
+        it('it reverts [sERC20EndWeight too small]', async () => {
+          await expect(setup(this, { balancer: true, mint: false, invalidEndWeight: true })).to.be.revertedWith(
+            'sBootstrappingPool: sERC20 max weigth must be superior to sERC20 min weight'
+          );
+        });
+      });
+    });
+
+    describe('» but start weight is invalid', () => {
+      it('it reverts [sERC20StartWeight too big]', async () => {
+        await expect(setup(this, { balancer: true, mint: false, invalidStartWeight: true, tooBig: true })).to.be.revertedWith('BAL#302');
+      });
+
+      it('it reverts [sERC20StartWeight too small]', async () => {
+        await expect(setup(this, { balancer: true, mint: false, invalidStartWeight: true })).to.be.revertedWith('BAL#302');
       });
     });
   });
