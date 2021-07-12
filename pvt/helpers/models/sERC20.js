@@ -74,6 +74,15 @@ class sERC20 {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
+  async transfer(opts = {}) {
+    opts.from ??= this.ctx.signers.holders[0];
+    opts.to ??= this.ctx.contracts.SERC20Splitter;
+    opts.amount ??= this.ctx.params.sERC20.amount;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).transfer(opts.to.address, opts.amount);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
   async _grantRoles() {
     await this.grantRole({ role: this.ctx.constants.sERC20.BURNER_ROLE, account: this.ctx.signers.sERC20.burner });
     await this.grantRole({ role: this.ctx.constants.sERC20.MINTER_ROLE, account: this.ctx.signers.sERC20.minter });

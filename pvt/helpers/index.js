@@ -4,9 +4,7 @@ const ERC721Mock = require('@spectrexyz/protocol-core/artifacts/contracts/test/E
 
 const { deployContract } = require('ethereum-waffle');
 
-const { expect, Assertion, assert } = require('chai');
-
-const { ethers, network } = require('hardhat');
+const { ethers } = require('hardhat');
 const Decimal = require('decimal.js');
 // const sERC20 = require('../../core/test/helpers/models/sERC20');
 const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
@@ -24,6 +22,7 @@ const initialize = async (ctx) => {
       symbol: 'MAS',
       cap: ethers.utils.parseEther('1000'),
       balance: ethers.BigNumber.from('100000000000000000000'),
+      amount: ethers.BigNumber.from('10000000000000000000'),
     },
     sERC721: {
       name: 'sERC721 Collection',
@@ -206,26 +205,6 @@ const setup = async (ctx, opts = {}) => {
   }
 };
 
-const transfer = {
-  sERC20: async (ctx, opts = {}) => {
-    opts.from ??= ctx.signers.holders[0];
-    opts.to ??= ctx.contracts.SERC20Splitter;
-    opts.amount ??= ctx.constants.amount;
-
-    ctx.contracts.sERC20 = ctx.contracts.sERC20.connect(opts.from);
-    ctx.data.tx = await ctx.contracts.sERC20.transfer(opts.to.address, opts.amount);
-    ctx.data.receipt = await ctx.data.tx.wait();
-  },
-  sERC721: async (ctx, opts = {}) => {
-    opts.from ??= ctx.signers.owners[0];
-    opts.to ??= ctx.contracts.sERC1155;
-
-    ctx.contracts.sERC721 = ctx.contracts.sERC721.connect(opts.from);
-    ctx.data.tx = await ctx.contracts.sERC721.transferFrom(opts.from.address, opts.to.address, ctx.data.tokenId);
-    ctx.data.receipt = await ctx.data.tx.wait();
-  },
-};
-
 const withdraw = async (ctx, opts = {}) => {
   opts.from ??= ctx.signers.beneficiaries[0];
 
@@ -242,11 +221,9 @@ const withdrawBatch = async (ctx, opts = {}) => {
 
 module.exports = {
   initialize,
-  computeInvariant,
   register,
   mock,
   setup,
-  transfer,
   withdraw,
   withdrawBatch,
 };
