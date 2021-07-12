@@ -133,8 +133,6 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         if (isReward) {
             uint256[] memory amountsIn;
             (, amountsIn) = abi.decode(userData, (uint256, uint256[]));
-            console.log(amountsIn[0]);
-            console.log(amountsIn[1]);
             return (0, amountsIn);
         } else {
             if (kind == BaseWeightedPool.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT) {
@@ -146,99 +144,4 @@ contract sBootstrappingPool is WeightedPool2Tokens {
             }
         }
     }
-
-    // function onSwap(
-    //     SwapRequest memory request,
-    //     uint256 balanceTokenIn,
-    //     uint256 balanceTokenOut
-    // ) external override whenNotPaused onlyVault(request.poolId) returns (uint256) {
-    //         bool tokenInIsToken0 = request.tokenIn == _token0;
-
-    //         uint256 scalingFactorTokenIn = _scalingFactor(tokenInIsToken0);
-    //         uint256 scalingFactorTokenOut = _scalingFactor(!tokenInIsToken0);
-
-    //         uint256 normalizedWeightIn = _normalizedWeights(tokenInIsToken0);
-    //         uint256 normalizedWeightOut = _normalizedWeights(!tokenInIsToken0);
-
-    //         // All token amounts are upscaled.
-    //         balanceTokenIn = _upscale(balanceTokenIn, scalingFactorTokenIn);
-    //         balanceTokenOut = _upscale(balanceTokenOut, scalingFactorTokenOut);
-
-    //         // Update price oracle with the pre-swap balances
-    //         _updateOracle(
-    //             request.lastChangeBlock,
-    //             tokenInIsToken0 ? balanceTokenIn : balanceTokenOut,
-    //             tokenInIsToken0 ? balanceTokenOut : balanceTokenIn
-    //         );
-
-    //     if (request.userData[0] == 0x77) {
-    //         console.log('MINT');
-
-    //         uint256 _mintFee = 5e16; // 5%
-
-    //         require(_sERC20IsToken0 && tokenInIsToken0 || !_sERC20IsToken0 && !tokenInIsToken0, "SBP: can only mint against ETH");
-
-    //         if (request.kind == IVault.SwapKind.GIVEN_IN) {
-    //                             uint256 feeAmount = request.amount.mulUp(getSwapFeePercentage());
-    //             request.amount = _upscale(request.amount.sub(feeAmount), scalingFactorTokenIn);
-
-    //             uint256 amountOut = _onSwapGivenIn_(
-    //                 request,
-    //                 balanceTokenIn,
-    //                 balanceTokenOut,
-    //                 normalizedWeightIn,
-    //                 normalizedWeightOut
-    //             );
-
-    //             // what we need is to send part of the ETH received
-
-    //               // ETH -> fixed
-    //             // return the amount of tokens exiting the pool: always 
-    //             // return the amount of tokens existing the pool: always 0
-    //             // amountOut tokens are exiting the Pool, so we round down.
-    //             return _downscaleDown(amountOut, scalingFactorTokenOut);
-    //         } else {
-    //             // return the amount of ETH entering the pool
-    //         }
-    //     } else {
-    //         // does exactly the same as WeightedPool2Tokens.onSwap
-        
-    //         if (request.kind == IVault.SwapKind.GIVEN_IN) {
-    //             // Fees are subtracted before scaling, to reduce the complexity of the rounding direction analysis.
-    //             // This is amount - fee amount, so we round up (favoring a higher fee amount).
-    //             uint256 feeAmount = request.amount.mulUp(getSwapFeePercentage());
-    //             request.amount = _upscale(request.amount.sub(feeAmount), scalingFactorTokenIn);
-
-    //             uint256 amountOut = _onSwapGivenIn_(
-    //                 request,
-    //                 balanceTokenIn,
-    //                 balanceTokenOut,
-    //                 normalizedWeightIn,
-    //                 normalizedWeightOut
-    //             );
-
-    //             // amountOut tokens are exiting the Pool, so we round down.
-    //             return _downscaleDown(amountOut, scalingFactorTokenOut);
-    //         } else {
-    //             request.amount = _upscale(request.amount, scalingFactorTokenOut);
-
-    //             uint256 amountIn = _onSwapGivenOut_(
-    //                 request,
-    //                 balanceTokenIn,
-    //                 balanceTokenOut,
-    //                 normalizedWeightIn,
-    //                 normalizedWeightOut
-    //             );
-
-    //             // amountIn tokens are entering the Pool, so we round up.
-    //             amountIn = _downscaleUp(amountIn, scalingFactorTokenIn);
-
-    //             // Fees are added after scaling happens, to reduce the complexity of the rounding direction analysis.
-    //             // This is amount + fee amount, so we round up (favoring a higher fee amount).
-    //             return amountIn.divUp(getSwapFeePercentage().complement());
-    //         }
-
-    //           // WeightedPool2Tokens.onSwap(request, balanceTokenIn, balanceTokenOut);
-    //     }
-    // }
 }

@@ -262,63 +262,21 @@ describe('sBootstrappingPool', () => {
       this.data.latestBTPPrice = await this.sBootstrappingPool.BTPPrice({ sERC20: true });
     });
 
-    it('it sets the pool name', async () => {
-      console.log(this.data.previousTotalSupply.toString());
-      console.log((await this.sBootstrappingPool.totalSupply()).toString());
+    it('it mints no BPT', async () => {
+      expect(await this.sBootstrappingPool.totalSupply()).to.equal(this.data.previousTotalSupply);
+    });
 
-      console.log(this.data.previousBalances[0].toString());
-      console.log(this.data.previousBalances[1].toString());
-      console.log(this.data.latestBalances[0].toString());
-      console.log(this.data.latestBalances[1].toString());
+    it('it updates pool balances', async () => {
+      expect(this.data.latestBalances[0]).to.equal(
+        this.sBootstrappingPool.sERC20IsToken0 ? this.data.previousBalances[0].add(this.params.sBootstrappingPool.pooled.sERC20) : this.data.previousBalances[0]
+      );
+      expect(this.data.latestBalances[1]).to.equal(
+        this.sBootstrappingPool.sERC20IsToken0 ? this.data.previousBalances[1] : this.data.previousBalances[1].add(this.params.sBootstrappingPool.pooled.sERC20)
+      );
+    });
 
-      console.log(this.data.previousBTPPrice.toString());
-      console.log(this.data.latestBTPPrice.toString());
+    it('it updates BPT price', async () => {
+      expect(this.data.latestBTPPrice).to.be.gt(this.data.previousBTPPrice);
     });
   });
-
-  // describe.skip('# mint', () => {
-  //   before(async () => {
-  //     await setup(this, { balancer: true });
-  //     await join(this, { init: true });
-
-  //     const singleSwap = {
-  //       poolId: this.data.poolId,
-  //       kind: 0, // GIVEN_IN
-  //       assetIn: ethers.constants.AddressZero,
-  //       assetOut: this.contracts.sERC20.address,
-  //       amount: ethers.BigNumber.from('10000000'),
-  //       userData: '0x77', //ethers.utils.defaultAbiCoder.encode(['bool'], [false]),
-  //     };
-
-  //     const fundManagement = {
-  //       sender: this.signers.holders[0].address,
-  //       fromInternalBalance: false,
-  //       recipient: this.signers.holders[0].address,
-  //       toInternalBalance: false,
-  //     };
-
-  //     const HOUR = ethers.BigNumber.from('3600');
-
-  //     const timestamp = (await currentTimestamp()).add(HOUR);
-
-  //     this.data.tx = await this.contracts.Vault.swap(singleSwap, fundManagement, 0, timestamp, { value: ethers.BigNumber.from('10000000') });
-  //     this.data.receipt = await this.data.tx.wait();
-  //   });
-
-  //   it('it does something', () => {});
-  // });
-
-  // describe.skip('# join', () => {
-  //   describe('» transaction initializes the pool', () => {
-  //     before(async () => {
-  //       await setup(this, { balancer: true });
-  //       await join(this, { init: true });
-  //     });
-  //     itJoinsPoolLikeExpected(this, { init: true });
-  //   });
-
-  //   describe('» transaction does not initialize the pool', () => {
-  //     describe('» and the last change block is an old block', () => {});
-  //   });
-  // });
 });
