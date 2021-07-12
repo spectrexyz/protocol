@@ -131,6 +131,7 @@ const initialize = async (ctx) => {
     ctx.signers.sERC20.pauser,
     ctx.signers.sERC20.snapshoter,
     ctx.signers.sERC721.owners[0],
+    ctx.signers.sERC721.owners[1],
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
@@ -225,25 +226,6 @@ const transfer = {
   },
 };
 
-const unlock = async (ctx, opts = {}) => {
-  opts.from ??= ctx.signers.owners[1];
-  opts.byAddress ??= false;
-
-  ctx.contracts.sERC1155 = ctx.contracts.sERC1155.connect(opts.from);
-
-  if (opts.byAddress) {
-    ctx.data.tx = await ctx.contracts.sERC1155['unlock(address,address,bytes)'](
-      ctx.contracts.sERC20.address,
-      ctx.signers.owners[2].address,
-      ethers.constants.HashZero
-    );
-  } else {
-    ctx.data.tx = await ctx.contracts.sERC1155['unlock(uint256,address,bytes)'](ctx.data.id, ctx.signers.owners[2].address, ethers.constants.HashZero);
-  }
-
-  ctx.data.receipt = await ctx.data.tx.wait();
-};
-
 const withdraw = async (ctx, opts = {}) => {
   opts.from ??= ctx.signers.beneficiaries[0];
 
@@ -258,63 +240,6 @@ const withdrawBatch = async (ctx, opts = {}) => {
   ctx.data.receipt = await ctx.data.tx.wait();
 };
 
-const itJoinsPoolLikeExpected = (ctx, opts = {}) => {
-  opts.init ??= false;
-  opts.old ??= true;
-
-  if (opts.init) {
-    it('it collects pooled tokens', async () => {
-      const { tokens, balances, lastChangeBlock } = await ctx.contracts.Vault.getPoolTokens(ctx.data.poolId);
-
-      expect(balances[0]).to.equal(ctx.constants.pooledETH);
-      expect(balances[1]).to.equal(ctx.constants.pooledSERC20);
-    });
-
-    it('it initializes pool invariant', async () => {
-      const invariant = computeInvariant(
-        [ctx.constants.pooledETH, ctx.constants.pooledSERC20],
-        [ctx.constants.pool.ONE.sub(ctx.constants.pool.normalizedStartWeight), ctx.constants.pool.normalizedStartWeight]
-      );
-      expect(await ctx.contracts.SBP.getLastInvariant()).to.be.near(invariant, 100000);
-      expect(await ctx.contracts.SBP.getInvariant()).to.be.near(invariant, 100000);
-    });
-
-    it('it mints LP tokens', async () => {
-      const invariant = computeInvariant(
-        [ctx.constants.pooledETH, ctx.constants.pooledSERC20],
-        [ctx.constants.pool.ONE.sub(ctx.constants.pool.normalizedStartWeight), ctx.constants.pool.normalizedStartWeight]
-      );
-      expect(await ctx.contracts.SBP.balanceOf(ctx.signers.holders[0].address)).to.be.near(invariant.mul(2).sub(ctx.constants.pool.MINIMUM_BPT), 100000);
-    });
-  }
-
-  if (!opts.init) {
-  }
-
-  if (opts.old) {
-    it('it caches the log of the last invariant', async () => {
-      //   function getMiscData()
-      // external
-      // view
-      // returns (
-      //     int256 logInvariant,
-      //     int256 logTotalSupply,
-      //     uint256 oracleSampleCreationTimestamp,
-      //     uint256 oracleIndex,
-      //     bool oracleEnabled,
-      //     uint256 swapFeePercentage
-      // )
-    });
-    it('it caches the total supply', async () => {});
-  } else {
-    it('it does not update the oracle data', async () => {});
-
-    it('it does not cache the log of the last invariant and supply', async () => {});
-
-    it('it does not cache the total supply', async () => {});
-  }
-};
-
 module.exports = {
   initialize,
   computeInvariant,
@@ -322,7 +247,6 @@ module.exports = {
   mock,
   setup,
   transfer,
-  unlock,
   withdraw,
   withdrawBatch,
 };

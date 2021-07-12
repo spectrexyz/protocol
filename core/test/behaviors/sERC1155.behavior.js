@@ -70,22 +70,20 @@ const itSpectralizesLikeExpected = (ctx, opts = {}) => {
   });
 
   it('it emits a Lock event', async () => {
-    await expect(ctx.data.tx)
-      .to.emit(ctx.contracts.sERC1155, 'Lock')
-      .withArgs(ctx.data.id);
+    await expect(ctx.data.tx2).to.emit(ctx.contracts.sERC1155, 'Lock').withArgs(ctx.data.id);
   });
 
   it('it clones and initializes sERC20', async () => {
     expect(await ctx.contracts.sERC20.name()).to.equal(ctx.constants.name);
     expect(await ctx.contracts.sERC20.symbol()).to.equal(ctx.constants.symbol);
     expect(await ctx.contracts.sERC20.cap()).to.equal(ctx.constants.cap);
-    expect(await ctx.contracts.sERC20.hasRole(await ctx.contracts.sERC20.DEFAULT_ADMIN_ROLE(), ctx.signers.admin.address)).to.equal(true);
+    expect(await ctx.contracts.sERC20.hasRole(await ctx.contracts.sERC20.DEFAULT_ADMIN_ROLE(), ctx.signers.sERC20.admin.address)).to.equal(true);
   });
 
   it('it emits a TransferSingle event as per the ERC1155 standard', async () => {
     opts.operator = opts.transfer ? ctx.contracts.sERC721 : ctx.signers.root;
 
-    await expect(ctx.data.tx)
+    await expect(ctx.data.tx2)
       .to.emit(ctx.contracts.sERC1155, 'TransferSingle')
       .withArgs(opts.operator.address, ethers.constants.AddressZero, ethers.constants.AddressZero, ctx.data.id, 0);
   });
@@ -96,13 +94,13 @@ const itSpectralizesLikeExpected = (ctx, opts = {}) => {
     expect(spectre.state).to.equal(ctx.constants.SpectreState.Locked);
     expect(spectre.collection).to.equal(ctx.contracts.sERC721.address);
     expect(spectre.tokenId).to.equal(ctx.data.tokenId);
-    expect(spectre.guardian).to.equal(ctx.signers.owners[1].address);
+    expect(spectre.guardian).to.equal(ctx.signers.sERC1155.guardian.address);
   });
 
   it('it emits a Spectralize event', async () => {
-    await expect(ctx.data.tx)
+    await expect(ctx.data.tx2)
       .to.emit(ctx.contracts.sERC1155, 'Spectralize')
-      .withArgs(ctx.contracts.sERC721.address, ctx.data.tokenId, ctx.data.id, ctx.contracts.sERC20.address, ctx.signers.owners[1].address);
+      .withArgs(ctx.contracts.sERC721.address, ctx.data.tokenId, ctx.data.id, ctx.contracts.sERC20.address, ctx.signers.sERC1155.guardian.address);
   });
 };
 
@@ -118,13 +116,11 @@ const itUnlocksLikeExpected = (ctx, opts = {}) => {
   });
 
   it('it emits an Unlock event', async () => {
-    await expect(ctx.data.tx)
-      .to.emit(ctx.contracts.sERC1155, 'Unlock')
-      .withArgs(ctx.data.id, ctx.signers.owners[2].address);
+    await expect(ctx.data.tx).to.emit(ctx.contracts.sERC1155, 'Unlock').withArgs(ctx.data.id, ctx.signers.sERC721.owners[1].address);
   });
 
   it('it transfers NFT', async () => {
-    expect(await ctx.contracts.sERC721.ownerOf(ctx.data.tokenId)).to.equal(ctx.signers.owners[2].address);
+    expect(await ctx.contracts.sERC721.ownerOf(ctx.data.tokenId)).to.equal(ctx.signers.sERC721.owners[1].address);
   });
 };
 

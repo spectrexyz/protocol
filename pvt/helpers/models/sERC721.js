@@ -22,6 +22,14 @@ class sERC721 {
     if (opts.approve) await this.approve(opts);
   }
 
+  async transfer(opts = {}) {
+    opts.from ??= this.ctx.signers.sERC721.owners[0];
+    opts.to ??= this.ctx.contracts.sERC1155;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).transferFrom(opts.from.address, opts.to.address, this.ctx.data.tokenId);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
   async approve(opts = {}) {
     opts.from ??= this.ctx.signers.sERC721.owners[0];
 
@@ -34,13 +42,11 @@ class sERC721 {
     opts.to ??= this.ctx.contracts.sERC1155;
     opts.data ??= '0x00';
 
-    this.ctx.data.tx = await this.contract['safeTransferFrom(address,address,uint256,bytes)'](
-      opts.from.address,
-      opts.to.address,
-      this.ctx.data.tokenId,
-      opts.data
-    );
+    this.ctx.data.tx = await this.contract
+      .connect(opts.from)
+      ['safeTransferFrom(address,address,uint256,bytes)'](opts.from.address, opts.to.address, this.ctx.data.tokenId, opts.data);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
+    this.ctx.data.tx2 = this.ctx.data.tx; // fix a bug where an un-waited tx overrides the current tx somewhere
   }
 }
 

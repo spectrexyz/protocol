@@ -1,22 +1,5 @@
 const { expect } = require('chai');
-const { ethers } = require('ethers');
-const { deployContract } = require('ethereum-waffle');
-const {
-  initialize,
-  mint,
-  mock,
-  safeBatchTransferFrom,
-  safeTransferFrom,
-  setApprovalForAll,
-  setup,
-  spectralize,
-  unlock,
-  itSafeBatchTransfersFromLikeExpected,
-  itSafeTransfersFromLikeExpected,
-  itSpectralizesLikeExpected,
-  itUnlocksLikeExpected,
-  transfer,
-} = require('@spectrexyz/protocol-helpers');
+const { initialize, setup, spectralize } = require('@spectrexyz/protocol-helpers');
 
 describe.only('sERC20', () => {
   before(async () => {

@@ -13,6 +13,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import "hardhat/console.sol";
 
 /**
  * @title sERC1155
@@ -303,7 +304,6 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         require(derrida == DERRIDA, "sERC1155: invalid spectralization data");
 
         emit Lock(_spectralize(collection, tokenId, name.toString(), symbol.toString(), cap, admin, guardian));
-        
         
         return IERC721Receiver.onERC721Received.selector; // 0x150b7a02
     }
