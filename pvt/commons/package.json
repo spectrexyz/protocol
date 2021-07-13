@@ -3,8 +3,6 @@
   "version": "1.0.0",
   "license": "GPL-3.0-or-later",
   "homepage": "https://github.com/spectrexyz/protocol",
-  "private": "true",
-  "devDependencies": {},
   "dependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.1",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
