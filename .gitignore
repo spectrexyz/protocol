@@ -1,14 +1,15 @@
 # npm
 node_modules
+package-lock.json
+
+# yarn
+yarn-error.log
 
 # hardhat
 cache
 artifacts
 coverage
 coverage.json
-
-# doc
-docs
 
 # macOS
 .DS_Store

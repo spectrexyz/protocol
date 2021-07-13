@@ -1,0 +1,26 @@
+{
+  "name": "@spectrexyz/protocol-infrastructure",
+  "version": "1.0.0",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/spectrexyz/protocol",
+  "files": [
+    "artifacts/**/*",
+    "contracts/**/*",
+    "!contracts/test/*"
+  ],
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "lint": "npx hardhat check",
+    "test": "npx hardhat test",
+    "test:coverage": "npx hardhat coverage",
+    "test:gas": "REPORT_GAS=true npx hardhat test"
+  },
+  "devDependencies": {
+    "@spectrexyz/protocol-commons": "^1.0.0",
+    "@spectrexyz/protocol-helpers": "^1.0.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.0.0",
+    "@spectrexyz/protocol-core": "^1.0.0"
+  }
+}
