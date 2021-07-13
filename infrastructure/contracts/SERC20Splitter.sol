@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
  * @title sERC20Splitter
  * @notice Split sERC20s between registered beneficiaries when received.
  */
-contract SERC20Splitter is Context, AccessControlEnumerable {
+contract sERC20Splitter is Context, AccessControlEnumerable {
     struct Split {
         address sERC20; // more efficient than bool to check if a split has been registered
         uint256 totalWithdrawn;
@@ -17,7 +17,7 @@ contract SERC20Splitter is Context, AccessControlEnumerable {
         mapping (address => uint256) withdrawn;
     }
 
-    bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
+    bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     uint256 public constant PCT_BASE = 1 ether; // 0% = 0 | 100% = 10^18 | 10% = 10^17
 
     mapping (address => Split) _splits;
@@ -28,7 +28,7 @@ contract SERC20Splitter is Context, AccessControlEnumerable {
 
     constructor(address registrar) { 
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(REGISTER_ROLE, registrar);
+        _setupRole(REGISTRAR_ROLE, registrar);
     }
 
     /**
@@ -43,7 +43,7 @@ contract SERC20Splitter is Context, AccessControlEnumerable {
     function register(address sERC20, address[] calldata beneficiaries, uint256[] calldata shares) external {
         Split storage split = _splits[sERC20];
 
-        require(hasRole(REGISTER_ROLE, _msgSender()), "SERC20Splitter: must have register role to register");
+        require(hasRole(REGISTRAR_ROLE, _msgSender()), "SERC20Splitter: must have register role to register");
         require(split.sERC20 == address(0), "SERC20Splitter: sERC20 split already registered");
         require(beneficiaries.length == shares.length, "SERC20Splitter: beneficiaries and shares length mismatch");
         

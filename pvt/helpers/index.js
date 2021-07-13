@@ -13,6 +13,7 @@ const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
 const sERC721 = require('./models/sERC721');
 const sERC1155 = require('./models/sERC1155');
 const sBootstrappingPool = require('./models/sBootstrappingPool');
+const sERC20Splitter = require('./models/sERC20Splitter');
 
 const initialize = async (ctx) => {
   ctx.params = {
@@ -48,6 +49,9 @@ const initialize = async (ctx) => {
       swapFeePercentage: ethers.BigNumber.from('10000000000000000'),
       pauseWindowDuration: ethers.BigNumber.from('3000'),
       bufferPeriodDuration: ethers.BigNumber.from('1000'),
+    },
+    sERC20Splitter: {
+      shares: [ethers.BigNumber.from('300000000000000000'), ethers.BigNumber.from('100000000000000000'), ethers.BigNumber.from('600000000000000000')],
     },
   };
 
@@ -92,7 +96,6 @@ const initialize = async (ctx) => {
     amount: ethers.BigNumber.from('10000000000000000000'),
     amount1: ethers.BigNumber.from('70000000000000000000'),
     amount2: ethers.BigNumber.from('12000000000000000000'),
-    shares: [ethers.BigNumber.from('300000000000000000'), ethers.BigNumber.from('100000000000000000'), ethers.BigNumber.from('600000000000000000')],
   };
 
   ctx.contracts = {};
@@ -103,6 +106,7 @@ const initialize = async (ctx) => {
     sERC20: {},
     sERC721: { owners: [] },
     sERC1155: {},
+    sERC20Splitter: { beneficiaries: [] },
     holders: [],
     owners: [],
     beneficiaries: [],
@@ -131,6 +135,11 @@ const initialize = async (ctx) => {
     ctx.signers.sERC20.snapshoter,
     ctx.signers.sERC721.owners[0],
     ctx.signers.sERC721.owners[1],
+    ctx.signers.sERC20Splitter.admin,
+    ctx.signers.sERC20Splitter.registrar,
+    ctx.signers.sERC20Splitter.beneficiaries[0],
+    ctx.signers.sERC20Splitter.beneficiaries[1],
+    ctx.signers.sERC20Splitter.beneficiaries[2],
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
@@ -146,20 +155,6 @@ const computeInvariant = (balances, weights) => {
   const invariant = balances[0].pow(weights[0].div(BASE)).mul(balances[1].pow(weights[1].div(BASE)));
 
   return ethers.BigNumber.from(invariant.truncated().toString());
-};
-
-const register = async (ctx, opts = {}) => {
-  opts.from ??= ctx.signers.admin;
-  opts.beneficiaries ??= [ctx.signers.beneficiaries[0], ctx.signers.beneficiaries[1], ctx.signers.beneficiaries[2]];
-  opts.shares ??= [ctx.constants.shares[0], ctx.constants.shares[1], ctx.constants.shares[2]];
-
-  ctx.contracts.SERC20Splitter = ctx.contracts.SERC20Splitter.connect(opts.from);
-  ctx.data.tx = await ctx.contracts.SERC20Splitter.register(
-    ctx.contracts.sERC20.address,
-    opts.beneficiaries.map((beneficiary) => beneficiary.address),
-    opts.shares
-  );
-  ctx.data.receipt = await ctx.data.tx.wait();
 };
 
 const mock = {
@@ -193,7 +188,7 @@ const setup = async (ctx, opts = {}) => {
   await sERC721.deploy(ctx);
   await sERC1155.deploy(ctx);
   await ctx.sERC721.mint(opts);
-  // ctx.contracts.SERC20Splitter = await deployContract(ctx.signers.root, SERC20Splitter, [ctx.signers.admin.address]);
+  await sERC20Splitter.deploy(ctx);
 
   if (opts.spectralize) {
     await ctx.sERC1155.spectralize();
@@ -205,25 +200,8 @@ const setup = async (ctx, opts = {}) => {
   }
 };
 
-const withdraw = async (ctx, opts = {}) => {
-  opts.from ??= ctx.signers.beneficiaries[0];
-
-  ctx.data.tx = await ctx.contracts.SERC20Splitter.withdraw(ctx.contracts.sERC20.address, opts.from.address);
-  ctx.data.receipt = await ctx.data.tx.wait();
-};
-
-const withdrawBatch = async (ctx, opts = {}) => {
-  opts.from ??= ctx.signers.beneficiaries[0];
-
-  ctx.data.tx = await ctx.contracts.SERC20Splitter.withdrawBatch([ctx.data.sERC201.address, ctx.data.sERC202.address], opts.from.address);
-  ctx.data.receipt = await ctx.data.tx.wait();
-};
-
 module.exports = {
   initialize,
-  register,
   mock,
   setup,
-  withdraw,
-  withdrawBatch,
 };

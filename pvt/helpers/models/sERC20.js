@@ -76,7 +76,7 @@ class sERC20 {
 
   async transfer(opts = {}) {
     opts.from ??= this.ctx.signers.holders[0];
-    opts.to ??= this.ctx.contracts.SERC20Splitter;
+    opts.to ??= this.ctx.contracts.sERC20Splitter;
     opts.amount ??= this.ctx.params.sERC20.amount;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).transfer(opts.to.address, opts.amount);
