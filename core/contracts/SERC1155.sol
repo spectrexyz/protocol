@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "./SERC20.sol";
+import "./sERC20.sol";
 import "./lib/Cast.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -22,7 +22,7 @@ import "hardhat/console.sol";
  *      financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
  *      sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
  */
-contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155MetadataURI, IERC721Receiver {
+contract sERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155MetadataURI, IERC721Receiver {
     using Address for address;
     using Cast for address;
     using Cast for bytes32;

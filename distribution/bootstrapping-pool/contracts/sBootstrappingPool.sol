@@ -9,7 +9,6 @@ import "hardhat/console.sol";
 contract sBootstrappingPool is WeightedPool2Tokens {
     using FixedPoint for uint256;
     using WeightedPoolUserDataHelpers for bytes;
-    // using WeightedPool2TokensMiscData for bytes32;
 
     sIERC20 internal _sERC20;
     uint256 internal _sERC20MinWeight;

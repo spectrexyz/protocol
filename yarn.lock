@@ -1018,6 +1018,7 @@ __metadata:
     "@balancer-labs/v2-solidity-utils": ^1.0.0
     "@balancer-labs/v2-vault": ^1.0.0
     "@spectrexyz/protocol-commons": ^1.0.0
+    "@spectrexyz/protocol-core": ^1.0.0
     "@spectrexyz/protocol-helpers": ^1.0.0
   languageName: unknown
   linkType: soft
@@ -1074,8 +1075,6 @@ __metadata:
 "@spectrexyz/protocol@workspace:.":
   version: 0.0.0-use.local
   resolution: "@spectrexyz/protocol@workspace:."
-  dependencies:
-    hardhat: ^2.4.3
   languageName: unknown
   linkType: soft
 
@@ -6331,7 +6330,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"hardhat@npm:^2.0.8, hardhat@npm:^2.2.0, hardhat@npm:^2.4.3":
+"hardhat@npm:^2.0.8, hardhat@npm:^2.2.0":
   version: 2.4.3
   resolution: "hardhat@npm:2.4.3"
   dependencies:

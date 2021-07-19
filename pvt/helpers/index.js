@@ -6,7 +6,6 @@ const { deployContract } = require('ethereum-waffle');
 
 const { ethers } = require('hardhat');
 const Decimal = require('decimal.js');
-// const sERC20 = require('../../core/test/helpers/models/sERC20');
 const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
 const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
 
@@ -14,6 +13,7 @@ const sERC721 = require('./models/sERC721');
 const sERC1155 = require('./models/sERC1155');
 const sBootstrappingPool = require('./models/sBootstrappingPool');
 const sERC20Splitter = require('./models/sERC20Splitter');
+const sMinter = require('./models/sMinter');
 
 const initialize = async (ctx) => {
   ctx.params = {
@@ -107,6 +107,7 @@ const initialize = async (ctx) => {
     sERC721: { owners: [] },
     sERC1155: {},
     sERC20Splitter: { beneficiaries: [] },
+    sMinter: {},
     holders: [],
     owners: [],
     beneficiaries: [],
@@ -140,6 +141,7 @@ const initialize = async (ctx) => {
     ctx.signers.sERC20Splitter.beneficiaries[0],
     ctx.signers.sERC20Splitter.beneficiaries[1],
     ctx.signers.sERC20Splitter.beneficiaries[2],
+    ctx.signers.sMinter.admin,
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
@@ -182,6 +184,7 @@ const setup = async (ctx, opts = {}) => {
   opts.approve ??= true;
   opts.balancer ??= false;
   opts.spectralize ??= true;
+  opts.minter ??= false;
 
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
 
@@ -197,6 +200,13 @@ const setup = async (ctx, opts = {}) => {
   if (opts.balancer) {
     await sBootstrappingPool.deploy(ctx, opts);
     ctx.data.poolId = await ctx.sBootstrappingPool.getPoolId();
+  }
+
+  if (opts.minter) {
+    await sMinter.deploy(ctx, opts);
+    await ctx.sMinter.register();
+    await ctx.sBootstrappingPool.join({ init: true });
+    await ctx.sBootstrappingPool.join();
   }
 };
 

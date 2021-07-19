@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.0;
 
-import "./SERC1155.sol";
+import "./sERC1155.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
@@ -19,7 +19,7 @@ import "hardhat/console.sol";
  * @notice ERC20 token of spectralized ERC721.
  * @dev This contract is meant to be used as the implementation contract of EIP1167 minimal proxies.
  */
-contract SERC20 is
+contract sERC20 is
     Initializable,
     ContextUpgradeable,
     AccessControlUpgradeable,
