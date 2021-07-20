@@ -8,7 +8,7 @@ class sMinter {
   }
 
   static async deploy(ctx) {
-    ctx.contracts.sMinter = await waffle.deployContract(ctx.signers.sMinter.admin, _sMinter_);
+    ctx.contracts.sMinter = await waffle.deployContract(ctx.signers.sMinter.admin, _sMinter_, [ctx.contracts.Vault.address, ctx.params.sMinter.protocolFee]);
 
     ctx.sMinter = new sMinter(ctx);
   }
@@ -16,14 +16,21 @@ class sMinter {
   async register(opts = {}) {
     opts.from ??= this.ctx.signers.sMinter.admin;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).register(this.ctx.sERC20.contract.address, this.ctx.sBootstrappingPool.contract.address);
+    this.ctx.data.tx = await this.contract.connect(opts.from).register(this.ctx.sERC20.contract.address, {
+      pool: this.ctx.sBootstrappingPool.contract.address,
+      poolId: ethers.constants.HashZero,
+      initialPrice: this.ctx.params.sMinter.initialPrice,
+      allocation: this.ctx.params.sMinter.allocation,
+      fee: this.ctx.params.sMinter.fee,
+    });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async mint(opts = {}) {
     opts.from ??= this.ctx.signers.holders[0];
+    opts.value ??= this.ctx.params.sMinter.value;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).mint(this.ctx.sERC20.contract.address);
+    this.ctx.data.tx = await this.contract.connect(opts.from).mint(this.ctx.sERC20.contract.address, { value: opts.value });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }

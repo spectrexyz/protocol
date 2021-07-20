@@ -14,70 +14,103 @@ import "./sBootstrappingPool.sol";
 // import "@openzeppelin/contracts/utils/Address.sol";
 // import "@openzeppelin/contracts/utils/Context.sol";
 // import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import "@balancer-labs/v2-vault/contracts/interfaces/IVault.sol";
+
 import "@balancer-labs/v2-pool-weighted/contracts/IPriceOracle.sol";
+import "@balancer-labs/v2-pool-weighted/contracts/BaseWeightedPool.sol";
+
+
 import "hardhat/console.sol";
 
 contract sMinter  {
+    struct Pit {
+        sBootstrappingPool pool;
+        bytes32 poolId;
+        // address beneficiary;
+        uint256 initialPrice;
+        uint256 allocation;
+        uint256 fee;
+        bool sERC20IsToken0;
+    }
+
+    uint256 public constant ONE = 1e18;
+
     address private _bank;
     address private _splitter;
+    IVault  private _vault;
+    uint256 private _protocolFee;
     mapping (address => uint256) private _fees;
     mapping (address => uint256) private _allocations;
     mapping (address => sBootstrappingPool) private _pools;
+    mapping (address => Pit) _pits;
 
-    function register(address sERC20_, address pool) external {
-        _pools[sERC20_] = sBootstrappingPool(pool);
+    constructor(address vault, uint256 protocolFee) {
+        _vault = IVault(vault);
+        _protocolFee = protocolFee;
     }
 
-    function mint(sIERC20 sERC20_/*, uint256 value, uint256 expected, address recipient*/) external {
-        sBootstrappingPool pool = _pools[address(sERC20_)];
+    function register(address sERC20_, Pit calldata pit) external {
+        _pits[sERC20_] = pit;
+        _pits[sERC20_].poolId = pit.pool.getPoolId();
+        _pits[sERC20_].sERC20IsToken0 = pit.pool.sERC20IsToken0();
+    }
 
-          console.log(pool.getLargestSafeQueryWindow());
+    function mint(address sERC20_/*, uint256 value, uint256 expected, address recipient*/) external payable {
+        Pit storage pit = _pits[sERC20_];
+
+        uint256 price = _price(pit.pool, pit.initialPrice, pit.sERC20IsToken0);
+        uint256 protocolFee = msg.value * _protocolFee / ONE;
+        uint256 fee = msg.value * pit.fee / ONE;
+        uint256 value = msg.value - protocolFee - fee;
+        uint256 amount = msg.value * price / ONE;
+        // uint256 fee = pit.fee * amount / ONE;
+
+        uint256 toPool = _toMint(pit.pool, value, pit.initialPrice, pit.sERC20IsToken0);
+
+        console.log("Price: %s", price);
+        console.log("ProtocolFee: %s", protocolFee);
+        console.log("MintingFee: %s", fee);
+        console.log("Value: %s", value);
+        console.log("toPool: %s", toPool);
 
 
-        IPriceOracle.OracleAverageQuery[] memory query = new IPriceOracle.OracleAverageQuery[](1);
-        query[0] = IPriceOracle.OracleAverageQuery({
-          variable: IPriceOracle.Variable.PAIR_PRICE,
-          secs: 1 days,
-          ago: 0
-        });
-        try pool.getTimeWeightedAverage(query) returns (uint256[] memory prices) {
-          console.log(prices[0]);
-        } catch Error(string memory reason) {
-          if (equal(reason, "BAL#313")) {
-            console.log("THIS IS A FAIL");
-          } else {
-            revert(reason);
-          }
-        } catch {
-            revert("sMinter: pool oracle reverted");
-        }
-        // if(pool.getLargestSafeQueryWindow() < 1 days) {
-        //   console.log("prout");
-        //   console.log(pool.getLargestSafeQueryWindow());
+        // IAsset[]  memory assets  = new IAsset[](2);
+        // uint256[] memory amounts = new uint256[](2);
+
+        // if (pit.sERC20IsToken0) {
+        //     assets[0] = IAsset(sERC20_);
+        //     assets[1] = IAsset(address(0));
+        //     amounts[0] = toPool;
+        //     amounts[1] = fee;
+        // } else {
+        //     assets[0] = IAsset(address(0));
+        //     assets[1] = IAsset(sERC20_);
+        //     amounts[0] = fee;
+        //     amounts[1] = toPool;
         // }
 
-      
-        // query[0].variable = IPriceOracle.Variable.PAIR_PRICE;
-
-        // IPriceOracle
         
-        // uint256 price = pool.getTimeWeightedAverage(query)[0];
+
+        // IVault.JoinPoolRequest memory request = IVault.JoinPoolRequest({
+        //     assets: assets,
+        //     maxAmountsIn: amounts,
+        //     userData: abi.encode(BaseWeightedPool.JoinKind.INIT, amounts), // il faut checker le totalSupply de Pool pour savoir si on fait INIT ou EXACT_TOKENS_IN_FOR_BPT_OUT
+        //     fromInternalBalance: false
+        // });
 
 
-// enum Variable { PAIR_PRICE, BPT_PRICE, INVARIANT }
+        // sIERC20(sERC20_).mint(address(this), toPool);
+        // sIERC20(sERC20_).approve(address(_vault), toPool);
+        // _vault.joinPool{value: value}(pit.poolId, address(this), address(this), request);
 
-// getTimeWeightedAverage(OracleAverageQuery[] memory queries)
 
-    // struct OracleAccumulatorQuery {
-    //     Variable variable;
-    //     uint256 ago;
-    // }
+        // 1. On prend un fee sur l'ETH pour nous.
+        // 2. On prend un fee sur l'ETH pour le minting.
+        // 3. On mint en supplément ce qu'il faut pour la pool
+        // 4. On mint ce qu'il faut pour l'acheteur
+        // 5. On mint l'allocation
+        // 6. On join / reward.
 
-//  struct OracleAverageQuery {
-//         Variable variable;
-//         uint256 secs;
-//         uint256 ago;
-//     }
 
 // https://github.com/balancer-labs/balancer-v2-monorepo/blob/df9afcf1bef4926f9b4901ba1ee617f44d4395b3/pkg/pool-utils/contracts/interfaces/IPriceOracle.sol
         
@@ -85,43 +118,85 @@ contract sMinter  {
     //   first token. For example, if token A is worth $2, and token B is worth $4, the pair price will be 2.0.
     //   Note that the price is computed *including* the tokens decimals. This means that the pair price of a Pool with
     //   DAI and USDC will be close to 1.0, despite DAI having 18 decimals and USDC 6.
-
-        // uint256 amount = pool.getPrice(sERC20) * msg.value
-        // sERC20.mint(amount);
-        // sERC20.mint(amount * allocation, splitter);
-        // fee = _fees[sERC20] * amount / PCT_BASE;
-        // toBank = protocolFee * fee / PCT_BASE;
-        // toSplit = fee - bank;
-        // vault.join(toSplit * reward, none);
-        //_vault.join(toSplit * common, broker);
-
-        // pool.deposit
-
-        // on calcule le fee sur le token qui a le plus grand poids puis on calcule pour l'autre.
+   
     }
 
-    // function _mint(address sERC20_, address pool, uint256 value, uint256 price, uint)
+   
 
-    function compare(string memory _a, string memory _b) private returns (int) {
-        bytes memory a = bytes(_a);
-        bytes memory b = bytes(_b);
-        uint minLength = a.length;
-        if (b.length < minLength) minLength = b.length;
-        //@todo unroll the loop into increments of 32 and do full 32 byte comparisons
-        for (uint i = 0; i < minLength; i ++)
-            if (a[i] < b[i])
-                return -1;
-            else if (a[i] > b[i])
-                return 1;
-        if (a.length < b.length)
-            return -1;
-        else if (a.length > b.length)
-            return 1;
-        else
-            return 0;
+    function _price(sBootstrappingPool pool, uint256 initialPrice, bool sERC20IsToken0) private returns (uint256) {
+        IPriceOracle.OracleAverageQuery[] memory query = new IPriceOracle.OracleAverageQuery[](1);
+        query[0] = IPriceOracle.OracleAverageQuery({
+            variable: IPriceOracle.Variable.PAIR_PRICE,
+            secs: 1 days,
+            ago: 0
+        });
+
+        try pool.getTimeWeightedAverage(query) returns (uint256[] memory prices) {
+          return sERC20IsToken0 ? prices[0] : ONE * ONE / prices[0]; // return in sERC20 per ETH;
+        } catch Error(string memory reason) {
+          if (keccak256(bytes(reason)) == keccak256(bytes("BAL#313"))) {
+            return initialPrice;
+          } else {
+            revert(reason);
+          }
+        } catch {
+            revert("sMinter: pool oracle reverted");
+        }
     }
 
-       function equal(string memory _a, string memory _b) private returns (bool) {
-        return compare(_a, _b) == 0;
-    }
+    function _toMint(sBootstrappingPool pool, uint256 value, uint256 initialPrice, bool sERC20IsToken0) private returns (uint256) {
+        (, uint256[] memory balances, ) = _vault.getPoolTokens(pool.getPoolId());
+        // uint256[] memory weights = pool.getNormalizedWeights();
+
+        uint256 sBalance;
+        uint256 eBalance;
+        // uint256 sWeight;
+        // uint256 eWeight;
+
+        if (sERC20IsToken0) {
+            sBalance = balances[0];
+            eBalance = balances[1];
+            // sWeight = weights[0];
+            // eWeight = weights[1];
+        } else {
+            sBalance = balances[1];
+            eBalance = balances[0];
+            // sWeight = weights[1];
+            // eWeight = weights[0];
+        }
+        
+        // console.log("sWeight: %s", sWeight);
+        // console.log("eWeight: %s", eWeight);
+        console.log("sBalance: %s", sBalance);
+        console.log("eBalance: %s", eBalance);
+
+        // uint256 price = (eBalance * sWeight) / (sBalance * eWeight);
+
+        if (eBalance == 0) {
+          uint256[] memory weights = pool.getNormalizedWeights();
+          console.log("sWeight: %s", sERC20IsToken0 ? weights[0] : weights[1]);
+          console.log("eWeight: %s", sERC20IsToken0 ? weights[1] : weights[0]);
+          if (sERC20IsToken0) 
+            return value * initialPrice * weights[0] / (ONE * weights[1]);
+          else
+            return value * initialPrice * weights[1] / (ONE * weights[0]);
+          // return value * initialPrice * sWeight / eWeight;
+        } else {
+          return (value * sBalance) / eBalance;
+        }
+
+        
+        // SP = (B_0 * w_1) / (B_1 * w_0)
+        // amount = (value * sWeight) / (price * eWeight);
+
+     }
+
+    // function _fee(sBootstrappingPool pool, uint256 IProtocolFeesCollector) private returns (uint256 value, uint256 amount) {
+    //     bool sERC20IsToken0 = pool.sERC20IsToken0();
+    //     uint256 maxWeightTokenIndex = pool.maxWeightTokenIndex();
+    //     if (sERC20isToken0 && maxWeightTokenIndex == 0)
+    //         return 
+    // }
+
+
 }

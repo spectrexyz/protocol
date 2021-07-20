@@ -31,7 +31,7 @@ class sBootstrappingPool {
 
   static async deploy(ctx, opts) {
     let token0, token1, sERC20IsToken0;
-    opts.mint ??= true;
+    opts.mint ??= opts.minter ? false : true;
 
     ctx.contracts.Authorizer = await waffle.deployContract(ctx.signers.root, _Authorizer_, [ctx.signers.root.address]);
     ctx.contracts.OracleMock = await waffle.deployContract(ctx.signers.root, _OracleMock_);

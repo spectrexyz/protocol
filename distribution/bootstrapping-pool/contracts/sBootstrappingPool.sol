@@ -36,6 +36,9 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         TemporarilyPausable(pauseWindowDuration, bufferPeriodDuration)
         WeightedPool2Tokens()
     {
+
+        // IL FAUT INVERSER L'ORDRE DES POIDS !!!
+        // sERC20 COMMENCE AVEC UN GRAND POIDS ET FINIT AVEC UN PETIT !
         _require(sERC20MinWeight >= _MIN_WEIGHT && sERC20MinWeight <= FixedPoint.ONE.sub(_MIN_WEIGHT), Errors.MIN_WEIGHT);
 
         _require(FixedPoint.ONE.sub(sERC20MaxWeight) >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
@@ -114,6 +117,11 @@ contract sBootstrappingPool is WeightedPool2Tokens {
             _maxWeightTokenIndex = _sERC20IsToken0 ? 1 : 0;
         }
     }
+
+    function sERC20IsToken0() external view returns (bool) {
+        return _sERC20IsToken0;
+    }
+
 
     function maxWeightTokenIndex() external view returns (uint256) {
         return _maxWeightTokenIndex;
