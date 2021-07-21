@@ -15,6 +15,7 @@ class sBootstrappingPool {
     this.name = this.contract.name;
     this.symbol = this.contract.symbol;
     this.decimals = this.contract.decimals;
+    this.balanceOf = this.contract.balanceOf;
     this.getPoolId = this.contract.getPoolId;
     this.getInvariant = this.contract.getInvariant;
     this.getLastInvariant = this.contract.getLastInvariant;

@@ -8,7 +8,12 @@ class sMinter {
   }
 
   static async deploy(ctx) {
-    ctx.contracts.sMinter = await waffle.deployContract(ctx.signers.sMinter.admin, _sMinter_, [ctx.contracts.Vault.address, ctx.params.sMinter.protocolFee]);
+    ctx.contracts.sMinter = await waffle.deployContract(ctx.signers.sMinter.admin, _sMinter_, [
+      ctx.contracts.Vault.address,
+      ctx.signers.sMinter.bank.address,
+      ctx.signers.sMinter.splitter.address,
+      ctx.params.sMinter.protocolFee,
+    ]);
 
     ctx.sMinter = new sMinter(ctx);
   }

@@ -390,11 +390,11 @@ abstract contract WeightedPool2Tokens is
             );
 
             // Note we no longer use `balances` after calling `_onJoinPool`, which may mutate it.
-
             _mintPoolTokens(recipient, bptAmountOut);
 
             // amountsIn are amounts entering the Pool, so we round up.
             _downscaleUpArray(amountsIn);
+
             // dueProtocolFeeAmounts are amounts exiting the Pool, so we round down.
             _downscaleDownArray(dueProtocolFeeAmounts);
         }
@@ -428,6 +428,7 @@ abstract contract WeightedPool2Tokens is
 
         uint256[] memory amountsIn = userData.initialAmountsIn();
         InputHelpers.ensureInputLengthMatch(amountsIn.length, 2);
+
         _upscaleArray(amountsIn);
 
         uint256[] memory normalizedWeights = _normalizedWeights();

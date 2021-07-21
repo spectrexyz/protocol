@@ -88,6 +88,9 @@ const initialize = async (ctx) => {
       Locked: 1,
       Unlocked: 2,
     },
+    sMinter: {
+      ONE: ethers.BigNumber.from('1000000000000000000'),
+    },
     unlockedURI: 'ipfs://Qm.../unwrapped',
     unavailableURI: 'ipfs://Qm.../unavailable',
     tokenURI: 'ipfs://Qm.../',
@@ -149,6 +152,8 @@ const initialize = async (ctx) => {
     ctx.signers.sERC20Splitter.beneficiaries[1],
     ctx.signers.sERC20Splitter.beneficiaries[2],
     ctx.signers.sMinter.admin,
+    ctx.signers.sMinter.bank,
+    ctx.signers.sMinter.splitter,
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
