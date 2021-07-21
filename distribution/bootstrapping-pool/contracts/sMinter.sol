@@ -26,12 +26,12 @@ contract sMinter  {
 
     struct Pit {
         sBootstrappingPool pool;
-        bytes32 poolId;
-        // address beneficiary;
-        uint256 initialPrice;
-        uint256 allocation;
-        uint256 fee;
-        bool sERC20IsToken0;
+        bytes32            poolId;
+        address payable    beneficiary;
+        uint256            initialPrice;
+        uint256            allocation;
+        uint256            fee;
+        bool               sERC20IsToken0;
     }
 
     uint256 public constant ONE = 1e18;
@@ -61,43 +61,55 @@ contract sMinter  {
         console.log("Received %s ETH", msg.value);
     }
 
-    function mint(address sERC20_/*, uint256 value, uint256 expected, address recipient*/) external payable {
-        require(msg.value != 0, "sMinter: value must not be null");
+    // check if on met un nonReentrant
 
-        Pit storage pit = _pits[sERC20_];
+    event Mint(address indexed sERC20, uint256 value, uint256 amount, uint256 protocolFee, uint256 fee);
 
-        uint256 price = _price(pit.pool, pit.initialPrice, pit.sERC20IsToken0);
+    function mint(address sERC20, uint256 expected, address payable recipient) external payable {
+        require(msg.value != 0, "sMinter: minted value must not be null");
+
+        Pit storage        pit            = _pits[sERC20];
+        sBootstrappingPool pool           = pit.pool;
+        uint256            initialPrice   = pit.initialPrice;
+        bool               sERC20IsToken0 = pit.sERC20IsToken0;
+
+
+        // (uint256 value, uint256 fee) = _doFees(pit.fee);
+
+        // uint256 protocolFee;
+        uint256 price = _price(pool, initialPrice, pit.sERC20IsToken0);
         uint256 protocolFee = msg.value * _protocolFee / ONE;
         uint256 fee = msg.value * pit.fee / ONE;
         uint256 value = msg.value - protocolFee - fee;
-        uint256 amount = msg.value * price / ONE;
-        // uint256 fee = pit.fee * amount / ONE;
+        uint256 amount = value * price / ONE;
 
-        uint256 toPool = _toMint(pit.pool, value, pit.initialPrice, pit.sERC20IsToken0);
+        // uint256 toPool = _toMint(pool, value, initialPrice, pit.sERC20IsToken0);
 
-        console.log("Price: %s", price);
-        console.log("ProtocolFee: %s", protocolFee);
-        console.log("MintingFee: %s", fee);
-        console.log("Value: %s", value);
-        console.log("toPool: %s", toPool);
-        console.log("ONE: %s", ONE);
+        // console.log("Price: %s", price);
+        // console.log("ProtocolFee: %s", protocolFee);
+        // console.log("MintingFee: %s", fee);
+        // console.log("Value: %s", value);
+        // console.log("toPool: %s", toPool);
+        // console.log("ONE: %s", ONE);
 
 
-        IVault.JoinPoolRequest memory request = _request(sERC20_, pit.pool, toPool, fee, pit.sERC20IsToken0);
-
+        // _bank.sendValue(protocolFee);
+        // sIERC20(sERC20).mint(address(this), toPool);
+        // sIERC20(sERC20).approve(address(_vault), toPool);
+        // _vault.joinPool{value: fee}(pit.poolId, address(this), _bank, _request(sERC20, pit.pool, toPool, fee, pit.sERC20IsToken0));
+        
+        // collect protocol fee
         _bank.sendValue(protocolFee);
-        sIERC20(sERC20_).mint(address(this), toPool);
-        sIERC20(sERC20_).approve(address(_vault), toPool);
-        _vault.joinPool{value: fee}(pit.poolId, address(this), _bank, request);
+        // pay beneficiary
+        pit.beneficiary.sendValue(value);
+        // pool LP reward
+        _reward(sERC20, pool, pit.poolId, fee, initialPrice, sERC20IsToken0);
+        // mint allocation
+        // _allocate();
+        // mint recipient tokens
+        sIERC20(sERC20).mint(recipient, amount);
 
-
-        // 1. On prend un fee sur l'ETH pour nous.
-        // 2. On prend un fee sur l'ETH pour le minting.
-        // 3. On mint en supplément ce qu'il faut pour la pool
-        // 4. On mint ce qu'il faut pour l'acheteur
-        // 5. On mint l'allocation
-        // 6. On join / reward.
-
+        // emit Mint(sERC20, msg.value, amount, protocolFee, fee);
 
 // https://github.com/balancer-labs/balancer-v2-monorepo/blob/df9afcf1bef4926f9b4901ba1ee617f44d4395b3/pkg/pool-utils/contracts/interfaces/IPriceOracle.sol
         
@@ -107,6 +119,14 @@ contract sMinter  {
     //   DAI and USDC will be close to 1.0, despite DAI having 18 decimals and USDC 6.
    
     }
+
+    function withdraw() external {
+        _bank.sendValue(address(this).balance);
+    }
+
+    function bank() public view returns (address) {
+        return _bank;
+    } 
 
    function _request(address sERC20, sBootstrappingPool pool, uint256 amount, uint256 value, bool sERC20IsToken0) private returns (IVault.JoinPoolRequest memory) {
       IAsset[]  memory assets  = new IAsset[](2);
@@ -155,59 +175,34 @@ contract sMinter  {
         }
     }
 
-    function _toMint(sBootstrappingPool pool, uint256 value, uint256 initialPrice, bool sERC20IsToken0) private returns (uint256) {
-        (, uint256[] memory balances, ) = _vault.getPoolTokens(pool.getPoolId());
-        // uint256[] memory weights = pool.getNormalizedWeights();
+    // always return sERC20 balance as first balance
+    function _balances(bytes32 poolId, bool sERC20IsToken0) private returns (uint256[2] memory) {
+        (, uint256[] memory balances, ) = _vault.getPoolTokens(poolId);
 
-        uint256 sBalance;
-        uint256 eBalance;
-        // uint256 sWeight;
-        // uint256 eWeight;
+        if (sERC20IsToken0)
+            return [balances[0], balances[1]];
+        else
+            return [balances[1], balances[0]];
+    }
 
-        if (sERC20IsToken0) {
-            sBalance = balances[0];
-            eBalance = balances[1];
-            // sWeight = weights[0];
-            // eWeight = weights[1];
-        } else {
-            sBalance = balances[1];
-            eBalance = balances[0];
-            // sWeight = weights[1];
-            // eWeight = weights[0];
-        }
-        
-        // console.log("sWeight: %s", sWeight);
-        // console.log("eWeight: %s", eWeight);
-        console.log("sBalance: %s", sBalance);
-        console.log("eBalance: %s", eBalance);
+    function _reward(address sERC20, sBootstrappingPool pool, bytes32 poolId, uint256 value, uint256 initialPrice, bool sERC20IsToken0) private returns (uint256) {
+        uint256[2] memory balances = _balances(poolId, sERC20IsToken0);
+        uint256 reward;
 
-        // uint256 price = (eBalance * sWeight) / (sBalance * eWeight);
-
-        if (eBalance == 0) {
+        if (balances[1] == 0) {
           uint256[] memory weights = pool.getNormalizedWeights();
           console.log("sWeight: %s", sERC20IsToken0 ? weights[0] : weights[1]);
           console.log("eWeight: %s", sERC20IsToken0 ? weights[1] : weights[0]);
           if (sERC20IsToken0) 
-            return value * initialPrice * weights[0] / (ONE * weights[1]);
+            reward = value * initialPrice * weights[0] / (ONE * weights[1]);
           else
-            return value * initialPrice * weights[1] / (ONE * weights[0]);
-          // return value * initialPrice * sWeight / eWeight;
+            reward = value * initialPrice * weights[1] / (ONE * weights[0]);
         } else {
-          return (value * sBalance) / eBalance;
+            reward = (value * balances[0]) / balances[1];
         }
 
-        
-        // SP = (B_0 * w_1) / (B_1 * w_0)
-        // amount = (value * sWeight) / (price * eWeight);
-
-     }
-
-    // function _fee(sBootstrappingPool pool, uint256 IProtocolFeesCollector) private returns (uint256 value, uint256 amount) {
-    //     bool sERC20IsToken0 = pool.sERC20IsToken0();
-    //     uint256 maxWeightTokenIndex = pool.maxWeightTokenIndex();
-    //     if (sERC20isToken0 && maxWeightTokenIndex == 0)
-    //         return 
-    // }
-
-
+        sIERC20(sERC20).mint(address(this), reward);
+        sIERC20(sERC20).approve(address(_vault), reward);
+        _vault.joinPool{value: value}(poolId, address(this), _bank, _request(sERC20, pool, reward, value, sERC20IsToken0));
+    }
 }

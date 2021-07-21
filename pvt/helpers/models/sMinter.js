@@ -1,4 +1,5 @@
 const _sMinter_ = require('@spectrexyz/protocol-bootstrapping-pool/artifacts/contracts/sMinter.sol/sMinter.json');
+const { ethers } = require('ethers');
 
 class sMinter {
   constructor(ctx) {
@@ -24,6 +25,7 @@ class sMinter {
     this.ctx.data.tx = await this.contract.connect(opts.from).register(this.ctx.sERC20.contract.address, {
       pool: this.ctx.sBootstrappingPool.contract.address,
       poolId: ethers.constants.HashZero,
+      beneficiary: this.ctx.signers.sMinter.beneficiary.address,
       initialPrice: this.ctx.params.sMinter.initialPrice,
       allocation: this.ctx.params.sMinter.allocation,
       fee: this.ctx.params.sMinter.fee,
@@ -34,8 +36,12 @@ class sMinter {
   async mint(opts = {}) {
     opts.from ??= this.ctx.signers.holders[0];
     opts.value ??= this.ctx.params.sMinter.value;
+    opts.expected ??= ethers.BigNumber.from('0');
+    opts.recipient ??= this.ctx.signers.sMinter.recipient;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).mint(this.ctx.sERC20.contract.address, { value: opts.value });
+    this.ctx.data.tx = await this.contract
+      .connect(opts.from)
+      .mint(this.ctx.sERC20.contract.address, opts.expected, opts.recipient.address, { value: opts.value });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }
