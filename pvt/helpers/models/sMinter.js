@@ -6,13 +6,22 @@ class sMinter {
     this.ctx = ctx;
     this.artifact = _sMinter_;
     this.contract = ctx.contracts.sMinter;
+    this.vault = this.contract.vault;
+    this.bank = this.contract.bank;
+    this.splitter = this.contract.splitter;
+    this.protocolFee = this.contract.protocolFee;
+    this.pitOf = this.contract.pitOf;
   }
 
-  static async deploy(ctx) {
+  static async deploy(ctx, opts = {}) {
+    opts.vault ??= ctx.contracts.Vault;
+    opts.bank ??= ctx.signers.sMinter.bank;
+    opts.splitter ??= ctx.signers.sMinter.splitter;
+
     ctx.contracts.sMinter = await waffle.deployContract(ctx.signers.sMinter.admin, _sMinter_, [
-      ctx.contracts.Vault.address,
-      ctx.signers.sMinter.bank.address,
-      ctx.signers.sMinter.splitter.address,
+      opts.vault.address,
+      opts.bank.address,
+      opts.splitter.address,
       ctx.params.sMinter.protocolFee,
     ]);
 
@@ -21,12 +30,15 @@ class sMinter {
 
   async register(opts = {}) {
     opts.from ??= this.ctx.signers.sMinter.admin;
+    opts.pool ??= this.ctx.sBootstrappingPool.contract;
+    opts.beneficiary ??= this.ctx.signers.sMinter.beneficiary;
+    opts.initialPrice ??= this.ctx.params.sMinter.initialPrice;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).register(this.ctx.sERC20.contract.address, {
-      pool: this.ctx.sBootstrappingPool.contract.address,
+      pool: opts.pool.address,
       poolId: ethers.constants.HashZero,
-      beneficiary: this.ctx.signers.sMinter.beneficiary.address,
-      initialPrice: this.ctx.params.sMinter.initialPrice,
+      beneficiary: opts.beneficiary.address,
+      initialPrice: opts.initialPrice,
       allocation: this.ctx.params.sMinter.allocation,
       fee: this.ctx.params.sMinter.fee,
     });

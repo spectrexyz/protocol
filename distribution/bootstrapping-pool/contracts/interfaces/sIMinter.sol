@@ -16,13 +16,12 @@ interface sIMinter {
         bool               sERC20IsToken0;
     }
 
-
-
+    event Register(address indexed sERC20, address pool, address beneficiary, uint256 initialPrice, uint256 allocation, uint256 fee);
     event Mint(address indexed sERC20, uint256 value, uint256 expected, uint256 amount);
 
   /* #region core */
-    function register(address sERC20_, Pit calldata pit)                       external        ;
-    function withdraw()                                                        external        ;
+    function register(address sERC20_, Pit calldata pit)                       external;
+    function withdraw(address token)                                           external;
     function mint(address sERC20, uint256 expected, address payable recipient) external payable;
   /* #endregion */
 
@@ -34,9 +33,10 @@ interface sIMinter {
   /* #endregion*/
 
   /* #region getters */
-    function bank()        external view returns (address);
-    function splitter()    external view returns (address);
-    function vault()       external view returns (IVault);
-    function protocolFee() external view returns (uint256);
+    function bank()                external view returns (address);
+    function splitter()            external view returns (address);
+    function vault()               external view returns (IVault);
+    function protocolFee()         external view returns (uint256);
+    function pitOf(address sERC20) external view returns (Pit memory);
   /* #endregion*/
 }

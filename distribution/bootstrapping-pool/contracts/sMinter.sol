@@ -47,7 +47,6 @@ contract sMinter is Context, AccessControl, sIMinter {
     }
 
     // check if on met un nonReentrant
-
     function mint(address sERC20, uint256 expected, address payable recipient) external payable override {
         require(msg.value != 0, "sMinter: minted value must not be null");
 
@@ -56,11 +55,11 @@ contract sMinter is Context, AccessControl, sIMinter {
         uint256            initialPrice   = pit.initialPrice;
         bool               sERC20IsToken0 = pit.sERC20IsToken0;
 
-        uint256 price = _price(pool, initialPrice, pit.sERC20IsToken0);
+        uint256 price       = _price(pool, initialPrice, pit.sERC20IsToken0);
         uint256 protocolFee = msg.value * _protocolFee / DECIMALS;
-        uint256 fee = msg.value * pit.fee / DECIMALS;
-        uint256 value = msg.value - protocolFee - fee;
-        uint256 amount = value * price / DECIMALS;
+        uint256 fee         = msg.value * pit.fee / DECIMALS;
+        uint256 value       = msg.value - protocolFee - fee;
+        uint256 amount      = value * price / DECIMALS;
 
         // collect protocol fee
         _bank.sendValue(protocolFee);
@@ -77,18 +76,25 @@ contract sMinter is Context, AccessControl, sIMinter {
 
     // https://github.com/balancer-labs/balancer-v2-monorepo/blob/df9afcf1bef4926f9b4901ba1ee617f44d4395b3/pkg/pool-utils/contracts/interfaces/IPriceOracle.sol
     }
-    
-    function register(address sERC20_, Pit calldata pit) external override {
-        _pits[sERC20_]                = pit;
-        _pits[sERC20_].poolId         = pit.pool.getPoolId();
-        _pits[sERC20_].sERC20IsToken0 = pit.pool.sERC20IsToken0();
+
+    function register(address sERC20, Pit calldata pit) external override {
+        require(_pits[sERC20].poolId == bytes32(0),          "sMinter: pit already registered");
+        require(address(pit.pool)    != address(0),          "sMinter: pool cannot be the zero address");
+        require(pit.beneficiary      != payable(address(0)), "sMinter: beneficiary cannot be the zero address");
+        require(pit.initialPrice     != 0,                   "sMinter: initial price cannot be null");
+
+        _pits[sERC20]                = pit;
+        _pits[sERC20].poolId         = pit.pool.getPoolId();
+        _pits[sERC20].sERC20IsToken0 = pit.pool.sERC20IsToken0();
+
+        emit Register(sERC20, address(pit.pool), address(pit.beneficiary), pit.initialPrice, pit.allocation, pit.fee);
     }
 
     function withdraw(address token) external override {
         if (token == address(0)) {
             _bank.sendValue(address(this).balance);
         } else {
-            sIERC20(token).transfer(_bank, sIERC20.balanceOf(address(this)));
+            sIERC20(token).transfer(_bank, sIERC20(token).balanceOf(address(this)));
         }
     }
 
@@ -97,6 +103,11 @@ contract sMinter is Context, AccessControl, sIMinter {
     }
 
   /* #region setters */
+    function setVault(address vault) external override protected {
+        require(vault != address(0), "sMinter: vault cannot be the zero address");
+        _vault = IVault(vault);
+    } 
+
     function setBank(address payable bank) external override protected {
         require(bank != address(0), "sMinter: bank cannot be the zero address");
         _bank = bank;
@@ -105,11 +116,6 @@ contract sMinter is Context, AccessControl, sIMinter {
     function setSplitter(address splitter) external override protected {
         require(splitter != address(0), "sMinter: splitter cannot be the zero address");
         _splitter = splitter;
-    } 
-
-    function setVault(address vault) external override protected {
-        require(vault != address(0), "sMinter: vault cannot be the zero address");
-        _vault = IVault(vault);
     } 
 
     function setProtocolFee(uint256 protocolFee) external override protected {
@@ -132,6 +138,10 @@ contract sMinter is Context, AccessControl, sIMinter {
 
     function protocolFee() external view override returns (uint256) {
         return _protocolFee;
+    }
+
+    function pitOf(address sERC20) external view override returns (Pit memory) {
+        return _pits[sERC20];
     }
   /* #endregion*/
 

@@ -199,6 +199,7 @@ const setup = async (ctx, opts = {}) => {
   opts.balancer ??= false;
   opts.spectralize ??= true;
   opts.minter ??= false;
+  opts.register ??= true;
 
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
 
@@ -219,9 +220,7 @@ const setup = async (ctx, opts = {}) => {
   if (opts.minter) {
     await sMinter.deploy(ctx, opts);
     await ctx.sERC20.grantRole({ role: ctx.constants.sERC20.MINTER_ROLE, account: ctx.sMinter.contract });
-    await ctx.sMinter.register();
-    // await ctx.sBootstrappingPool.join({ init: true });
-    // await ctx.sBootstrappingPool.join();
+    if (opts.register) await ctx.sMinter.register();
   }
 };
 
