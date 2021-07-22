@@ -12,11 +12,14 @@ import "@balancer-labs/v2-pool-weighted/contracts/BaseWeightedPool.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol" as OZMath;
+
 
 import "hardhat/console.sol";
 
 contract sMinter is Context, AccessControl, sIMinter {
-    using Address for address payable;
+    using Address         for address payable;
+    using OZMath.SafeMath for uint256;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     uint256 public constant DECIMALS   = 1e18;
@@ -56,10 +59,10 @@ contract sMinter is Context, AccessControl, sIMinter {
         bool               sERC20IsToken0 = pit.sERC20IsToken0;
 
         uint256 price       = _price(pool, initialPrice, pit.sERC20IsToken0);
-        uint256 protocolFee = msg.value * _protocolFee / DECIMALS;
-        uint256 fee         = msg.value * pit.fee / DECIMALS;
-        uint256 value       = msg.value - protocolFee - fee;
-        uint256 amount      = value * price / DECIMALS;
+        uint256 protocolFee = (msg.value.mul(_protocolFee)).div(DECIMALS);
+        uint256 fee         = (msg.value.mul(pit.fee)).div(DECIMALS);
+        uint256 value       = msg.value.sub(protocolFee).sub(fee);
+        uint256 amount      = (value.mul(price)).div(DECIMALS);
 
         // collect protocol fee
         _bank.sendValue(protocolFee);
@@ -181,7 +184,7 @@ contract sMinter is Context, AccessControl, sIMinter {
         });
 
         try pool.getTimeWeightedAverage(query) returns (uint256[] memory prices) {
-          return sERC20IsToken0 ? prices[0] : DECIMALS * DECIMALS / prices[0]; // return in sERC20 per ETH;
+          return sERC20IsToken0 ? prices[0] : (DECIMALS.mul(DECIMALS)).div(prices[0]); // return in sERC20 per ETH;
         } catch Error(string memory reason) {
           if (keccak256(bytes(reason)) == keccak256(bytes("BAL#313"))) {
             return initialPrice;
