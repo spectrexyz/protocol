@@ -17,7 +17,8 @@
   },
   "devDependencies": {
     "@spectrexyz/protocol-commons": "^1.0.0",
-    "@spectrexyz/protocol-helpers": "^1.0.0"
+    "@spectrexyz/protocol-helpers": "^1.0.0",
+    "hardhat": "^2.5.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.0.0",

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "../sERC20.sol";
+import "../interfaces/sIERC20.sol";
 
 /**
  * @title Cast
@@ -16,8 +16,8 @@ library Cast {
         return address(uint160(id));
     }
 
-    function toSERC20(uint256 id) internal pure returns (SERC20) {
-        return SERC20(address(uint160(id)));
+    function toSERC20(uint256 id) internal pure returns (sIERC20) {
+        return sIERC20(address(uint160(id)));
     }
 
     function toString(bytes32 _bytes32) internal pure returns (string memory) {
