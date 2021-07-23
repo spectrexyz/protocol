@@ -12,6 +12,8 @@ class sERC20 {
     this.cap = this.contract.cap;
     this.hasRole = this.contract.hasRole;
     this.totalSupply = this.contract.totalSupply;
+    this.totalSupplyAt = this.contract.totalSupplyAt;
+    this.balanceOfAt = this.contract.balanceOfAt;
   }
 
   static async deploy(ctx) {
@@ -33,6 +35,14 @@ class sERC20 {
     }
 
     return sERC20_;
+  }
+
+  async initialize(opts = {}) {
+    opts.cap ??= this.ctx.params.sERC20.cap;
+    opts.admin ??= this.ctx.signers.sERC20.admin;
+
+    this.ctx.data.tx = await this.contract.initialize(this.ctx.params.sERC20.name, this.ctx.params.sERC20.symbol, opts.cap, opts.admin.address);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async balanceOf(account) {
@@ -91,6 +101,20 @@ class sERC20 {
 
     this.ctx.data.tx = await this.contract.connect(opts.from).transfer(opts.to.address, opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async burn(opts = {}) {
+    opts.from ??= this.ctx.signers.holders[0];
+    opts.amount ??= this.ctx.params.sERC20.amount;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).burn(opts.amount);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async snapshot() {
+    this.ctx.data.tx = await this.contract.connect(this.ctx.signers.sERC20.snapshoter).snapshot();
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+    this.ctx.data.snapshotId = this.ctx.data.receipt.events[0].args[0];
   }
 
   async _grantRoles() {

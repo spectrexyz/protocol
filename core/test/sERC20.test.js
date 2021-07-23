@@ -7,7 +7,7 @@ describe.only('sERC20', () => {
     await initialize(this);
   });
 
-  describe.only('⇛ initialize', () => {
+  describe('⇛ initialize', () => {
     describe('» is called on the proxy contract', () => {
       describe('» and cap is not zero', () => {
         describe('» and admin is not the zero address', () => {
@@ -35,6 +35,14 @@ describe.only('sERC20', () => {
             expect(await this.sERC20.hasRole(await this.contracts.sERC20.DEFAULT_ADMIN_ROLE(), this.signers.sERC20.admin.address)).to.equal(true);
           });
         });
+
+        describe('» but admin is the zero address', () => {
+          // we would need to deploy a proxy factory to test
+        });
+      });
+
+      describe('» but cap is zero', () => {
+        // we would need to deploy a proxy factory to test
       });
     });
 
@@ -44,9 +52,7 @@ describe.only('sERC20', () => {
       });
 
       it('it reverts', async () => {
-        await expect(
-          this.sERC20.contract.initialize(this.params.sERC20.name, this.params.sERC20.symbol, this.params.sERC20.cap, this.signers.sERC20.admin.address)
-        ).to.be.revertedWith('Initializable: contract is already initialized');
+        await expect(this.sERC20.initialize()).to.be.revertedWith('Initializable: contract is already initialized');
       });
     });
   });
@@ -86,13 +92,12 @@ describe.only('sERC20', () => {
   describe.only('# transfer', () => {});
 
   describe.only('⇛ sERC20', () => {
-    describe('⇛ mint', () => {
-      describe('⇛ cap is not reached yet', () => {
-        describe('⇛ and amount is inferior to cap', () => {
-          describe('⇛ and sERC20 is not paused', () => {
+    describe('# mint', () => {
+      describe('» cap is not reached yet', () => {
+        describe('» and minted amount is inferior to cap', () => {
+          describe('» and sERC20 is not paused', () => {
             before(async () => {
               await setup(this);
-              // await spectralize(this);
               await this.sERC20.mint();
             });
 
@@ -100,25 +105,41 @@ describe.only('sERC20', () => {
               expect(await this.sERC20.totalSupply()).to.equal(this.params.sERC20.balance);
               expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance);
             });
+
+            it('it emits a Transfer event', async () => {
+              await expect(this.data.tx)
+                .to.emit(this.contracts.sERC20, 'Transfer')
+                .withArgs(ethers.constants.AddressZero, this.signers.holders[0].address, this.params.sERC20.balance);
+            });
+
+            it('it emits a TransferSingle event at the sERC1155 layer', async () => {
+              await expect(this.data.tx)
+                .to.emit(this.contracts.sERC1155, 'TransferSingle')
+                .withArgs(
+                  this.sERC20.contract.address,
+                  ethers.constants.AddressZero,
+                  this.signers.holders[0].address,
+                  this.data.id,
+                  this.params.sERC20.balance
+                );
+            });
+          });
+
+          describe('» but sERC20 is paused', () => {
+            before(async () => {
+              await setup(this);
+              await this.sERC20.pause();
+            });
+
+            it('it reverts', async () => {
+              await expect(this.sERC20.mint()).to.be.revertedWith('ERC20Pausable: token transfer while paused');
+            });
           });
         });
 
-        describe.only('» but sERC20 is paused', () => {
+        describe('» but amount is superior to cap', () => {
           before(async () => {
             await setup(this);
-            // await spectralize(this);
-            await this.sERC20.pause();
-          });
-
-          it('it reverts', async () => {
-            await expect(this.sERC20.mint()).to.be.revertedWith('ERC20Pausable: token transfer while paused');
-          });
-        });
-
-        describe.only('» but amount is superior to cap', () => {
-          before(async () => {
-            await setup(this);
-            // await spectralize(this);
           });
 
           it('it reverts', async () => {
@@ -127,16 +148,42 @@ describe.only('sERC20', () => {
         });
       });
 
-      describe.only('⇛ cap is already reached', () => {
+      describe('» cap is already reached', () => {
         before(async () => {
           await setup(this);
-          // await spectralize(this);
           await this.sERC20.mint({ amount: this.params.sERC20.cap });
         });
 
         it('it reverts', async () => {
           await expect(this.sERC20.mint({ amount: 1 })).to.be.revertedWith('ERC20Capped: cap exceeded');
         });
+      });
+    });
+
+    describe.only('# snapshot', () => {
+      before(async () => {
+        await setup(this);
+        await this.sERC20.mint();
+        await this.sERC20.transfer({ to: this.signers.holders[1] });
+        await this.sERC20.snapshot();
+        this.data.tx1 = this.data.tx;
+        await this.sERC20.transfer({ to: this.signers.holders[1] });
+        await this.sERC20.burn();
+        await this.sERC20.mint();
+      });
+
+      it('it snapshots total supply', async () => {
+        expect(await this.sERC20.totalSupplyAt(this.data.snapshotId)).to.equal(this.params.sERC20.balance);
+      });
+
+      it('it snapshots balances', async () => {
+        expect(await this.sERC20.balanceOfAt(this.signers.holders[0].address, this.data.snapshotId)).to.equal(
+          this.params.sERC20.balance.sub(this.params.sERC20.amount)
+        );
+      });
+
+      it('it emits a Snapshot event', async () => {
+        await expect(this.data.tx1).to.emit(this.contracts.sERC20, 'Snapshot');
       });
     });
   });

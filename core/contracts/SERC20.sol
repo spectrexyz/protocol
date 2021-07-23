@@ -168,15 +168,10 @@ contract sERC20 is
         internal
         override(ERC20Upgradeable, ERC20PausableUpgradeable, ERC20SnapshotUpgradeable)
     {
-        // ERC20PausableUpgradeable._beforeTokenTransfer(from, to, amount);
-        // ERC20SnapshotUpgradeable._beforeTokenTransfer(from, to, amount);
         super._beforeTokenTransfer(from, to, amount);
 
         if(!_hooked)
             sIERC1155(_sERC1155).onSERC20Transferred(from, to, amount);
     }
   /* #endregion */
-
-    // vérifier que ça se comporte correctement quand on transfere à l'addresse zero sans minter ou burner.
-    //// IL FAUT IMPLEMENTER UNE FONCTION DE BURNING PARCE QUE SI ON TRANSFER A 0 CA VA MERDER DANS ERC155 ???
 }
