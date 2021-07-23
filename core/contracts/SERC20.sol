@@ -13,9 +13,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20Pe
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 /**
- * @title sERC20
+ * @title  sERC20
  * @notice ERC20 token of spectralized ERC721.
- * @dev This contract is meant to be used as the implementation contract of EIP1167 minimal proxies.
+ * @dev    - This contract is meant to be used as the implementation contract of EIP-1167 minimal proxies.
+ *         - See https://eips.ethereum.org/EIPS/eip-1167.
  */
 contract sERC20 is
     Initializable,
@@ -92,17 +93,17 @@ contract sERC20 is
     }
 
     function mint(address to, uint256 amount) external override {
-        require(hasRole(MINT_ROLE, _msgSender()), "sERC20: must have minter role to mint");
+        require(hasRole(MINT_ROLE, _msgSender()), "sERC20: must have minte role to mint");
         _mint(to, amount);
     }
 
     function pause() external override {
-        require(hasRole(PAUSE_ROLE, _msgSender()), "sERC20: must have pauser role to pause");
+        require(hasRole(PAUSE_ROLE, _msgSender()), "sERC20: must have pause role to pause");
         _pause();
     }
 
     function unpause() external override {
-        require(hasRole(PAUSE_ROLE, _msgSender()), "sERC20: must have pauser role to unpause");
+        require(hasRole(PAUSE_ROLE, _msgSender()), "sERC20: must have pause role to unpause");
         _unpause();
     }
 

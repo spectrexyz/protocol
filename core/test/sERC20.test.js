@@ -89,7 +89,53 @@ describe.only('sERC20', () => {
     });
   });
 
-  describe.only('# transfer', () => {});
+  describe.only('# pause', () => {
+    describe.only('» caller has PAUSE_ROLE', () => {
+      before(async () => {
+        await setup(this);
+        await this.sERC20.pause();
+      });
+
+      it('it pauses sERC20', async () => {
+        expect(await this.sERC20.paused()).to.equal(true);
+      });
+    });
+
+    describe.only('# caller does not have PAUSE_ROLE', () => {
+      before(async () => {
+        await setup(this);
+      });
+
+      it('it reverts', async () => {
+        await expect(this.sERC20.pause({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have pause role to pause');
+      });
+    });
+  });
+
+  describe.only('# unepause', () => {
+    describe.only('» caller has PAUSE_ROLE', () => {
+      before(async () => {
+        await setup(this);
+        await this.sERC20.pause();
+        await this.sERC20.unpause();
+      });
+
+      it('it pauses sERC20', async () => {
+        expect(await this.sERC20.paused()).to.equal(false);
+      });
+    });
+
+    describe.only('# caller does not have PAUSE_ROLE', () => {
+      before(async () => {
+        await setup(this);
+        await this.sERC20.pause();
+      });
+
+      it('it reverts', async () => {
+        await expect(this.sERC20.unpause({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have pause role to unpause');
+      });
+    });
+  });
 
   describe.only('⇛ sERC20', () => {
     describe('# mint', () => {
@@ -161,29 +207,41 @@ describe.only('sERC20', () => {
     });
 
     describe.only('# snapshot', () => {
-      before(async () => {
-        await setup(this);
-        await this.sERC20.mint();
-        await this.sERC20.transfer({ to: this.signers.holders[1] });
-        await this.sERC20.snapshot();
-        this.data.tx1 = this.data.tx;
-        await this.sERC20.transfer({ to: this.signers.holders[1] });
-        await this.sERC20.burn();
-        await this.sERC20.mint();
+      describe('» caller has SNAPSHOT_ROLE', () => {
+        before(async () => {
+          await setup(this);
+          await this.sERC20.mint();
+          await this.sERC20.transfer({ to: this.signers.holders[1] });
+          await this.sERC20.snapshot();
+          this.data.tx1 = this.data.tx;
+          await this.sERC20.transfer({ to: this.signers.holders[1] });
+          await this.sERC20.burn();
+          await this.sERC20.mint();
+        });
+
+        it("it snapshots sERC20's total supply", async () => {
+          expect(await this.sERC20.totalSupplyAt(this.data.snapshotId)).to.equal(this.params.sERC20.balance);
+        });
+
+        it("it snapshots sERC20's balances", async () => {
+          expect(await this.sERC20.balanceOfAt(this.signers.holders[0].address, this.data.snapshotId)).to.equal(
+            this.params.sERC20.balance.sub(this.params.sERC20.amount)
+          );
+        });
+
+        it('it emits a Snapshot event', async () => {
+          await expect(this.data.tx1).to.emit(this.contracts.sERC20, 'Snapshot');
+        });
       });
 
-      it('it snapshots total supply', async () => {
-        expect(await this.sERC20.totalSupplyAt(this.data.snapshotId)).to.equal(this.params.sERC20.balance);
-      });
+      describe('» caller does not have SNAPSHOT_ROLE', () => {
+        before(async () => {
+          await setup(this);
+        });
 
-      it('it snapshots balances', async () => {
-        expect(await this.sERC20.balanceOfAt(this.signers.holders[0].address, this.data.snapshotId)).to.equal(
-          this.params.sERC20.balance.sub(this.params.sERC20.amount)
-        );
-      });
-
-      it('it emits a Snapshot event', async () => {
-        await expect(this.data.tx1).to.emit(this.contracts.sERC20, 'Snapshot');
+        it('it reverts', async () => {
+          await expect(this.sERC20.snapshot({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have snapshot role to snapshot');
+        });
       });
     });
   });
