@@ -74,7 +74,6 @@ contract sERC20 is
         __ERC20Permit_init(name_);
         
         _sERC1155 = _msgSender();
-
         _setupRole(DEFAULT_ADMIN_ROLE, admin);
     }
 

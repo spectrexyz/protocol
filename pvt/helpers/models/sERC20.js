@@ -1,4 +1,4 @@
-const _sERC20 = require('@spectrexyz/protocol-core/artifacts/contracts/SERC20.sol/sERC20.json');
+const _sERC20_ = require('@spectrexyz/protocol-core/artifacts/contracts/SERC20.sol/sERC20.json');
 const { _throw } = require('../errors');
 
 class sERC20 {
@@ -6,15 +6,25 @@ class sERC20 {
     this.ctx = ctx;
     this.contract = ctx.contracts.sERC20;
 
+    this.name = this.contract.name;
+    this.symbol = this.contract.symbol;
+    this.decimals = this.contract.decimals;
     this.cap = this.contract.cap;
+    this.hasRole = this.contract.hasRole;
     this.totalSupply = this.contract.totalSupply;
+  }
+
+  static async deploy(ctx) {
+    ctx.contracts.sERC20 = await waffle.deployContract(ctx.signers.sERC20.admin, _sERC20_);
+
+    ctx.sERC20 = new sERC20(ctx);
   }
 
   static async at(ctx, address, opts = {}) {
     opts.permissions ??= true;
     opts.root ??= ctx.signers.root;
 
-    ctx.contracts.sERC20 = new ethers.Contract(address, _sERC20.abi, opts.root);
+    ctx.contracts.sERC20 = new ethers.Contract(address, _sERC20_.abi, opts.root);
 
     const sERC20_ = new sERC20(ctx);
 
@@ -84,10 +94,10 @@ class sERC20 {
   }
 
   async _grantRoles() {
-    await this.grantRole({ role: this.ctx.constants.sERC20.BURNER_ROLE, account: this.ctx.signers.sERC20.burner });
-    await this.grantRole({ role: this.ctx.constants.sERC20.MINTER_ROLE, account: this.ctx.signers.sERC20.minter });
-    await this.grantRole({ role: this.ctx.constants.sERC20.PAUSER_ROLE, account: this.ctx.signers.sERC20.pauser });
-    await this.grantRole({ role: this.ctx.constants.sERC20.SNAPSHOTER_ROLE, account: this.ctx.signers.sERC20.snapshoter });
+    await this.grantRole({ role: this.ctx.constants.sERC20.BURN_ROLE, account: this.ctx.signers.sERC20.burner });
+    await this.grantRole({ role: this.ctx.constants.sERC20.MINT_ROLE, account: this.ctx.signers.sERC20.minter });
+    await this.grantRole({ role: this.ctx.constants.sERC20.PAUSE_ROLE, account: this.ctx.signers.sERC20.pauser });
+    await this.grantRole({ role: this.ctx.constants.sERC20.SNAPSHOT_ROLE, account: this.ctx.signers.sERC20.snapshoter });
   }
 }
 

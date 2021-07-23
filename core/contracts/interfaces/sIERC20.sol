@@ -18,7 +18,7 @@ interface sIERC20 is IAccessControlUpgradeable, IERC20Upgradeable, IERC20Metadat
     function burn(uint256 amount)                          external;
     /**
      * @notice Destroys `amount` tokens from `account`, deducting from the caller's allowance.
-     * @param  account The account whose tokens are to destroy.
+     * @param  account The account whose tokens to destroy.
      * @param  amount  The amount of tokens to destroy.
      */
     function burnFrom(address account, uint256 amount)     external;

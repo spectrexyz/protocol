@@ -8,7 +8,7 @@ const {
   itUnlocksLikeExpected,
 } = require('./behaviors/sERC1155.behavior');
 
-describe.only('sERC1155', () => {
+describe('sERC1155', () => {
   before(async () => {
     await initialize(this);
   });

@@ -1,59 +1,54 @@
 const { expect } = require('chai');
 const { initialize, setup, spectralize } = require('@spectrexyz/protocol-helpers');
+const { sERC20 } = require('@spectrexyz/protocol-helpers/models');
 
 describe.only('sERC20', () => {
   before(async () => {
     await initialize(this);
   });
 
-  describe('⇛ constructor', () => {
-    // make sure that the implementation contract cannot be initialized
+  describe.only('⇛ initialize', () => {
+    describe('» is called on the proxy contract', () => {
+      describe('» and cap is not zero', () => {
+        describe('» and admin is not the zero address', () => {
+          before(async () => {
+            await setup(this);
+          });
 
-    describe('» cap is not zero', () => {
-      describe('» and admin is not the zero address', () => {});
+          it("# it sets sERC20's name", async () => {
+            expect(await this.sERC20.name()).to.equal(this.params.sERC20.name);
+          });
 
-      before(async () => {
-        await setup(this);
-        await spectralize(this);
+          it("# it sets sERC20's symbol", async () => {
+            expect(await this.sERC20.symbol()).to.equal(this.params.sERC20.symbol);
+          });
+
+          it("# it sets sERC20's decimals", async () => {
+            expect(await this.sERC20.decimals()).to.equal(18);
+          });
+
+          it("# it sets sERC20's cap", async () => {
+            expect(await this.sERC20.cap()).to.equal(this.params.sERC20.cap);
+          });
+
+          it("# it sets sERC20's admin", async () => {
+            expect(await this.sERC20.hasRole(await this.contracts.sERC20.DEFAULT_ADMIN_ROLE(), this.signers.sERC20.admin.address)).to.equal(true);
+          });
+        });
       });
-
-      it('# it sets sERC20 name', async () => {
-        expect(await this.contracts.sERC20.name()).to.equal(this.constants.name);
-      });
-
-      it('# it sets sERC20 symbol', async () => {
-        expect(await this.contracts.sERC20.symbol()).to.equal(this.constants.symbol);
-      });
-
-      it('# it sets sERC20 decimals', async () => {
-        expect(await this.contracts.sERC20.decimals()).to.equal(18);
-      });
-
-      it('# it sets sERC20 cap', async () => {
-        expect(await this.contracts.sERC20.cap()).to.equal(this.constants.cap);
-      });
-
-      it('# it sets sERC20 admin permissions', async () => {
-        expect(await this.contracts.sERC20.hasRole(await this.contracts.sERC20.DEFAULT_ADMIN_ROLE(), this.signers.admin.address)).to.equal(true);
-      });
-
-      it('# it sets sERC20 admin permissions', async () => {
-        // expect(await this.contracts.sERC20.name()).to.equal(this.constants.name);
-      });
-
-      // it('# it sets up admin permissions', async () => {
-      //   expect(await this.contracts.sERC1155.hasRole(await this.contracts.sERC1155.ADMIN_ROLE(), this.signers.root.address)).to.equal(true);
-      //   expect(await this.contracts.sERC1155.getRoleAdmin(await this.contracts.sERC1155.ADMIN_ROLE())).to.equal(await this.contracts.sERC1155.ADMIN_ROLE());
-      // });
     });
 
-    // describe('» sERC20 base address is the zero address', () => {
-    //   it('it reverts', async () => {
-    //     await expect(deployContract(this.signers.root, this.artifacts.SERC1155, [ethers.constants.AddressZero, this.constants.unlockedURI])).to.be.revertedWith(
-    //       'sERC1155: sERC20 base cannot be the zero address'
-    //     );
-    //   });
-    // });
+    describe('» is called on the implementation contract', () => {
+      before(async () => {
+        await sERC20.deploy(this);
+      });
+
+      it('it reverts', async () => {
+        await expect(
+          this.sERC20.contract.initialize(this.params.sERC20.name, this.params.sERC20.symbol, this.params.sERC20.cap, this.signers.sERC20.admin.address)
+        ).to.be.revertedWith('Initializable: contract is already initialized');
+      });
+    });
   });
 
   describe('⇛ access control', () => {
@@ -81,6 +76,7 @@ describe.only('sERC20', () => {
         await spectralize(this);
         await this.sERC20.mint();
       });
+
       it('it returns the sERC20 supply', async () => {
         expect(await this.contracts.sERC20.totalSupply()).to.equal(this.constants.balance);
       });

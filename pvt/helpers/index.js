@@ -64,10 +64,10 @@ const initialize = async (ctx) => {
 
   ctx.constants = {
     sERC20: {
-      BURNER_ROLE: ethers.BigNumber.from('0x3c11d16cbaffd01df69ce1c404f6340ee057498f5f00246190ea54220576a848'),
-      MINTER_ROLE: ethers.BigNumber.from('0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6'),
-      PAUSER_ROLE: ethers.BigNumber.from('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a'),
-      SNAPSHOTER_ROLE: ethers.BigNumber.from('0xe81b7fde06adf1242da26197bd147d2a1b7c0c31ac749e1d4b2c4a883f986140'),
+      BURN_ROLE: ethers.BigNumber.from('0xe97b137254058bd94f28d2f3eb79e2d34074ffb488d042e3bc958e0a57d2fa22'),
+      MINT_ROLE: ethers.BigNumber.from('0x154c00819833dac601ee5ddded6fda79d9d8b506b911b3dbd54cdb95fe6c3686'),
+      PAUSE_ROLE: ethers.BigNumber.from('0x139c2898040ef16910dc9f44dc697df79363da767d8bc92f2e310312b816e46d'),
+      SNAPSHOT_ROLE: ethers.BigNumber.from('0x5fdbd35e8da83ee755d5e62a539e5ed7f47126abede0b8b10f9ea43dc6eed07f'),
     },
     sERC1155: {
       DERRIDA: '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce',
