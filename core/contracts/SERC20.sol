@@ -93,7 +93,7 @@ contract sERC20 is
     }
 
     function mint(address to, uint256 amount) external override {
-        require(hasRole(MINT_ROLE, _msgSender()), "sERC20: must have minte role to mint");
+        require(hasRole(MINT_ROLE, _msgSender()), "sERC20: must have mint role to mint");
         _mint(to, amount);
     }
 

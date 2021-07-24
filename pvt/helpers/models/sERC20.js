@@ -15,6 +15,8 @@ class sERC20 {
     this.totalSupplyAt = this.contract.totalSupplyAt;
     this.balanceOfAt = this.contract.balanceOfAt;
     this.paused = this.contract.paused;
+    this.allowance = this.contract.allowance;
+    this.sERC1155 = this.contract.sERC1155;
   }
 
   static async deploy(ctx) {
@@ -39,7 +41,7 @@ class sERC20 {
   }
 
   async pause(opts = {}) {
-    opts.from = this.ctx.signers.sERC20.pauser;
+    opts.from ??= this.ctx.signers.sERC20.pauser;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).pause();
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -103,7 +105,7 @@ class sERC20 {
   async mint(opts = {}) {
     opts.from ??= this.ctx.signers.sERC20.minter;
     opts.to ??= this.ctx.signers.holders[0];
-    opts.amount ??= this.ctx.constants.balance;
+    opts.amount ??= this.ctx.params.sERC20.balance;
 
     this.ctx.data.tx = await this.ctx.contracts.sERC20.connect(opts.from).mint(opts.to.address, opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -115,6 +117,16 @@ class sERC20 {
     opts.amount ??= this.ctx.params.sERC20.amount;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).transfer(opts.to.address, opts.amount);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async transferFrom(opts = {}) {
+    opts.from ??= this.ctx.signers.others[0];
+    opts.owner ??= this.ctx.signers.holders[0];
+    opts.to ??= this.ctx.signers.holders[1];
+    opts.amount ??= this.ctx.params.sERC20.amount;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).transferFrom(opts.owner.address, opts.to.address, opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
