@@ -39,24 +39,18 @@ contract sERC20 is
     bool    private _hooked;
 
     /**
-     * @notice sERC20 constructor.
-     * @dev  - This contract is meant to be used as the implementation contract of EIP-1167 minimal proxies.
-     *       - The initializer modifier prevents the base implementation of being actually initialized.
-     *       - See https://eips.ethereum.org/EIPS/eip-1167.
+     * @dev - This contract is meant to be used as the implementation contract of EIP-1167 minimal proxies.
+     *      - The initializer modifier prevents the base implementation of being actually initialized.
+     *      - See https://eips.ethereum.org/EIPS/eip-1167.
      */
     constructor() initializer {
     }
 
     /**
-     * @notice Initializes sERC20.
-     * @dev   - `name_` is left unchecked as per the ERC20 standard.
-     *        - `symbol_` is left unchecked as per the ERC20 standard.
-     *        - `cap_` > 0 is checked in __ERC20Capped_init().
-     *        - `admin` can be set to the zero address to neutralize its privileges.
-     * @param name_   The name of the sERC20.
-     * @param symbol_ The symbol of the sERC20.
-     * @param cap_    The supply cap of the sERC20.
-     * @param admin   The admin of the sERC20 [allowed to manage its permissions].
+     * @dev - `name_` is left unchecked as per the ERC20 standard.
+     *      - `symbol_` is left unchecked as per the ERC20 standard.
+     *      - `cap_` > 0 is checked in __ERC20Capped_init().
+     *      - `admin` can be set to the zero address to neutralize its privileges.
      */
     function initialize(
         string  memory name_,
@@ -93,33 +87,38 @@ contract sERC20 is
     }
 
     function mint(address to, uint256 amount) external override {
-        require(hasRole(MINT_ROLE, _msgSender()), "sERC20: must have mint role to mint");
+        require(hasRole(MINT_ROLE, _msgSender()), "sERC20: must have MINT_ROLE to mint");
+
         _mint(to, amount);
     }
 
     function pause() external override {
-        require(hasRole(PAUSE_ROLE, _msgSender()), "sERC20: must have pause role to pause");
+        require(hasRole(PAUSE_ROLE, _msgSender()), "sERC20: must have PAUSE_ROLE to pause");
+
         _pause();
     }
 
     function unpause() external override {
-        require(hasRole(PAUSE_ROLE, _msgSender()), "sERC20: must have pause role to unpause");
+        require(hasRole(PAUSE_ROLE, _msgSender()), "sERC20: must have PAUSE_ROLE to unpause");
+
         _unpause();
     }
 
+    /**
+     * @dev This function can potentially be used by attackers in two ways. First, it can be used to increase the cost
+     *      of retrieval of values from snapshots, although it will grow logarithmically thus rendering this attack
+     *      ineffective in the long term. Second, it can be used to target specific accounts and increase the cost of
+     *      sERC20 transfers for them. That's the reason why this function is protected by SNAPSHOT_ROLE.
+     */
     function snapshot() external override returns (uint256) {
-        require(hasRole(SNAPSHOT_ROLE, _msgSender()), "sERC20: must have snapshot role to snapshot");
+        require(hasRole(SNAPSHOT_ROLE, _msgSender()), "sERC20: must have SNAPSHOT_ROLE to snapshot");
+
         return _snapshot();
     }
   /* #endregion */
 
-    /**
-     * @notice Handles sERC1155 transfers.
-     * @dev This function is called by sERC1155 whenever a transfer is triggered at the sERC1155 layer.
-     * @param from The address the tokens have been transferred from.
-     * @param to The address the tokens have been transferred to.
-     * @param amount The amount of tokens which have been transferred.
-     */
+
+  /* #region hooks */
     function onSERC1155Transferred(address from, address to, uint256 amount) external override {
         require(_msgSender() == _sERC1155, "sERC20: must be sERC1155 to use transfer hook");
         
@@ -127,6 +126,7 @@ contract sERC20 is
         _transfer(from, to, amount);
         _hooked = false;
     }
+  /* #enregion */
 
   /* #region view functions */
     function sERC1155() public view override returns (address) {
@@ -141,11 +141,21 @@ contract sERC20 is
         return PausableUpgradeable.paused();
     }
 
-    function balanceOfAt(address account, uint256 snapshotId) public view override(ERC20SnapshotUpgradeable, sIERC20) returns (uint256) {
+    function balanceOfAt(address account, uint256 snapshotId)
+        public
+        view
+        override(ERC20SnapshotUpgradeable, sIERC20)
+        returns (uint256)
+    {
         return ERC20SnapshotUpgradeable.balanceOfAt(account, snapshotId);
     }
 
-    function totalSupplyAt(uint256 snapshotId) public view override(ERC20SnapshotUpgradeable, sIERC20) returns (uint256) {
+    function totalSupplyAt(uint256 snapshotId)
+        public
+        view
+        override(ERC20SnapshotUpgradeable, sIERC20)
+        returns (uint256)
+    {
         return ERC20SnapshotUpgradeable.totalSupplyAt(snapshotId);
     }
   /* #endregion */
