@@ -1,4 +1,4 @@
-const _sERC20_ = require('@spectrexyz/protocol-core/artifacts/contracts/SERC20.sol/sERC20.json');
+const _sERC20_ = require('@spectrexyz/protocol-core/artifacts/contracts/sERC20.sol/sERC20.json');
 const { _throw } = require('../errors');
 
 class sERC20 {

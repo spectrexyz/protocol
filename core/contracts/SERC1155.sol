@@ -94,7 +94,7 @@ contract sERC1155 is Context, ERC165, AccessControlEnumerable, sIERC1155 {
     function balanceOf(address account, uint256 id) public view override returns (uint256) {
         require(account != address(0), "sERC1155: balance query for the zero address");
 
-        return _spectres[id].state != SpectreState.Null ? id.toSERC20().balanceOf(account) : 0;
+        return _spectres[id].state != SpectreState.Null ? id.tosIERC20().balanceOf(account) : 0;
     }
 
     /**
@@ -176,7 +176,7 @@ contract sERC1155 is Context, ERC165, AccessControlEnumerable, sIERC1155 {
         require(to != address(0), "sERC1155: transfer to the zero address");
         require(from == operator || _operatorApprovals[from][operator], "sERC1155: must be owner or approved to transfer");
 
-        id.toSERC20().onSERC1155Transferred(from, to, amount);
+        id.tosIERC20().onSERC1155Transferred(from, to, amount);
 
         emit TransferSingle(operator, from, to, id, amount);
 
@@ -200,7 +200,7 @@ contract sERC1155 is Context, ERC165, AccessControlEnumerable, sIERC1155 {
         require(from == operator || _operatorApprovals[from][operator], "sERC1155: must be owner or approved to transfer");
 
         for (uint256 i = 0; i < ids.length; i++) {
-            ids[i].toSERC20().onSERC1155Transferred(from, to, amounts[i]);
+            ids[i].tosIERC20().onSERC1155Transferred(from, to, amounts[i]);
         }
 
         emit TransferBatch(operator, from, to, ids, amounts);
