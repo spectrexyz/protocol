@@ -15,6 +15,7 @@ class sBootstrappingPool {
     this.name = this.contract.name;
     this.symbol = this.contract.symbol;
     this.decimals = this.contract.decimals;
+    this.balanceOf = this.contract.balanceOf;
     this.getPoolId = this.contract.getPoolId;
     this.getInvariant = this.contract.getInvariant;
     this.getLastInvariant = this.contract.getLastInvariant;
@@ -31,7 +32,7 @@ class sBootstrappingPool {
 
   static async deploy(ctx, opts) {
     let token0, token1, sERC20IsToken0;
-    opts.mint ??= true;
+    opts.mint ??= opts.minter ? false : true;
 
     ctx.contracts.Authorizer = await waffle.deployContract(ctx.signers.root, _Authorizer_, [ctx.signers.root.address]);
     ctx.contracts.OracleMock = await waffle.deployContract(ctx.signers.root, _OracleMock_);

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "./SERC20.sol";
+import "./interfaces/sIERC20.sol";
+import "./interfaces/sIERC1155.sol";
 import "./lib/Cast.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -22,26 +23,13 @@ import "hardhat/console.sol";
  *      financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
  *      sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
  */
-contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155MetadataURI, IERC721Receiver {
+contract sERC1155 is Context, ERC165, AccessControlEnumerable, sIERC1155 {
     using Address for address;
     using Cast for address;
     using Cast for bytes32;
     using Cast for uint256;
     using Clones for address;
     using ERC165Checker for address;
-
-    enum SpectreState {
-        Null,
-        Locked,
-        Unlocked
-    }
-
-    struct Spectre {
-        SpectreState state;
-        address collection;
-        uint256 tokenId;
-        address guardian;
-    }
 
     bytes32 public  constant ADMIN_ROLE         = keccak256("ADMIN_ROLE");
     // keccak256("Le spectral, ce sont ces autres, jamais présents comme tels, ni vivants ni morts, avec lesquels je m'entretiens");
@@ -333,6 +321,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         address guardian
     )
         external
+        override
         returns (uint256 id)
     {
         require(collection.supportsInterface(ERC721_ID), "sERC1155: NFT is not ERC721-compliant");
@@ -349,7 +338,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         emit Lock(id);
     }
 
-    function unlock(uint256 id, address recipient, bytes calldata data) external {
+    function unlock(uint256 id, address recipient, bytes calldata data) external override {
         Spectre storage spectre = _spectres[id];
 
         require(spectre.state == SpectreState.Locked, "sERC1155: spectre is not locked");
@@ -358,7 +347,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
 
-    function unlock(address sERC20, address recipient, bytes calldata data) external {
+    function unlock(address sERC20, address recipient, bytes calldata data) external override {
         uint256 id = sERC20.toId();
         Spectre storage spectre = _spectres[id];
 
@@ -368,13 +357,13 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
 
-    function updateUnavailableURI(string memory unavailableURI_) external {
+    function updateUnavailableURI(string memory unavailableURI_) external override {
         require(hasRole(ADMIN_ROLE, _msgSender()), "sERC1155: must have admin role to update unavailableURI");
 
         _unavailableURI = unavailableURI_;
     }
 
-    function updateUnlockedURI(string memory unlockedURI_) external {
+    function updateUnlockedURI(string memory unlockedURI_) external override {
         require(hasRole(ADMIN_ROLE, _msgSender()), "sERC1155: must have admin role to update unlockedURI");
 
         _unlockedURI = unlockedURI_;
@@ -395,6 +384,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         uint256 amount
     )
         external
+        override
     {
         address operator = _msgSender();
         uint256 id = operator.toId();
@@ -416,23 +406,23 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         }
     }
 
-    function sERC20Base() external view returns (address) {
+    function sERC20Base() external view override returns (address) {
         return _sERC20Base;
     }
 
-    function unavailableURI() external view returns (string memory) {
+    function unavailableURI() external view override returns (string memory) {
         return _unavailableURI;
     }
 
-    function unlockedURI() external view returns (string memory) {
+    function unlockedURI() external view override returns (string memory) {
         return _unlockedURI;
     }
 
-    function isLocked(address collection, uint256 tokenId) external view returns (bool) {
+    function isLocked(address collection, uint256 tokenId) external view override returns (bool) {
         return _locks[collection][tokenId] != 0;
     }
 
-    function lockOf(address collection, uint256 tokenId) external view returns (uint256) {
+    function lockOf(address collection, uint256 tokenId) external view override returns (uint256) {
         return _locks[collection][tokenId];
     }
 
@@ -441,7 +431,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @param id The id of the token type whose NFT is queried.
      * @return The NFT associated to the `id` token type.
      */
-    function spectreOf(uint256 id) external view returns (Spectre memory) {
+    function spectreOf(uint256 id) external view override returns (Spectre memory) {
         return _spectres[id];
     }
 
@@ -450,7 +440,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @param sERC20 The address of the sERC20 whose NFT is queried.
      * @return The NFT associated to the `sERC20` token.
      */
-    function spectreOf(address sERC20) external view returns (Spectre memory) {
+    function spectreOf(address sERC20) external view override returns (Spectre memory) {
         return _spectres[sERC20.toId()];
     }
 
@@ -459,7 +449,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
      * @param id The id of the token type whose sERC20 address is queried.
      * @return The address of the sERC20 associated to the `id` token type.
      */
-    function sERC20Of(uint256 id) external pure returns (address) {
+    function sERC20Of(uint256 id) external pure override returns (address) {
         return id.toAddress();
     }
   /* #endregion*/
@@ -482,7 +472,7 @@ contract SERC1155 is Context, ERC165, AccessControlEnumerable, IERC1155, IERC115
         
         _locks[collection][tokenId] = id;
         _spectres[id] = Spectre({ state: SpectreState.Locked, collection: collection, tokenId: tokenId, guardian: guardian });
-        SERC20(sERC20).initialize(name, symbol, cap, admin);
+        sIERC20(sERC20).initialize(name, symbol, cap, admin);
 
         emit TransferSingle(_msgSender(), address(0), address(0), id, uint256(0));
         emit Spectralize(collection, tokenId, id, sERC20, guardian);

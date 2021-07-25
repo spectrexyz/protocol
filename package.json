@@ -13,7 +13,6 @@
     "compile:infrastructure": "cd infrastructure && yarn compile",
     "compile": "yarn compile:core && yarn compile:distribution && yarn compile:infrastructure"
   },
-  "devDependencies": {},
   "workspaces": [
     "core",
     "infrastructure",

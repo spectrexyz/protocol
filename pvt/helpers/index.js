@@ -6,7 +6,6 @@ const { deployContract } = require('ethereum-waffle');
 
 const { ethers } = require('hardhat');
 const Decimal = require('decimal.js');
-// const sERC20 = require('../../core/test/helpers/models/sERC20');
 const RECEIVER_SINGLE_MAGIC_VALUE = '0xf23a6e61';
 const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
 
@@ -14,6 +13,7 @@ const sERC721 = require('./models/sERC721');
 const sERC1155 = require('./models/sERC1155');
 const sBootstrappingPool = require('./models/sBootstrappingPool');
 const sERC20Splitter = require('./models/sERC20Splitter');
+const sMinter = require('./models/sMinter');
 
 const initialize = async (ctx) => {
   ctx.params = {
@@ -53,14 +53,21 @@ const initialize = async (ctx) => {
     sERC20Splitter: {
       shares: [ethers.BigNumber.from('300000000000000000'), ethers.BigNumber.from('100000000000000000'), ethers.BigNumber.from('600000000000000000')],
     },
+    sMinter: {
+      protocolFee: ethers.BigNumber.from('20000000000000000'), // 2e16 = 2%
+      fee: ethers.BigNumber.from('50000000000000000'), // 5%
+      initialPrice: ethers.utils.parseEther('2'), // 2 sERC20 / ETH
+      allocation: ethers.utils.parseEther('1').mul(ethers.BigNumber.from('10')), // 10%
+      value: ethers.utils.parseEther('3'), // 3 ETH
+    },
   };
 
   ctx.constants = {
     sERC20: {
-      BURNER_ROLE: ethers.BigNumber.from('0x3c11d16cbaffd01df69ce1c404f6340ee057498f5f00246190ea54220576a848'),
-      MINTER_ROLE: ethers.BigNumber.from('0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6'),
-      PAUSER_ROLE: ethers.BigNumber.from('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a'),
-      SNAPSHOTER_ROLE: ethers.BigNumber.from('0xe81b7fde06adf1242da26197bd147d2a1b7c0c31ac749e1d4b2c4a883f986140'),
+      DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
+      MINT_ROLE: ethers.BigNumber.from('0x154c00819833dac601ee5ddded6fda79d9d8b506b911b3dbd54cdb95fe6c3686'),
+      PAUSE_ROLE: ethers.BigNumber.from('0x139c2898040ef16910dc9f44dc697df79363da767d8bc92f2e310312b816e46d'),
+      SNAPSHOT_ROLE: ethers.BigNumber.from('0x5fdbd35e8da83ee755d5e62a539e5ed7f47126abede0b8b10f9ea43dc6eed07f'),
     },
     sERC1155: {
       DERRIDA: '0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce',
@@ -80,6 +87,9 @@ const initialize = async (ctx) => {
       Null: 0,
       Locked: 1,
       Unlocked: 2,
+    },
+    sMinter: {
+      ONE: ethers.BigNumber.from('1000000000000000000'),
     },
     unlockedURI: 'ipfs://Qm.../unwrapped',
     unavailableURI: 'ipfs://Qm.../unavailable',
@@ -107,6 +117,7 @@ const initialize = async (ctx) => {
     sERC721: { owners: [] },
     sERC1155: {},
     sERC20Splitter: { beneficiaries: [] },
+    sMinter: {},
     holders: [],
     owners: [],
     beneficiaries: [],
@@ -129,7 +140,6 @@ const initialize = async (ctx) => {
     ctx.signers.sERC1155.guardian,
     ctx.signers.sERC1155.operator,
     ctx.signers.sERC20.admin,
-    ctx.signers.sERC20.burner,
     ctx.signers.sERC20.minter,
     ctx.signers.sERC20.pauser,
     ctx.signers.sERC20.snapshoter,
@@ -140,6 +150,11 @@ const initialize = async (ctx) => {
     ctx.signers.sERC20Splitter.beneficiaries[0],
     ctx.signers.sERC20Splitter.beneficiaries[1],
     ctx.signers.sERC20Splitter.beneficiaries[2],
+    ctx.signers.sMinter.admin,
+    ctx.signers.sMinter.bank,
+    ctx.signers.sMinter.splitter,
+    ctx.signers.sMinter.beneficiary,
+    ctx.signers.sMinter.recipient,
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
@@ -182,6 +197,8 @@ const setup = async (ctx, opts = {}) => {
   opts.approve ??= true;
   opts.balancer ??= false;
   opts.spectralize ??= true;
+  opts.minter ??= false;
+  opts.register ??= true;
 
   ctx.contracts.sERC20Base = await deployContract(ctx.signers.root, SERC20);
 
@@ -197,6 +214,12 @@ const setup = async (ctx, opts = {}) => {
   if (opts.balancer) {
     await sBootstrappingPool.deploy(ctx, opts);
     ctx.data.poolId = await ctx.sBootstrappingPool.getPoolId();
+  }
+
+  if (opts.minter) {
+    await sMinter.deploy(ctx, opts);
+    await ctx.sERC20.grantRole({ role: ctx.constants.sERC20.MINTER_ROLE, account: ctx.sMinter.contract });
+    if (opts.register) await ctx.sMinter.register();
   }
 };
 
