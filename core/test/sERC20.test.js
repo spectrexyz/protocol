@@ -1,7 +1,6 @@
 const { expect } = require('chai');
 const { initialize, setup } = require('@spectrexyz/protocol-helpers');
 const { sERC20 } = require('@spectrexyz/protocol-helpers/models');
-const { getBinarySize } = require('ethjs-util');
 
 describe.only('sERC20', () => {
   before(async () => {
@@ -110,6 +109,12 @@ describe.only('sERC20', () => {
             .to.emit(this.contracts.sERC20, 'Transfer')
             .withArgs(this.signers.holders[0].address, this.signers.holders[1].address, this.params.sERC20.amount);
         });
+
+        it('it emits a TransferSingle event at the sERC1155 layer', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.contracts.sERC1155, 'TransferSingle')
+            .withArgs(this.sERC20.contract.address, this.signers.holders[0].address, this.signers.holders[1].address, this.data.id, this.params.sERC20.amount);
+        });
       });
 
       describe('» but sender does not have enough balance', () => {
@@ -163,6 +168,18 @@ describe.only('sERC20', () => {
               await expect(this.data.tx)
                 .to.emit(this.contracts.sERC20, 'Transfer')
                 .withArgs(this.signers.holders[0].address, this.signers.holders[1].address, this.params.sERC20.amount);
+            });
+
+            it('it emits a TransferSingle event at the sERC1155 layer', async () => {
+              await expect(this.data.tx)
+                .to.emit(this.contracts.sERC1155, 'TransferSingle')
+                .withArgs(
+                  this.sERC20.contract.address,
+                  this.signers.holders[0].address,
+                  this.signers.holders[1].address,
+                  this.data.id,
+                  this.params.sERC20.amount
+                );
             });
 
             it('it emits an Approval event', async () => {
@@ -225,68 +242,233 @@ describe.only('sERC20', () => {
     });
   });
 
-  describe.only('# burn', () => {});
+  describe('# setRoleAdmin', () => {
+    describe('» caller has admin role', () => {
+      before(async () => {
+        await setup(this);
+        await this.sERC20.setRoleAdmin({ adminRole: ethers.BigNumber.from('0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c2177') });
+      });
 
-  describe.only('# burnFrom', () => {});
+      it('it sets admin role', async () => {
+        expect(await this.sERC20.getRoleAdmin(this.constants.sERC20.MINT_ROLE)).to.equal(
+          ethers.BigNumber.from('0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c2177')
+        );
+      });
 
-  describe('# mint', () => {
-    describe('» cap is not reached yet', () => {
-      describe('» and minted amount is inferior to cap', () => {
-        describe('» and sERC20 is not paused', () => {
-          before(async () => {
-            await setup(this);
-            await this.sERC20.mint();
-          });
+      it('it emits a RoleAdminChanged event', async () => {
+        await expect(this.data.tx)
+          .to.emit(this.contracts.sERC20, 'RoleAdminChanged')
+          .withArgs(
+            this.constants.sERC20.MINT_ROLE,
+            this.constants.sERC20.DEFAULT_ADMIN_ROLE,
+            ethers.BigNumber.from('0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c2177')
+          );
+      });
+    });
 
-          it('it mints tokens', async () => {
-            expect(await this.sERC20.totalSupply()).to.equal(this.params.sERC20.balance);
-            expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance);
-          });
+    describe('» caller does not have admin role', () => {
+      before(async () => {
+        await setup(this);
+      });
 
-          it('it emits a Transfer event', async () => {
-            await expect(this.data.tx)
-              .to.emit(this.contracts.sERC20, 'Transfer')
-              .withArgs(ethers.constants.AddressZero, this.signers.holders[0].address, this.params.sERC20.balance);
-          });
+      it('it reverts', async () => {
+        await expect(this.sERC20.setRoleAdmin({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must be role admin to set role admin');
+      });
+    });
+  });
 
-          it('it emits a TransferSingle event at the sERC1155 layer', async () => {
-            await expect(this.data.tx)
-              .to.emit(this.contracts.sERC1155, 'TransferSingle')
-              .withArgs(this.sERC20.contract.address, ethers.constants.AddressZero, this.signers.holders[0].address, this.data.id, this.params.sERC20.balance);
-          });
+  describe('# burn', () => {
+    describe('» burnt amount is inferior to balance', () => {
+      describe('» and sERC20 is not paused', () => {
+        before(async () => {
+          await setup(this);
+          await this.sERC20.mint();
+          await this.sERC20.burn();
         });
 
-        describe('» but sERC20 is paused', () => {
-          before(async () => {
-            await setup(this);
-            await this.sERC20.pause();
-          });
+        it('it burns tokens', async () => {
+          expect(await this.sERC20.totalSupply()).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
+          expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
+        });
 
-          it('it reverts', async () => {
-            await expect(this.sERC20.mint()).to.be.revertedWith('ERC20Pausable: token transfer while paused');
-          });
+        it('it emits a Transfer event', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.contracts.sERC20, 'Transfer')
+            .withArgs(this.signers.holders[0].address, ethers.constants.AddressZero, this.params.sERC20.amount);
+        });
+
+        it('it emits a TransferSingle event at the sERC1155 layer', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.contracts.sERC1155, 'TransferSingle')
+            .withArgs(this.sERC20.contract.address, this.signers.holders[0].address, ethers.constants.AddressZero, this.data.id, this.params.sERC20.amount);
         });
       });
 
-      describe('» but amount is superior to cap', () => {
+      describe('» but sERC20 is paused', () => {
         before(async () => {
           await setup(this);
+          await this.sERC20.pause();
         });
 
         it('it reverts', async () => {
-          await expect(this.sERC20.mint({ amount: this.params.sERC20.cap.add(ethers.BigNumber.from('1')) })).to.be.revertedWith('ERC20Capped: cap exceeded');
+          await expect(this.sERC20.burn()).to.be.revertedWith('ERC20Pausable: token transfer while paused');
         });
       });
     });
 
-    describe('» cap is already reached', () => {
+    describe('» burnt amount is superior to balance', () => {
       before(async () => {
         await setup(this);
-        await this.sERC20.mint({ amount: this.params.sERC20.cap });
+        await this.sERC20.mint();
       });
 
       it('it reverts', async () => {
-        await expect(this.sERC20.mint({ amount: 1 })).to.be.revertedWith('ERC20Capped: cap exceeded');
+        await expect(this.sERC20.burn({ amount: this.params.sERC20.balance.add(ethers.BigNumber.from('1')) })).to.be.revertedWith(
+          'ERC20: burn amount exceeds balance'
+        );
+      });
+    });
+  });
+
+  describe('# burnFrom', () => {
+    describe('» and spender has enough approved balance', () => {
+      describe('» and token owner has enough balance', () => {
+        before(async () => {
+          await setup(this);
+          await this.sERC20.mint();
+          await this.sERC20.approve({ spender: this.signers.others[0], amount: this.params.sERC20.amount });
+          await this.sERC20.burnFrom();
+        });
+
+        it('it transfers tokens', async () => {
+          expect(await this.sERC20.totalSupply()).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
+          expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
+        });
+
+        it("it updates spender's allowance", async () => {
+          expect(await this.sERC20.allowance(this.signers.holders[0].address, this.signers.others[0].address)).to.equal(0);
+        });
+
+        it('it emits a Transfer event', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.contracts.sERC20, 'Transfer')
+            .withArgs(this.signers.holders[0].address, ethers.constants.AddressZero, this.params.sERC20.amount);
+        });
+
+        it('it emits a TransferSingle event at the sERC1155 layer', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.contracts.sERC1155, 'TransferSingle')
+            .withArgs(this.sERC20.contract.address, this.signers.holders[0].address, ethers.constants.AddressZero, this.data.id, this.params.sERC20.amount);
+        });
+
+        it('it emits an Approval event', async () => {
+          await expect(this.data.tx).to.emit(this.contracts.sERC20, 'Approval').withArgs(this.signers.holders[0].address, this.signers.others[0].address, 0);
+        });
+      });
+
+      describe('» but token owner does not have enough balance', () => {
+        before(async () => {
+          await setup(this);
+          await this.sERC20.mint();
+          await this.sERC20.approve({ spender: this.signers.others[0], amount: this.params.sERC20.balance.add(this.params.sERC20.balance) });
+        });
+
+        it('it reverts', async () => {
+          await expect(this.sERC20.burnFrom({ amount: this.params.sERC20.balance.add(this.params.sERC20.balance) })).to.be.revertedWith(
+            'ERC20: burn amount exceeds balance'
+          );
+        });
+      });
+    });
+
+    describe('» but spender does not have enough approved balance', () => {
+      before(async () => {
+        await setup(this);
+        await this.sERC20.mint();
+      });
+
+      it('it reverts', async () => {
+        await expect(this.sERC20.burnFrom()).to.be.revertedWith('ERC20: burn amount exceeds allowance');
+      });
+    });
+  });
+
+  describe('# mint', () => {
+    describe('» caller has MINT_ROLE', () => {
+      describe('» cap is not reached yet', () => {
+        describe('» and minted amount is inferior to cap', () => {
+          describe('» and sERC20 is not paused', () => {
+            before(async () => {
+              await setup(this);
+              await this.sERC20.mint();
+            });
+
+            it('it mints tokens', async () => {
+              expect(await this.sERC20.totalSupply()).to.equal(this.params.sERC20.balance);
+              expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance);
+            });
+
+            it('it emits a Transfer event', async () => {
+              await expect(this.data.tx)
+                .to.emit(this.contracts.sERC20, 'Transfer')
+                .withArgs(ethers.constants.AddressZero, this.signers.holders[0].address, this.params.sERC20.balance);
+            });
+
+            it('it emits a TransferSingle event at the sERC1155 layer', async () => {
+              await expect(this.data.tx)
+                .to.emit(this.contracts.sERC1155, 'TransferSingle')
+                .withArgs(
+                  this.sERC20.contract.address,
+                  ethers.constants.AddressZero,
+                  this.signers.holders[0].address,
+                  this.data.id,
+                  this.params.sERC20.balance
+                );
+            });
+          });
+
+          describe('» but sERC20 is paused', () => {
+            before(async () => {
+              await setup(this);
+              await this.sERC20.pause();
+            });
+
+            it('it reverts', async () => {
+              await expect(this.sERC20.mint()).to.be.revertedWith('ERC20Pausable: token transfer while paused');
+            });
+          });
+        });
+
+        describe('» but amount is superior to cap', () => {
+          before(async () => {
+            await setup(this);
+          });
+
+          it('it reverts', async () => {
+            await expect(this.sERC20.mint({ amount: this.params.sERC20.cap.add(ethers.BigNumber.from('1')) })).to.be.revertedWith('ERC20Capped: cap exceeded');
+          });
+        });
+      });
+
+      describe('» cap is already reached', () => {
+        before(async () => {
+          await setup(this);
+          await this.sERC20.mint({ amount: this.params.sERC20.cap });
+        });
+
+        it('it reverts', async () => {
+          await expect(this.sERC20.mint({ amount: 1 })).to.be.revertedWith('ERC20Capped: cap exceeded');
+        });
+      });
+    });
+
+    describe('» caller does not have MINT_ROLE', () => {
+      before(async () => {
+        await setup(this);
+      });
+
+      it('it reverts', async () => {
+        await expect(this.sERC20.mint({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have MINT_ROLE to mint');
       });
     });
   });
@@ -309,7 +491,7 @@ describe.only('sERC20', () => {
       });
 
       it('it reverts', async () => {
-        await expect(this.sERC20.pause({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have pause role to pause');
+        await expect(this.sERC20.pause({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have PAUSE_ROLE to pause');
       });
     });
   });
@@ -334,7 +516,7 @@ describe.only('sERC20', () => {
       });
 
       it('it reverts', async () => {
-        await expect(this.sERC20.unpause({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have pause role to unpause');
+        await expect(this.sERC20.unpause({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have PAUSE_ROLE to unpause');
       });
     });
   });
@@ -373,7 +555,7 @@ describe.only('sERC20', () => {
       });
 
       it('it reverts', async () => {
-        await expect(this.sERC20.snapshot({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have snapshot role to snapshot');
+        await expect(this.sERC20.snapshot({ from: this.signers.others[0] })).to.be.revertedWith('sERC20: must have SNAPSHOT_ROLE to snapshot');
       });
     });
   });

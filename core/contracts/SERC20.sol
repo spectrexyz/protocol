@@ -30,7 +30,6 @@ contract sERC20 is
     ERC20PermitUpgradeable,
     sIERC20
 {
-    bytes32 public constant BURN_ROLE     = keccak256("BURN_ROLE");
     bytes32 public constant MINT_ROLE     = keccak256("MINT_ROLE");
     bytes32 public constant PAUSE_ROLE    = keccak256("PAUSE_ROLE");
     bytes32 public constant SNAPSHOT_ROLE = keccak256("SNAPSHOT_ROLE");
@@ -74,7 +73,8 @@ contract sERC20 is
 
   /* #region state-modifying functions */
     function setRoleAdmin(bytes32 role, bytes32 adminRole) external override {
-        require(hasRole(getRoleAdmin(role), _msgSender()), "sERC20: must be admin to set role admin");
+        require(hasRole(getRoleAdmin(role), _msgSender()), "sERC20: must be role admin to set role admin");
+
         _setRoleAdmin(role, adminRole);
     }
 

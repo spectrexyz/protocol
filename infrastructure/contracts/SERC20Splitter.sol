@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "@spectrexyz/protocol-core/contracts/SERC20.sol";
+import "@spectrexyz/protocol-core/contracts/interfaces/sIERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
 /**
- * @title sERC20Splitter
+ * @title  sSplitter
  * @notice Split sERC20s between registered beneficiaries when received.
  */
 contract sERC20Splitter is Context, AccessControlEnumerable {

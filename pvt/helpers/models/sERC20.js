@@ -17,6 +17,7 @@ class sERC20 {
     this.paused = this.contract.paused;
     this.allowance = this.contract.allowance;
     this.sERC1155 = this.contract.sERC1155;
+    this.getRoleAdmin = this.contract.getRoleAdmin;
   }
 
   static async deploy(ctx) {
@@ -68,6 +69,15 @@ class sERC20 {
 
   async hasRole(role, account) {
     return await this.contract.hasRole(role, account.address);
+  }
+
+  async setRoleAdmin(opts = {}) {
+    opts.from ??= this.ctx.signers.sERC20.admin;
+    opts.role ??= this.ctx.constants.sERC20.MINT_ROLE;
+    opts.adminRole ??= this.ctx.constants.sERC20.MINT_ROLE;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).setRoleAdmin(opts.role, opts.adminRole);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async pause(opts = {}) {
@@ -130,6 +140,15 @@ class sERC20 {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
+  async burnFrom(opts = {}) {
+    opts.from ??= this.ctx.signers.others[0];
+    opts.owner ??= this.ctx.signers.holders[0];
+    opts.amount ??= this.ctx.params.sERC20.amount;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).burnFrom(opts.owner.address, opts.amount);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
   async burn(opts = {}) {
     opts.from ??= this.ctx.signers.holders[0];
     opts.amount ??= this.ctx.params.sERC20.amount;
@@ -147,7 +166,6 @@ class sERC20 {
   }
 
   async _grantRoles() {
-    await this.grantRole({ role: this.ctx.constants.sERC20.BURN_ROLE, account: this.ctx.signers.sERC20.burner });
     await this.grantRole({ role: this.ctx.constants.sERC20.MINT_ROLE, account: this.ctx.signers.sERC20.minter });
     await this.grantRole({ role: this.ctx.constants.sERC20.PAUSE_ROLE, account: this.ctx.signers.sERC20.pauser });
     await this.grantRole({ role: this.ctx.constants.sERC20.SNAPSHOT_ROLE, account: this.ctx.signers.sERC20.snapshoter });
