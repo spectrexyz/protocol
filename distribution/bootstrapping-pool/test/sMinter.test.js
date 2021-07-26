@@ -165,36 +165,50 @@ describe.only('sMinter', () => {
   });
 
   describe.only('⇛ core', () => {
-    describe.only('# register', () => {
+    describe('# register', () => {
       describe('» pit is not registered yet', () => {
         describe('» and pool is not the zero address', () => {
           describe('» and beneficiary is not the zero address', () => {
             describe('» and initial price is not null', () => {
-              before(async () => {
-                await setup(this, { balancer: true, minter: true, mint: false });
-                this.data.pit = await this.sMinter.pitOf(this.sERC20.contract.address);
+              describe('» and allocation is inferior to 100%', () => {
+                before(async () => {
+                  await setup(this, { balancer: true, minter: true, mint: false });
+                  this.data.pit = await this.sMinter.pitOf(this.sERC20.contract.address);
+                });
+
+                it('it registers pit', async () => {
+                  expect(this.data.pit.pool).to.equal(this.sBootstrappingPool.contract.address);
+                  expect(this.data.pit.poolId).to.equal(await this.sBootstrappingPool.getPoolId());
+                  expect(this.data.pit.beneficiary).to.equal(this.signers.sMinter.beneficiary.address);
+                  expect(this.data.pit.initialPrice).to.equal(this.params.sMinter.initialPrice);
+                  expect(this.data.pit.fee).to.equal(this.params.sMinter.fee);
+                  expect(this.data.pit.sERC20IsToken0).to.equal(this.sBootstrappingPool.sERC20IsToken0);
+                });
+
+                it('it emits a Register event', async () => {
+                  await expect(this.data.tx)
+                    .to.emit(this.sMinter.contract, 'Register')
+                    .withArgs(
+                      this.sERC20.contract.address,
+                      this.sBootstrappingPool.contract.address,
+                      this.signers.sMinter.beneficiary.address,
+                      this.params.sMinter.initialPrice,
+                      this.params.sMinter.allocation,
+                      this.params.sMinter.fee
+                    );
+                });
               });
 
-              it('it registers pit', async () => {
-                expect(this.data.pit.pool).to.equal(this.sBootstrappingPool.contract.address);
-                expect(this.data.pit.poolId).to.equal(await this.sBootstrappingPool.getPoolId());
-                expect(this.data.pit.beneficiary).to.equal(this.signers.sMinter.beneficiary.address);
-                expect(this.data.pit.initialPrice).to.equal(this.params.sMinter.initialPrice);
-                expect(this.data.pit.fee).to.equal(this.params.sMinter.fee);
-                expect(this.data.pit.sERC20IsToken0).to.equal(this.sBootstrappingPool.sERC20IsToken0);
-              });
+              describe('» but allocation is superior to 100%', () => {
+                before(async () => {
+                  await setup(this, { balancer: true, minter: true, mint: false, register: false });
+                });
 
-              it('it emits a Register event', async () => {
-                await expect(this.data.tx)
-                  .to.emit(this.sMinter.contract, 'Register')
-                  .withArgs(
-                    this.sERC20.contract.address,
-                    this.sBootstrappingPool.contract.address,
-                    this.signers.sMinter.beneficiary.address,
-                    this.params.sMinter.initialPrice,
-                    this.params.sMinter.allocation,
-                    this.params.sMinter.fee
+                it('it reverts', async () => {
+                  await expect(this.sMinter.register({ allocation: ethers.utils.parseEther('1').mul(ethers.BigNumber.from('100')) })).to.be.revertedWith(
+                    'sMinter: allocation must be inferior to 100%'
                   );
+                });
               });
             });
 
@@ -246,7 +260,7 @@ describe.only('sMinter', () => {
       });
     });
 
-    describe('# mint', () => {
+    describe.only('# mint', () => {
       describe('» pool is not initialized yet', () => {
         before(async () => {
           await setup(this, { balancer: true, minter: true });
@@ -289,6 +303,12 @@ describe.only('sMinter', () => {
         it('it preserves pair price', async () => {
           console.log(this.sBootstrappingPool.sERC20IsToken0);
           console.log((await this.sBootstrappingPool.pairPrice()).toString());
+        });
+
+        it('it emits a Mint event', async () => {
+          await expect(this.data.tx)
+            .to.emit(this.sMinter.contract, 'Mint')
+            .withArgs(this.sERC20.contract.address, this.signers.sMinter.recipient.address, this.params.sMinter.value, 0);
         });
       });
     });

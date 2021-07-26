@@ -23,6 +23,7 @@ contract sMinter is Context, AccessControl, sIMinter {
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     uint256 public constant DECIMALS   = 1e18;
+    uint256 public constant HUNDRED    = 1e20;
 
     modifier protected() {
         require(hasRole(ADMIN_ROLE, _msgSender()), "sMinter: protected operation");
@@ -64,20 +65,23 @@ contract sMinter is Context, AccessControl, sIMinter {
         uint256 value       = msg.value.sub(protocolFee).sub(fee);
         uint256 amount      = (value.mul(price)).div(DECIMALS);
 
+        require(amount >= expected, "sMinter: insufficient minting return");
+
         // collect protocol fee
         _bank.sendValue(protocolFee);
         // pay beneficiary
         pit.beneficiary.sendValue(value);
         // pool LP reward
-        _reward(sERC20, pool, pit.poolId, fee, initialPrice, sERC20IsToken0);
+        uint256 reward = _reward(sERC20, pool, pit.poolId, fee, initialPrice, sERC20IsToken0);
         // mint allocation
         // _allocate();
         // mint recipient tokens
         sIERC20(sERC20).mint(recipient, amount);
+        // mint allocation
+        sIERC20(sERC20).mint(_splitter, _allocation(pit.allocation, amount.add(reward)));
 
-        // emit Mint(sERC20, msg.value, amount, protocolFee, fee);
-
-    // https://github.com/balancer-labs/balancer-v2-monorepo/blob/df9afcf1bef4926f9b4901ba1ee617f44d4395b3/pkg/pool-utils/contracts/interfaces/IPriceOracle.sol
+        emit Mint(sERC20, recipient, msg.value, amount);
+        // https://github.com/balancer-labs/balancer-v2-monorepo/blob/df9afcf1bef4926f9b4901ba1ee617f44d4395b3/pkg/pool-utils/contracts/interfaces/IPriceOracle.sol
     }
 
     function register(address sERC20, Pit calldata pit) external override {
@@ -85,6 +89,7 @@ contract sMinter is Context, AccessControl, sIMinter {
         require(address(pit.pool)    != address(0),          "sMinter: pool cannot be the zero address");
         require(pit.beneficiary      != payable(address(0)), "sMinter: beneficiary cannot be the zero address");
         require(pit.initialPrice     != 0,                   "sMinter: initial price cannot be null");
+        require(pit.allocation       < HUNDRED,              "sMinter: allocation must be inferior to 100%");
 
         _pits[sERC20]                = pit;
         _pits[sERC20].poolId         = pit.pool.getPoolId();
@@ -127,23 +132,23 @@ contract sMinter is Context, AccessControl, sIMinter {
   /* #endregion*/
 
   /* #region getters */
-    function bank() external view override returns (address) {
+    function bank() public view override returns (address) {
         return _bank;
     }
 
-    function splitter() external view override returns (address) {
+    function splitter() public view override returns (address) {
         return _splitter;
     } 
 
-    function vault() external view override returns (IVault) {
+    function vault() public view override returns (IVault) {
         return _vault;
     } 
 
-    function protocolFee() external view override returns (uint256) {
+    function protocolFee() public view override returns (uint256) {
         return _protocolFee;
     }
 
-    function pitOf(address sERC20) external view override returns (Pit memory) {
+    function pitOf(address sERC20) public view override returns (Pit memory) {
         return _pits[sERC20];
     }
   /* #endregion*/
@@ -225,5 +230,11 @@ contract sMinter is Context, AccessControl, sIMinter {
         sIERC20(sERC20).mint(address(this), reward);
         sIERC20(sERC20).approve(address(_vault), reward);
         _vault.joinPool{value: value}(poolId, address(this), _bank, _request(sERC20, pool, reward, value, sERC20IsToken0));
+
+        return reward;
+    }
+
+    function _allocation(uint256 allocation, uint256 amount) private pure returns (uint256) {
+        return (allocation.mul(amount)).div(HUNDRED.sub(allocation));
     }
 }

@@ -1,4 +1,4 @@
-const SERC20 = require('@spectrexyz/protocol-core/artifacts/contracts/SERC20.sol/sERC20.json');
+const SERC20 = require('@spectrexyz/protocol-core/artifacts/contracts/sERC20.sol/sERC20.json');
 const ERC1155Receiver = require('@spectrexyz/protocol-core/artifacts/contracts/test/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json');
 const ERC721Mock = require('@spectrexyz/protocol-core/artifacts/contracts/test/ERC721Mock.sol/ERC721Mock.json');
 
@@ -89,6 +89,7 @@ const initialize = async (ctx) => {
       Unlocked: 2,
     },
     sMinter: {
+      DECIMALS: ethers.BigNumber.from('1000000000000000000'),
       ONE: ethers.BigNumber.from('1000000000000000000'),
     },
     unlockedURI: 'ipfs://Qm.../unwrapped',
@@ -218,7 +219,7 @@ const setup = async (ctx, opts = {}) => {
 
   if (opts.minter) {
     await sMinter.deploy(ctx, opts);
-    await ctx.sERC20.grantRole({ role: ctx.constants.sERC20.MINTER_ROLE, account: ctx.sMinter.contract });
+    await ctx.sERC20.grantRole({ role: ctx.constants.sERC20.MINT_ROLE, account: ctx.sMinter.contract });
     if (opts.register) await ctx.sMinter.register();
   }
 };
