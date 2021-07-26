@@ -33,13 +33,14 @@ class sMinter {
     opts.pool ??= this.ctx.sBootstrappingPool.contract;
     opts.beneficiary ??= this.ctx.signers.sMinter.beneficiary;
     opts.initialPrice ??= this.ctx.params.sMinter.initialPrice;
+    opts.allocation ??= this.ctx.params.sMinter.allocation;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).register(this.ctx.sERC20.contract.address, {
       pool: opts.pool.address,
       poolId: ethers.constants.HashZero,
       beneficiary: opts.beneficiary.address,
       initialPrice: opts.initialPrice,
-      allocation: this.ctx.params.sMinter.allocation,
+      allocation: opts.allocation,
       fee: this.ctx.params.sMinter.fee,
     });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
