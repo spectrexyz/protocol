@@ -64,6 +64,10 @@ interface sIMinter {
      * @notice Returns the current protocol fee.
      */
     function protocolFee()         external view returns (uint256);
+    /**
+     * @notice Returns pit associated to an `sERC20`.
+     * @param  sERC20 The address of the sERC20 whose pit is queried.
+     */
     function pitOf(address sERC20) external view returns (Pit memory);
   /* #endregion*/
 }

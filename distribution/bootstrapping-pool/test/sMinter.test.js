@@ -264,51 +264,78 @@ describe.only('sMinter', () => {
       describe('» pool is not initialized yet', () => {
         before(async () => {
           await setup(this, { balancer: true, minter: true });
-          // this.data.previousPairPrice = await this.sBootstrappingPool.pairPrice();
-          // this.data.previousTotalSupply = await this.sERC20.totalSupply();
+
           this.data.previousBankBalance = await this.signers.sMinter.bank.getBalance();
           this.data.previousBeneficiaryBalance = await this.signers.sMinter.beneficiary.getBalance();
+          this.data.previousPairPrice = this.params.sMinter.initialPrice;
+          this.data.previousBankBTPBalance = await this.sBootstrappingPool.balanceOf(this.signers.sMinter.bank.address);
+          this.data.previousRecipientBalance = await this.sERC20.balanceOf(this.signers.sMinter.recipient);
+
           await advanceTime(86400);
           await this.sMinter.mint();
-          // this.data.latestPairPrice = await this.sBootstrappingPool.pairPrice();
-          // this.data.latestTotalSupply = await this.sERC20.totalSupply();
+          this.data.latestTotalSupply = await this.sERC20.totalSupply();
           this.data.latestBankBalance = await this.signers.sMinter.bank.getBalance();
           this.data.latestBeneficiaryBalance = await this.signers.sMinter.beneficiary.getBalance();
+          this.data.latestPairPrice = this.sBootstrappingPool.sERC20IsToken0
+            ? await this.sBootstrappingPool.pairPrice()
+            : this.constants.sMinter.DECIMALS.mul(this.constants.sMinter.DECIMALS).div(await this.sBootstrappingPool.pairPrice());
+          this.data.latestBankBTPBalance = await this.sBootstrappingPool.balanceOf(this.signers.sMinter.bank.address);
+          this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.sMinter.recipient);
 
-          this.data.expectedProtocolFee = this.params.sMinter.value.mul(this.params.sMinter.protocolFee).div(this.constants.sMinter.ONE);
-          this.data.expectedFee = this.params.sMinter.value.mul(this.params.sMinter.fee).div(this.constants.sMinter.ONE);
+          this.data.expectedProtocolFee = this.params.sMinter.value.mul(this.params.sMinter.protocolFee).div(this.constants.sMinter.DECIMALS);
+          this.data.expectedFee = this.params.sMinter.value.mul(this.params.sMinter.fee).div(this.constants.sMinter.DECIMALS);
+          this.data.expectedReward = this.data.expectedFee
+            .mul(this.params.sMinter.initialPrice)
+            .mul(this.params.sBootstrappingPool.normalizedStartWeight)
+            .div(this.constants.sBootstrappingPool.ONE.sub(this.params.sBootstrappingPool.normalizedStartWeight))
+            .div(this.constants.sMinter.DECIMALS);
           this.data.expectedBeneficiaryPay = this.params.sMinter.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
+          this.data.expectedAmount = this.params.sMinter.value
+            .sub(this.data.expectedProtocolFee)
+            .sub(this.data.expectedFee)
+            .mul(this.params.sMinter.initialPrice)
+            .div(this.constants.sMinter.DECIMALS);
+        });
+
+        it('it initializes pool', async () => {
+          const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
+          const sBalance = this.sBootstrappingPool.sERC20IsToken0 ? balances[0] : balances[1];
+          const eBalance = this.sBootstrappingPool.sERC20IsToken0 ? balances[1] : balances[0];
+
+          expect(sBalance).to.equal(this.data.expectedReward);
+          expect(eBalance).to.equal(this.data.expectedFee);
+        });
+
+        it('it preserves pair price', async () => {
+          expect(this.data.latestPairPrice).to.be.near(this.data.previousPairPrice, MAX_RELATIVE_ERROR);
+        });
+
+        it('it mints BPT towards sMinter bank', async () => {
+          expect(this.data.latestBankBTPBalance).to.be.gt(this.data.previousBankBTPBalance);
         });
 
         it('it collects protocol fee', async () => {
           expect(this.data.latestBankBalance.sub(this.data.previousBankBalance)).to.equal(this.data.expectedProtocolFee);
         });
 
-        it('it updates pool balance', async () => {
-          const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
-          const sBalance = this.sBootstrappingPool.sERC20IsToken0 ? balances[0] : balances[1];
-          const eBalance = this.sBootstrappingPool.sERC20IsToken0 ? balances[1] : balances[0];
-
-          expect(eBalance).to.equal(this.data.expectedFee);
-        });
-
         it('it pays beneficiary', async () => {
           expect(this.data.latestBeneficiaryBalance.sub(this.data.previousBeneficiaryBalance)).to.equal(this.data.expectedBeneficiaryPay);
         });
 
-        it('it mints BPT towards sMinter bank', async () => {
-          expect(await this.sBootstrappingPool.balanceOf(this.signers.sMinter.bank.address)).to.not.equal(0);
+        it('it mints sERC20 towards recipient', async () => {
+          expect(this.data.latestRecipientBalance.sub(this.data.previousRecipientBalance)).to.equal(this.data.expectedAmount);
         });
 
-        it('it preserves pair price', async () => {
-          console.log(this.sBootstrappingPool.sERC20IsToken0);
-          console.log((await this.sBootstrappingPool.pairPrice()).toString());
+        it('it mints sERC20 allocation towards splitter', async () => {
+          expect(await this.sERC20.balanceOf(this.signers.sMinter.splitter)).to.equal(
+            this.params.sMinter.allocation.mul(this.data.latestTotalSupply).div(this.constants.sMinter.HUNDRED)
+          );
         });
 
         it('it emits a Mint event', async () => {
           await expect(this.data.tx)
             .to.emit(this.sMinter.contract, 'Mint')
-            .withArgs(this.sERC20.contract.address, this.signers.sMinter.recipient.address, this.params.sMinter.value, 0);
+            .withArgs(this.sERC20.contract.address, this.signers.sMinter.recipient.address, this.params.sMinter.value, this.data.expectedAmount);
         });
       });
     });

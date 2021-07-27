@@ -90,6 +90,7 @@ const initialize = async (ctx) => {
     },
     sMinter: {
       DECIMALS: ethers.BigNumber.from('1000000000000000000'),
+      HUNDRED: ethers.BigNumber.from('100000000000000000000'),
       ONE: ethers.BigNumber.from('1000000000000000000'),
     },
     unlockedURI: 'ipfs://Qm.../unwrapped',
