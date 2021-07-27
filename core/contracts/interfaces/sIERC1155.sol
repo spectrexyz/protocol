@@ -14,19 +14,19 @@ interface sIERC1155 is IERC1155, IERC1155MetadataURI, IERC721Receiver {
     
     struct Spectre {
         SpectreState state;
-        address collection;
-        uint256 tokenId;
-        address guardian;
+        address      collection;
+        uint256      tokenId;
+        address      guardian;
     }
 
     function spectralize(
-        address collection,
-        uint256 tokenId,
-        string memory name,
-        string memory symbol,
-        uint256 cap,
-        address admin,
-        address guardian
+        address        collection,
+        uint256        tokenId,
+        string  memory name,
+        string  memory symbol,
+        uint256        cap,
+        address        admin,
+        address        guardian
     )
         external
         returns (uint256 id);

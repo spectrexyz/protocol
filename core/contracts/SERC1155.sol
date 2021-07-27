@@ -24,11 +24,11 @@ import "hardhat/console.sol";
  *      sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
  */
 contract sERC1155 is Context, ERC165, AccessControlEnumerable, sIERC1155 {
-    using Address for address;
-    using Cast for address;
-    using Cast for bytes32;
-    using Cast for uint256;
-    using Clones for address;
+    using Address       for address;
+    using Cast          for address;
+    using Cast          for bytes32;
+    using Cast          for uint256;
+    using Clones        for address;
     using ERC165Checker for address;
 
     bytes32 public  constant ADMIN_ROLE         = keccak256("ADMIN_ROLE");
