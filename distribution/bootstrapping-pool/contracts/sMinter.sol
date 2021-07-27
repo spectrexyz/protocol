@@ -21,25 +21,27 @@ contract sMinter is Context, AccessControl, sIMinter {
     using Address         for address payable;
     using OZMath.SafeMath for uint256;
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    uint256 public constant DECIMALS   = 1e18;
-    uint256 public constant HUNDRED    = 1e20;
+    bytes32 public constant ADMIN_ROLE    = keccak256("ADMIN_ROLE");
+    bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
+    uint256 public constant DECIMALS      = 1e18;
+    uint256 public constant HUNDRED       = 1e20;
 
     modifier protected() {
         require(hasRole(ADMIN_ROLE, _msgSender()), "sMinter: protected operation");
         _;
     }
 
-    IVault                   private _vault;
+    IVault  immutable        private _vault;
     address payable          private _bank;
     address                  private _splitter;
     uint256                  private _protocolFee;
     mapping (address => Pit) private _pits;
 
     constructor(address vault, address payable bank, address splitter, uint256 protocolFee) {
-        require(vault    != address(0), "sMinter: vault cannot be the zero address");
-        require(bank     != address(0), "sMinter: bank cannot be the zero address");
-        require(splitter != address(0), "sMinter: splitter cannot be the zero address");
+        require(vault      != address(0), "sMinter: vault cannot be the zero address");
+        require(bank       != address(0), "sMinter: bank cannot be the zero address");
+        require(splitter   != address(0), "sMinter: splitter cannot be the zero address");
+        require(protocolFee < HUNDRED,    "sMinter: protocol fee must be inferior to 100%");
 
         _vault       = IVault(vault);
         _bank        = bank;
@@ -48,6 +50,7 @@ contract sMinter is Context, AccessControl, sIMinter {
 
         _setupRole(ADMIN_ROLE, _msgSender());
         _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
+        _setRoleAdmin(REGISTER_ROLE, ADMIN_ROLE);
     }
 
     // check if on met un nonReentrant
@@ -60,8 +63,8 @@ contract sMinter is Context, AccessControl, sIMinter {
         bool               sERC20IsToken0 = pit.sERC20IsToken0;
 
         uint256 price       = _price(pool, initialPrice, pit.sERC20IsToken0);
-        uint256 protocolFee = (msg.value.mul(_protocolFee)).div(DECIMALS);
-        uint256 fee         = (msg.value.mul(pit.fee)).div(DECIMALS);
+        uint256 protocolFee = (msg.value.mul(_protocolFee)).div(HUNDRED);
+        uint256 fee         = (msg.value.mul(pit.fee)).div(HUNDRED);
         uint256 value       = msg.value.sub(protocolFee).sub(fee);
         uint256 amount      = (value.mul(price)).div(DECIMALS);
 
@@ -73,29 +76,36 @@ contract sMinter is Context, AccessControl, sIMinter {
         pit.beneficiary.sendValue(value);
         // pool LP reward
         uint256 reward = _reward(sERC20, pool, pit.poolId, fee, initialPrice, sERC20IsToken0);
-        // mint allocation
-        // _allocate();
         // mint recipient tokens
         sIERC20(sERC20).mint(recipient, amount);
-        // mint allocation
+        // mint allocation tokens
         sIERC20(sERC20).mint(_splitter, _allocation(pit.allocation, amount.add(reward)));
 
         emit Mint(sERC20, recipient, msg.value, amount);
         // https://github.com/balancer-labs/balancer-v2-monorepo/blob/df9afcf1bef4926f9b4901ba1ee617f44d4395b3/pkg/pool-utils/contracts/interfaces/IPriceOracle.sol
     }
 
-    function register(address sERC20, Pit calldata pit) external override {
+    function register(address sERC20, address pool, address payable beneficiary, uint256 initialPrice, uint256 allocation, uint256 fee) external override {
+        require(hasRole(REGISTER_ROLE, _msgSender()), "sMinter: must have REGISTER_ROLE to register");
+        
+        uint256 protocolFee = _protocolFee;
         require(_pits[sERC20].poolId == bytes32(0),          "sMinter: pit already registered");
-        require(address(pit.pool)    != address(0),          "sMinter: pool cannot be the zero address");
-        require(pit.beneficiary      != payable(address(0)), "sMinter: beneficiary cannot be the zero address");
-        require(pit.initialPrice     != 0,                   "sMinter: initial price cannot be null");
-        require(pit.allocation       < HUNDRED,              "sMinter: allocation must be inferior to 100%");
+        require(address(pool)        != address(0),          "sMinter: pool cannot be the zero address");
+        require(beneficiary          != payable(address(0)), "sMinter: beneficiary cannot be the zero address");
+        require(initialPrice         != 0,                   "sMinter: initial price cannot be null");
+        require(allocation            < HUNDRED,             "sMinter: allocation must be inferior to 100%");
+        require(fee.add(protocolFee)  < HUNDRED,             "sMinter: cumulated fees must be inferior to 100%");
 
-        _pits[sERC20]                = pit;
-        _pits[sERC20].poolId         = pit.pool.getPoolId();
-        _pits[sERC20].sERC20IsToken0 = pit.pool.sERC20IsToken0();
+        _pits[sERC20].pool           = sBootstrappingPool(pool);
+        _pits[sERC20].beneficiary    = beneficiary;
+        _pits[sERC20].initialPrice   = initialPrice;
+        _pits[sERC20].allocation     = allocation;
+        _pits[sERC20].fee            = fee;
+        _pits[sERC20].protocolFee    = protocolFee;
+        _pits[sERC20].poolId         = sBootstrappingPool(pool).getPoolId();
+        _pits[sERC20].sERC20IsToken0 = sBootstrappingPool(pool).sERC20IsToken0();
 
-        emit Register(sERC20, address(pit.pool), address(pit.beneficiary), pit.initialPrice, pit.allocation, pit.fee);
+        emit Register(sERC20, pool, address(beneficiary), initialPrice, allocation, fee);
     }
 
     function withdraw(address token) external override {
@@ -105,43 +115,38 @@ contract sMinter is Context, AccessControl, sIMinter {
             sIERC20(token).transfer(_bank, sIERC20(token).balanceOf(address(this)));
         }
     }
-
-    receive() external payable {
-        console.log("Received %s ETH", msg.value);
-    }
-
+  
   /* #region setters */
-    function setVault(address vault) external override protected {
-        require(vault != address(0), "sMinter: vault cannot be the zero address");
-        _vault = IVault(vault);
-    } 
-
     function setBank(address payable bank) external override protected {
         require(bank != address(0), "sMinter: bank cannot be the zero address");
+
         _bank = bank;
     }
 
     function setSplitter(address splitter) external override protected {
         require(splitter != address(0), "sMinter: splitter cannot be the zero address");
+
         _splitter = splitter;
     } 
 
     function setProtocolFee(uint256 protocolFee) external override protected {
+        require(protocolFee < HUNDRED, "sMinter: protocol fee must be inferior to 100%");
+
         _protocolFee = protocolFee;
     }
   /* #endregion*/
 
   /* #region getters */
+    function vault() public view override returns (IVault) {
+        return _vault;
+    } 
+    
     function bank() public view override returns (address) {
         return _bank;
     }
 
     function splitter() public view override returns (address) {
         return _splitter;
-    } 
-
-    function vault() public view override returns (IVault) {
-        return _vault;
     } 
 
     function protocolFee() public view override returns (uint256) {

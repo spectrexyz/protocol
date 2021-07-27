@@ -14,19 +14,38 @@ describe.only('sMinter', () => {
     await initialize(this);
   });
 
-  describe('⇛ constructor', () => {
+  describe.only('⇛ constructor', () => {
     describe('» vault is not the zero address', () => {
       describe('» and bank is not the zero address', () => {
         describe('» and splitter is not the zero address', () => {
-          before(async () => {
-            await setup(this, { balancer: true, minter: true, mint: false });
+          describe('» and protocol fee is inferior to 100%', () => {
+            before(async () => {
+              await setup(this, { balancer: true, minter: true, mint: false });
+            });
+
+            it('it initializes contract', async () => {
+              expect(await this.sMinter.vault()).to.equal(this.contracts.Vault.address);
+              expect(await this.sMinter.bank()).to.equal(this.signers.sMinter.bank.address);
+              expect(await this.sMinter.splitter()).to.equal(this.signers.sMinter.splitter.address);
+              expect(await this.sMinter.protocolFee()).to.equal(this.params.sMinter.protocolFee);
+            });
+
+            it('it sets up permissions', async () => {
+              const ADMIN_ROLE = await this.sMinter.ADMIN_ROLE();
+              const REGISTER_ROLE = await this.sMinter.REGISTER_ROLE();
+
+              expect(await this.sMinter.hasRole(ADMIN_ROLE, this.signers.sMinter.admin.address)).to.equal(true);
+              expect(await this.sMinter.getRoleAdmin(ADMIN_ROLE)).to.equal(ADMIN_ROLE);
+              expect(await this.sMinter.getRoleAdmin(REGISTER_ROLE)).to.equal(ADMIN_ROLE);
+            });
           });
 
-          it('it initializes contract', async () => {
-            expect(await this.sMinter.vault()).to.equal(this.contracts.Vault.address);
-            expect(await this.sMinter.bank()).to.equal(this.signers.sMinter.bank.address);
-            expect(await this.sMinter.splitter()).to.equal(this.signers.sMinter.splitter.address);
-            expect(await this.sMinter.protocolFee()).to.equal(this.params.sMinter.protocolFee);
+          describe('» but protocol fee is superior or equal to 100%', () => {
+            it('it reverts', async () => {
+              await expect(sMinter.deploy(this, { protocolFee: this.constants.sMinter.HUNDRED })).to.be.revertedWith(
+                'sMinter: protocol fee must be inferior to 100%'
+              );
+            });
           });
         });
 
@@ -57,42 +76,7 @@ describe.only('sMinter', () => {
     });
   });
 
-  describe('⇛ setters', () => {
-    describe('# setVault', () => {
-      describe('» caller is admin', () => {
-        describe('» and vault is not the zero address', () => {
-          before(async () => {
-            await setup(this, { balancer: true, minter: true, mint: false });
-            await this.sMinter.contract.connect(this.signers.sMinter.admin).setVault(this.signers.others[0].address);
-          });
-
-          it('it sets Vault', async () => {
-            expect(await this.sMinter.vault()).to.equal(this.signers.others[0].address);
-          });
-        });
-
-        describe('» but vault is the zero address', () => {
-          it('it reverts', async () => {
-            await expect(this.sMinter.contract.connect(this.signers.sMinter.admin).setVault(ethers.constants.AddressZero)).to.be.revertedWith(
-              'sMinter: vault cannot be the zero addres'
-            );
-          });
-        });
-      });
-
-      describe('» caller is not admin', () => {
-        before(async () => {
-          await setup(this, { balancer: true, minter: true, mint: false });
-        });
-
-        it('it reverts', async () => {
-          await expect(this.sMinter.contract.connect(this.signers.others[0]).setVault(this.signers.others[0].address)).to.be.revertedWith(
-            'sMinter: protected operation'
-          );
-        });
-      });
-    });
-
+  describe.only('⇛ setters', () => {
     describe('# setBank', () => {
       describe('» caller is admin', () => {
         describe('» and bank is not the zero address', () => {
@@ -162,15 +146,55 @@ describe.only('sMinter', () => {
         });
       });
     });
+
+    describe('# setProtocolFee', () => {
+      describe('» caller is admin', () => {
+        describe('» and protocol fee is inferior to 100%', () => {
+          before(async () => {
+            await setup(this, { balancer: true, minter: true, mint: false });
+            await this.sMinter.contract.connect(this.signers.sMinter.admin).setProtocolFee('1000');
+          });
+
+          it('it sets protocol fee', async () => {
+            expect(await this.sMinter.protocolFee()).to.equal('1000');
+          });
+        });
+
+        describe('» but protocol fee is superior or equal to 100%', () => {
+          before(async () => {
+            await setup(this, { balancer: true, minter: true, mint: false });
+          });
+
+          it('it reverts', async () => {
+            await expect(this.sMinter.contract.connect(this.signers.sMinter.admin).setProtocolFee(this.constants.sMinter.HUNDRED)).to.be.revertedWith(
+              'sMinter: protocol fee must be inferior to 100%'
+            );
+          });
+        });
+      });
+
+      describe('» caller is not admin', () => {
+        before(async () => {
+          await setup(this, { balancer: true, minter: true, mint: false });
+        });
+
+        it('it reverts', async () => {
+          await expect(this.sMinter.contract.connect(this.signers.others[0]).setProtocolFee(this.params.sMinter.protocolFee)).to.be.revertedWith(
+            'sMinter: protected operation'
+          );
+        });
+      });
+    });
   });
 
-  describe.only('⇛ core', () => {
+  describe('⇛ core', () => {
     describe('# register', () => {
       describe('» pit is not registered yet', () => {
         describe('» and pool is not the zero address', () => {
           describe('» and beneficiary is not the zero address', () => {
             describe('» and initial price is not null', () => {
               describe('» and allocation is inferior to 100%', () => {
+                // also need to test when fee + protocol fee is >= 100%
                 before(async () => {
                   await setup(this, { balancer: true, minter: true, mint: false });
                   this.data.pit = await this.sMinter.pitOf(this.sERC20.contract.address);
@@ -199,7 +223,7 @@ describe.only('sMinter', () => {
                 });
               });
 
-              describe('» but allocation is superior to 100%', () => {
+              describe('» but allocation is superior or equal to 100%', () => {
                 before(async () => {
                   await setup(this, { balancer: true, minter: true, mint: false, register: false });
                 });
@@ -260,82 +284,94 @@ describe.only('sMinter', () => {
       });
     });
 
-    describe.only('# mint', () => {
+    describe('# mint', () => {
       describe('» pool is not initialized yet', () => {
-        before(async () => {
-          await setup(this, { balancer: true, minter: true });
+        describe('» and minted amount is more than expected', () => {
+          before(async () => {
+            await setup(this, { balancer: true, minter: true });
 
-          this.data.previousBankBalance = await this.signers.sMinter.bank.getBalance();
-          this.data.previousBeneficiaryBalance = await this.signers.sMinter.beneficiary.getBalance();
-          this.data.previousPairPrice = this.params.sMinter.initialPrice;
-          this.data.previousBankBTPBalance = await this.sBootstrappingPool.balanceOf(this.signers.sMinter.bank.address);
-          this.data.previousRecipientBalance = await this.sERC20.balanceOf(this.signers.sMinter.recipient);
+            this.data.previousBankBalance = await this.signers.sMinter.bank.getBalance();
+            this.data.previousBeneficiaryBalance = await this.signers.sMinter.beneficiary.getBalance();
+            this.data.previousPairPrice = this.params.sMinter.initialPrice;
+            this.data.previousBankBTPBalance = await this.sBootstrappingPool.balanceOf(this.signers.sMinter.bank.address);
+            this.data.previousRecipientBalance = await this.sERC20.balanceOf(this.signers.sMinter.recipient);
 
-          await advanceTime(86400);
-          await this.sMinter.mint();
-          this.data.latestTotalSupply = await this.sERC20.totalSupply();
-          this.data.latestBankBalance = await this.signers.sMinter.bank.getBalance();
-          this.data.latestBeneficiaryBalance = await this.signers.sMinter.beneficiary.getBalance();
-          this.data.latestPairPrice = this.sBootstrappingPool.sERC20IsToken0
-            ? await this.sBootstrappingPool.pairPrice()
-            : this.constants.sMinter.DECIMALS.mul(this.constants.sMinter.DECIMALS).div(await this.sBootstrappingPool.pairPrice());
-          this.data.latestBankBTPBalance = await this.sBootstrappingPool.balanceOf(this.signers.sMinter.bank.address);
-          this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.sMinter.recipient);
+            await advanceTime(86400);
+            await this.sMinter.mint();
+            this.data.latestTotalSupply = await this.sERC20.totalSupply();
+            this.data.latestBankBalance = await this.signers.sMinter.bank.getBalance();
+            this.data.latestBeneficiaryBalance = await this.signers.sMinter.beneficiary.getBalance();
+            this.data.latestPairPrice = this.sBootstrappingPool.sERC20IsToken0
+              ? await this.sBootstrappingPool.pairPrice()
+              : this.constants.sMinter.DECIMALS.mul(this.constants.sMinter.DECIMALS).div(await this.sBootstrappingPool.pairPrice());
+            this.data.latestBankBTPBalance = await this.sBootstrappingPool.balanceOf(this.signers.sMinter.bank.address);
+            this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.sMinter.recipient);
 
-          this.data.expectedProtocolFee = this.params.sMinter.value.mul(this.params.sMinter.protocolFee).div(this.constants.sMinter.DECIMALS);
-          this.data.expectedFee = this.params.sMinter.value.mul(this.params.sMinter.fee).div(this.constants.sMinter.DECIMALS);
-          this.data.expectedReward = this.data.expectedFee
-            .mul(this.params.sMinter.initialPrice)
-            .mul(this.params.sBootstrappingPool.normalizedStartWeight)
-            .div(this.constants.sBootstrappingPool.ONE.sub(this.params.sBootstrappingPool.normalizedStartWeight))
-            .div(this.constants.sMinter.DECIMALS);
-          this.data.expectedBeneficiaryPay = this.params.sMinter.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
-          this.data.expectedAmount = this.params.sMinter.value
-            .sub(this.data.expectedProtocolFee)
-            .sub(this.data.expectedFee)
-            .mul(this.params.sMinter.initialPrice)
-            .div(this.constants.sMinter.DECIMALS);
+            this.data.expectedProtocolFee = this.params.sMinter.value.mul(this.params.sMinter.protocolFee).div(this.constants.sMinter.DECIMALS);
+            this.data.expectedFee = this.params.sMinter.value.mul(this.params.sMinter.fee).div(this.constants.sMinter.DECIMALS);
+            this.data.expectedReward = this.data.expectedFee
+              .mul(this.params.sMinter.initialPrice)
+              .mul(this.params.sBootstrappingPool.normalizedStartWeight)
+              .div(this.constants.sBootstrappingPool.ONE.sub(this.params.sBootstrappingPool.normalizedStartWeight))
+              .div(this.constants.sMinter.DECIMALS);
+            this.data.expectedBeneficiaryPay = this.params.sMinter.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
+            this.data.expectedAmount = this.params.sMinter.value
+              .sub(this.data.expectedProtocolFee)
+              .sub(this.data.expectedFee)
+              .mul(this.params.sMinter.initialPrice)
+              .div(this.constants.sMinter.DECIMALS);
+          });
+
+          it('it initializes pool', async () => {
+            const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
+            const sBalance = this.sBootstrappingPool.sERC20IsToken0 ? balances[0] : balances[1];
+            const eBalance = this.sBootstrappingPool.sERC20IsToken0 ? balances[1] : balances[0];
+
+            expect(sBalance).to.equal(this.data.expectedReward);
+            expect(eBalance).to.equal(this.data.expectedFee);
+          });
+
+          it('it preserves pair price', async () => {
+            expect(this.data.latestPairPrice).to.be.near(this.data.previousPairPrice, MAX_RELATIVE_ERROR);
+          });
+
+          it('it mints BPT towards sMinter bank', async () => {
+            expect(this.data.latestBankBTPBalance).to.be.gt(this.data.previousBankBTPBalance);
+          });
+
+          it('it collects protocol fee', async () => {
+            expect(this.data.latestBankBalance.sub(this.data.previousBankBalance)).to.equal(this.data.expectedProtocolFee);
+          });
+
+          it('it pays beneficiary', async () => {
+            expect(this.data.latestBeneficiaryBalance.sub(this.data.previousBeneficiaryBalance)).to.equal(this.data.expectedBeneficiaryPay);
+          });
+
+          it('it mints sERC20 towards recipient', async () => {
+            expect(this.data.latestRecipientBalance.sub(this.data.previousRecipientBalance)).to.equal(this.data.expectedAmount);
+          });
+
+          it('it mints sERC20 allocation towards splitter', async () => {
+            expect(await this.sERC20.balanceOf(this.signers.sMinter.splitter)).to.equal(
+              this.params.sMinter.allocation.mul(this.data.latestTotalSupply).div(this.constants.sMinter.HUNDRED)
+            );
+          });
+
+          it('it emits a Mint event', async () => {
+            await expect(this.data.tx)
+              .to.emit(this.sMinter.contract, 'Mint')
+              .withArgs(this.sERC20.contract.address, this.signers.sMinter.recipient.address, this.params.sMinter.value, this.data.expectedAmount);
+          });
         });
 
-        it('it initializes pool', async () => {
-          const { balances } = await this.contracts.Vault.getPoolTokens(this.data.poolId);
-          const sBalance = this.sBootstrappingPool.sERC20IsToken0 ? balances[0] : balances[1];
-          const eBalance = this.sBootstrappingPool.sERC20IsToken0 ? balances[1] : balances[0];
+        describe('» but minted amount is less than expected', () => {
+          before(async () => {
+            await setup(this, { balancer: true, minter: true });
+          });
 
-          expect(sBalance).to.equal(this.data.expectedReward);
-          expect(eBalance).to.equal(this.data.expectedFee);
-        });
-
-        it('it preserves pair price', async () => {
-          expect(this.data.latestPairPrice).to.be.near(this.data.previousPairPrice, MAX_RELATIVE_ERROR);
-        });
-
-        it('it mints BPT towards sMinter bank', async () => {
-          expect(this.data.latestBankBTPBalance).to.be.gt(this.data.previousBankBTPBalance);
-        });
-
-        it('it collects protocol fee', async () => {
-          expect(this.data.latestBankBalance.sub(this.data.previousBankBalance)).to.equal(this.data.expectedProtocolFee);
-        });
-
-        it('it pays beneficiary', async () => {
-          expect(this.data.latestBeneficiaryBalance.sub(this.data.previousBeneficiaryBalance)).to.equal(this.data.expectedBeneficiaryPay);
-        });
-
-        it('it mints sERC20 towards recipient', async () => {
-          expect(this.data.latestRecipientBalance.sub(this.data.previousRecipientBalance)).to.equal(this.data.expectedAmount);
-        });
-
-        it('it mints sERC20 allocation towards splitter', async () => {
-          expect(await this.sERC20.balanceOf(this.signers.sMinter.splitter)).to.equal(
-            this.params.sMinter.allocation.mul(this.data.latestTotalSupply).div(this.constants.sMinter.HUNDRED)
-          );
-        });
-
-        it('it emits a Mint event', async () => {
-          await expect(this.data.tx)
-            .to.emit(this.sMinter.contract, 'Mint')
-            .withArgs(this.sERC20.contract.address, this.signers.sMinter.recipient.address, this.params.sMinter.value, this.data.expectedAmount);
+          it('it reverts', async () => {
+            await expect(this.sMinter.mint({ expected: ethers.utils.parseEther('1000') })).to.be.revertedWith('sMinter: insufficient minting return');
+          });
         });
       });
     });

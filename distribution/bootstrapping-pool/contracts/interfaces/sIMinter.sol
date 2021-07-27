@@ -12,6 +12,7 @@ interface sIMinter {
         address payable    beneficiary;
         uint256            initialPrice;
         uint256            allocation;
+        uint256            protocolFee;
         uint256            fee;
         bool               sERC20IsToken0;
     }
@@ -21,33 +22,54 @@ interface sIMinter {
 
   /* #region core */
     /**
-     * @notice Registers `pit` for `sERC20`.
-     * @param  sERC20 The sERC20 to register the pit for.
-     * @param  pit    The pit to register.
+     * @notice Registers a pit for `sERC20`.
+     * @dev    This function is protected by the REGISTER_ROLE.
+     * @param  sERC20       The sERC20 to register the pit for.
+     * @param  pool         The address of the sERC20's bootstrapping pool [to which LP rewards are transferred].
+     * @param  beneficiary  The address of the pit's beneficiary [to which ETH proceeds are transferred] 
+     * @param  initialPrice The price of the sERC20 before the pool's oracle is functional [expressed in sERC20s / ETH and 18 decimals].
+     * @param  allocation   The allocated percentage of sERC20s [expressed with 18 decimals so that 100% = 1e20 and 1% = 1e18].
+     * @param  fee          The minting fee [deducted from the ETH proceeds and sent as a reward to LPs].
      */
-    function register(address sERC20, Pit calldata pit)                        external;
+    function register(address sERC20, address pool, address payable beneficiary, uint256 initialPrice, uint256 allocation, uint256 fee) external;
     /**
      * @notice Mints sERC20s against sent ETH.
      * @param  sERC20    The sERC20 to mint.
      * @param  expected  The amount of sERC20 tokens expected in return for the ETH sent [reverts otherwise].
      * @param  recipient The recipient of the sERC20 tokens to mint.
      */
-    function mint(address sERC20, uint256 expected, address payable recipient) external payable;
+    function mint(address sERC20, uint256 expected, address payable recipient)                                                          external payable;
     /**
-     * @notice Transfer any ERC20 or ETH send by mistake to this contract to the bank.
+     * @notice Transfers any ERC20 or ETH owned by this contract to the bank.
      * @param  token The address of the ERC20 token to withdraw [address(0) for ETH].
      */
-    function withdraw(address token)                                           external;
+    function withdraw(address token)                                                                                                    external;
   /* #endregion */
 
   /* #region setters */
+    /**
+     * @notice Sets the address of the bank [to which protocol fees are transferred].
+     * @dev    This function is protected by the ADMIN_ROLE.
+     */
     function setBank(address payable bank)       external;
+    /**
+     * @notice Sets the address of the allocation splitter contract [to which sERC20 allocations are transferred].
+     * @dev    This function is protected by the ADMIN_ROLE.
+     */
     function setSplitter(address splitter)       external;
-    function setVault(address vault)             external;
+    /**
+     * @notice Sets the protocol fee [expressed with 18 decimals so that 100% = 1e20 and 1% = 1e18].
+     * @dev    This function is protected by the ADMIN_ROLE.
+     * @param  protocolFee The protocol fee to set.
+     */
     function setProtocolFee(uint256 protocolFee) external;
   /* #endregion*/
 
   /* #region getters */
+    /**
+     * @notice Returns the address of Balancer V2's Vault.
+     */
+    function vault()               external view returns (IVault);
     /**
      * @notice Returns the address of the sMinter's bank.
      */
@@ -56,10 +78,6 @@ interface sIMinter {
      * @notice Returns the address of the allocation splitter contract.
      */
     function splitter()            external view returns (address);
-    /**
-     * @notice Returns the address of Balancer V2's Vault.
-     */
-    function vault()               external view returns (IVault);
     /**
      * @notice Returns the current protocol fee.
      */

@@ -157,6 +157,7 @@ const initialize = async (ctx) => {
     ctx.signers.sMinter.splitter,
     ctx.signers.sMinter.beneficiary,
     ctx.signers.sMinter.recipient,
+    ctx.signers.sMinter.registerer,
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
