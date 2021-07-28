@@ -13,6 +13,8 @@ import "@openzeppelin/contracts/math/SafeMath.sol" as OZMath;
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
+import "hardhat/console.sol";
+
 contract sMinter is Context, AccessControl, sIMinter {
     using Address         for address payable;
     using OZMath.SafeMath for uint256;
@@ -81,7 +83,8 @@ contract sMinter is Context, AccessControl, sIMinter {
         sIERC20(sERC20).mint(recipient, amount);
         // mint allocation tokens
         sIERC20(sERC20).mint(_splitter, _allocation(pit.allocation, amount.add(reward)));
-
+        // poke weights
+        pool.pokeWeights();
         emit Mint(sERC20, recipient, msg.value, amount);
     }
 
@@ -203,9 +206,25 @@ contract sMinter is Context, AccessControl, sIMinter {
         });
 
         try pool.getTimeWeightedAverage(query) returns (uint256[] memory prices) {
-          return sERC20IsToken0 ? (DECIMALS.mul(DECIMALS)).div(prices[0]) : prices[0] ;
+          console.log("Price from contract");
+          console.log(pool.getLatest(IPriceOracle.Variable.PAIR_PRICE));
+          console.log(sERC20IsToken0);
+
+          if(sERC20IsToken0) {
+            console.log("Token0");
+            console.log(prices[0]);
+          }
+          else{
+            console.log("Token1");
+              console.log((DECIMALS.mul(DECIMALS)).div(prices[0]));
+
+          }
+          return sERC20IsToken0 ? prices[0] : (DECIMALS.mul(DECIMALS)).div(prices[0]) ;
         } catch Error(string memory reason) {
+          console.log('error');
           if (keccak256(bytes(reason)) == keccak256(bytes("BAL#313"))) {
+            console.log('initial');
+
             return initialPrice;
           } else {
             revert(reason);

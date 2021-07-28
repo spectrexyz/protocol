@@ -11,7 +11,7 @@ contract sBootstrappingPool is WeightedPool2Tokens {
     using WeightedPoolUserDataHelpers for bytes;
 
     sIERC20 internal _sERC20;
-    uint256 internal _sERC20MinWeight;
+    uint256 internal _sERC20MaxWeight;
     uint256 internal _delta;
     bool    internal _sERC20IsToken0;
 
@@ -59,7 +59,7 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         _poolId = poolId;
         _token0 = token0;
         _token1 = token1;
-        _sERC20MinWeight = sERC20MinWeight;
+        _sERC20MaxWeight = sERC20MaxWeight;
         _delta = sERC20MaxWeight.sub(sERC20MinWeight);
         _sERC20IsToken0 = sERC20IsToken0;
         _sERC20 = sERC20IsToken0 ? sIERC20(address(token0)) : sIERC20(address(token1));
@@ -93,9 +93,10 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         uint256 gamma  = delta * supply;
         require(gamma / delta == supply, "sBootstrappingPool: math overflow");
 
-        uint256 sWeight = _sERC20MinWeight.add(gamma / _sERC20.cap()); // cap is always > 0
+        uint256 sWeight = _sERC20MaxWeight.sub(gamma / _sERC20.cap()); // cap is always > 0
         uint256 eWeight = FixedPoint.ONE.sub(sWeight);
-
+ console.log("sWeight: %s", sWeight);
+            console.log("eWeight: %s", eWeight);
         weights = new uint256[](2);
 
         if (_sERC20IsToken0) {
@@ -103,7 +104,6 @@ contract sBootstrappingPool is WeightedPool2Tokens {
             _normalizedWeight1 = eWeight;
             weights[0] = sWeight;
             weights[1] = eWeight;
-
         } else {
             _normalizedWeight0 = eWeight;
             _normalizedWeight1 = sWeight;
