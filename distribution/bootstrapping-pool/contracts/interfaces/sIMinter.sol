@@ -12,12 +12,15 @@ interface sIMinter {
         address payable    beneficiary;
         uint256            initialPrice;
         uint256            allocation;
-        uint256            protocolFee;
         uint256            fee;
+        uint256            protocolFee;
         bool               sERC20IsToken0;
     }
 
-    event Register(address indexed sERC20, address pool, address beneficiary, uint256 initialPrice, uint256 allocation, uint256 fee);
+    /**
+     * @notice Emitted when an `sERC20`pit is registered.
+     */
+    event Register(address indexed sERC20, address pool, address beneficiary, uint256 initialPrice, uint256 allocation, uint256 fee, uint256 protocolFee);
     event Mint(address indexed sERC20, address indexed recipient, uint256 value, uint256 amount);
 
   /* #region core */

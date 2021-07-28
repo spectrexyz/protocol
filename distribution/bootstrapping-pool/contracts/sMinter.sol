@@ -4,18 +4,14 @@ pragma experimental ABIEncoderV2;
 
 import "./interfaces/sIERC20.sol";
 import "./interfaces/sIMinter.sol";
-import "./sBootstrappingPool.sol";
-
-import "@balancer-labs/v2-vault/contracts/interfaces/IVault.sol";
+import "./sBootstrappingPool.sol"; // pass it as an interface or directly as a BaseWeightPoolTwotokens
 import "@balancer-labs/v2-pool-weighted/contracts/IPriceOracle.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/BaseWeightedPool.sol";
+import "@balancer-labs/v2-vault/contracts/interfaces/IVault.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol" as OZMath;
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol" as OZMath;
-
-
-import "hardhat/console.sol";
 
 contract sMinter is Context, AccessControl, sIMinter {
     using Address         for address payable;
@@ -55,15 +51,20 @@ contract sMinter is Context, AccessControl, sIMinter {
 
     // check if on met un nonReentrant
     function mint(address sERC20, uint256 expected, address payable recipient) external payable override {
-        require(msg.value != 0, "sMinter: minted value must not be null");
-
-        Pit storage        pit            = _pits[sERC20];
+        Pit storage pit                   = _pits[sERC20];
         sBootstrappingPool pool           = pit.pool;
+        bytes32            poolId         = pit.poolId;
         uint256            initialPrice   = pit.initialPrice;
         bool               sERC20IsToken0 = pit.sERC20IsToken0;
 
-        uint256 price       = _price(pool, initialPrice, pit.sERC20IsToken0);
-        uint256 protocolFee = (msg.value.mul(_protocolFee)).div(HUNDRED);
+        require(poolId != bytes32(0), "sMinter: no pit registered for sERC20");
+        require(msg.value  != 0,          "sMinter: minted value must not be null");
+        require(recipient  != address(0), "sMinter: recipient cannot be the zero address");
+
+        
+
+        uint256 price       = _price(pool, initialPrice, sERC20IsToken0);
+        uint256 protocolFee = (msg.value.mul(pit.protocolFee)).div(HUNDRED);
         uint256 fee         = (msg.value.mul(pit.fee)).div(HUNDRED);
         uint256 value       = msg.value.sub(protocolFee).sub(fee);
         uint256 amount      = (value.mul(price)).div(DECIMALS);
@@ -75,20 +76,19 @@ contract sMinter is Context, AccessControl, sIMinter {
         // pay beneficiary
         pit.beneficiary.sendValue(value);
         // pool LP reward
-        uint256 reward = _reward(sERC20, pool, pit.poolId, fee, initialPrice, sERC20IsToken0);
+        uint256 reward = _doReward(sERC20, pool, poolId, fee, initialPrice, sERC20IsToken0);
         // mint recipient tokens
         sIERC20(sERC20).mint(recipient, amount);
         // mint allocation tokens
         sIERC20(sERC20).mint(_splitter, _allocation(pit.allocation, amount.add(reward)));
 
         emit Mint(sERC20, recipient, msg.value, amount);
-        // https://github.com/balancer-labs/balancer-v2-monorepo/blob/df9afcf1bef4926f9b4901ba1ee617f44d4395b3/pkg/pool-utils/contracts/interfaces/IPriceOracle.sol
     }
 
     function register(address sERC20, address pool, address payable beneficiary, uint256 initialPrice, uint256 allocation, uint256 fee) external override {
-        require(hasRole(REGISTER_ROLE, _msgSender()), "sMinter: must have REGISTER_ROLE to register");
-        
         uint256 protocolFee = _protocolFee;
+
+        require(hasRole(REGISTER_ROLE, _msgSender()),        "sMinter: must have REGISTER_ROLE to register");        
         require(_pits[sERC20].poolId == bytes32(0),          "sMinter: pit already registered");
         require(address(pool)        != address(0),          "sMinter: pool cannot be the zero address");
         require(beneficiary          != payable(address(0)), "sMinter: beneficiary cannot be the zero address");
@@ -105,7 +105,7 @@ contract sMinter is Context, AccessControl, sIMinter {
         _pits[sERC20].poolId         = sBootstrappingPool(pool).getPoolId();
         _pits[sERC20].sERC20IsToken0 = sBootstrappingPool(pool).sERC20IsToken0();
 
-        emit Register(sERC20, pool, address(beneficiary), initialPrice, allocation, fee);
+        emit Register(sERC20, pool, address(beneficiary), initialPrice, allocation, fee, protocolFee);
     }
 
     function withdraw(address token) external override {
@@ -163,8 +163,6 @@ contract sMinter is Context, AccessControl, sIMinter {
         IAsset[]  memory assets  = new IAsset[](2);
         uint256[] memory amounts = new uint256[](2);
 
-        BaseWeightedPool.JoinKind kind = pool.totalSupply() > 0 ? BaseWeightedPool.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT : BaseWeightedPool.JoinKind.INIT;
-
         if (sERC20IsToken0) {
             assets[0]  = IAsset(sERC20);
             assets[1]  = IAsset(address(0));
@@ -177,24 +175,35 @@ contract sMinter is Context, AccessControl, sIMinter {
             amounts[1] = amount;
         }
 
-        return IVault.JoinPoolRequest({
-            assets: assets,
-            maxAmountsIn: amounts,
-            userData: abi.encode(kind, amounts), // il faut checker le totalSupply de Pool pour savoir si on fait INIT ou EXACT_TOKENS_IN_FOR_BPT_OUT
-            fromInternalBalance: false
-        });
+        return pool.totalSupply() > 0 ?
+            IVault.JoinPoolRequest({
+                assets:              assets,
+                maxAmountsIn:        amounts,
+                userData:            abi.encode(uint256(3), amounts),
+                fromInternalBalance: false
+            }) :
+            IVault.JoinPoolRequest({
+                assets:              assets,
+                maxAmountsIn:        amounts,
+                userData:            abi.encode(BaseWeightedPool.JoinKind.INIT, amounts),
+                fromInternalBalance: false
+            });
     }
 
+    /**
+     * @dev - This function always returns the price in sERC20 per ETH [see PriceOracle.sol for details].
+     *      - This function do not care about decimals as both ETH and sERC20s have 18 decimals.
+     */
     function _price(sBootstrappingPool pool, uint256 initialPrice, bool sERC20IsToken0) private view returns (uint256) {
         IPriceOracle.OracleAverageQuery[] memory query = new IPriceOracle.OracleAverageQuery[](1);
         query[0] = IPriceOracle.OracleAverageQuery({
             variable: IPriceOracle.Variable.PAIR_PRICE,
-            secs: 1 days,
-            ago: 0
+            secs:     1 days,
+            ago:      0
         });
 
         try pool.getTimeWeightedAverage(query) returns (uint256[] memory prices) {
-          return sERC20IsToken0 ? prices[0] : (DECIMALS.mul(DECIMALS)).div(prices[0]); // return in sERC20 per ETH;
+          return sERC20IsToken0 ? (DECIMALS.mul(DECIMALS)).div(prices[0]) : prices[0] ;
         } catch Error(string memory reason) {
           if (keccak256(bytes(reason)) == keccak256(bytes("BAL#313"))) {
             return initialPrice;
@@ -202,11 +211,13 @@ contract sMinter is Context, AccessControl, sIMinter {
             revert(reason);
           }
         } catch {
-            revert("sMinter: pool oracle reverted");
+            revert("sMinter: pool's oracle reverted");
         }
     }
 
-    // always return sERC20 balance as first balance
+    /**
+     * @dev This function return sERC20's balance as first balance in the array.
+     */ 
     function _balances(bytes32 poolId, bool sERC20IsToken0) private view returns (uint256[2] memory) {
         (, uint256[] memory balances, ) = _vault.getPoolTokens(poolId);
 
@@ -216,14 +227,16 @@ contract sMinter is Context, AccessControl, sIMinter {
             return [balances[1], balances[0]];
     }
 
-    function _reward(address sERC20, sBootstrappingPool pool, bytes32 poolId, uint256 value, uint256 initialPrice, bool sERC20IsToken0) private returns (uint256) {
+    function _allocation(uint256 allocation, uint256 amount) private pure returns (uint256) {
+        return (allocation.mul(amount)).div(HUNDRED.sub(allocation));
+    }
+
+    function _doReward(address sERC20, sBootstrappingPool pool, bytes32 poolId, uint256 value, uint256 initialPrice, bool sERC20IsToken0) private returns (uint256) {
+        uint256           reward;
         uint256[2] memory balances = _balances(poolId, sERC20IsToken0);
-        uint256 reward;
 
         if (balances[1] == 0) {
           uint256[] memory weights = pool.getNormalizedWeights();
-          console.log("sWeight: %s", sERC20IsToken0 ? weights[0] : weights[1]);
-          console.log("eWeight: %s", sERC20IsToken0 ? weights[1] : weights[0]);
           if (sERC20IsToken0) 
             reward = value * initialPrice * weights[0] / (DECIMALS * weights[1]);
           else
@@ -237,9 +250,5 @@ contract sMinter is Context, AccessControl, sIMinter {
         _vault.joinPool{value: value}(poolId, address(this), _bank, _request(sERC20, pool, reward, value, sERC20IsToken0));
 
         return reward;
-    }
-
-    function _allocation(uint256 allocation, uint256 amount) private pure returns (uint256) {
-        return (allocation.mul(amount)).div(HUNDRED.sub(allocation));
     }
 }

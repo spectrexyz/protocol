@@ -54,8 +54,8 @@ const initialize = async (ctx) => {
       shares: [ethers.BigNumber.from('300000000000000000'), ethers.BigNumber.from('100000000000000000'), ethers.BigNumber.from('600000000000000000')],
     },
     sMinter: {
-      protocolFee: ethers.BigNumber.from('20000000000000000'), // 2e16 = 2%
-      fee: ethers.BigNumber.from('50000000000000000'), // 5%
+      protocolFee: ethers.BigNumber.from('2000000000000000000'), // 2e18 = 2%
+      fee: ethers.BigNumber.from('5000000000000000000'), // 5%
       initialPrice: ethers.utils.parseEther('2'), // 2 sERC20 / ETH
       allocation: ethers.utils.parseEther('1').mul(ethers.BigNumber.from('10')), // 10%
       value: ethers.utils.parseEther('3'), // 3 ETH
