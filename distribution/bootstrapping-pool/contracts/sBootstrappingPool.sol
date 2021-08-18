@@ -18,17 +18,17 @@ contract sBootstrappingPool is WeightedPool2Tokens {
     uint256 internal constant JOIN_REWARD = 3;
 
     constructor(
-        IVault vault,
-        string memory name,
-        string memory symbol,
-        IERC20 token0,
-        IERC20 token1,
-        uint256 sERC20MinWeight,
+        IVault  vault,
+        string  memory name,
+        string  memory symbol,
+        IERC20  token0,
+        IERC20  token1,
         uint256 sERC20MaxWeight,
+        uint256 sERC20MinWeight,
         uint256 swapFeePercentage,
         uint256 pauseWindowDuration,
         uint256 bufferPeriodDuration,
-        bool sERC20IsToken0
+        bool    sERC20IsToken0
     )
         Authentication(bytes32(uint256(msg.sender)))
         BalancerPoolToken(name, symbol)
@@ -51,8 +51,8 @@ contract sBootstrappingPool is WeightedPool2Tokens {
 
         // pass in zero addresses for asset managers
         IERC20[] memory tokens = new IERC20[](2);
-        tokens[0] = token0;
-        tokens[1] = token1;
+        tokens[0]              = token0;
+        tokens[1]              = token1;
         vault.registerTokens(poolId, tokens, new address[](2));
 
         _vault = vault;

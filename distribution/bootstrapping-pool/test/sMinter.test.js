@@ -428,6 +428,9 @@ describe.only('sMinter', () => {
 
               await advanceTime(86400);
               await this.sMinter.mint();
+              await advanceTime(86400);
+              console.log('last');
+              await this.sMinter.mint();
 
               this.data.latestSBalance = this.sBootstrappingPool.sERC20IsToken0
                 ? (await this.contracts.Vault.getPoolTokens(this.data.poolId)).balances[0]
@@ -443,25 +446,28 @@ describe.only('sMinter', () => {
               this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.sMinter.recipient);
               this.data.latestSplitterBalance = await this.sERC20.balanceOf(this.signers.sMinter.splitter);
               this.data.latestPairPrice = this.sBootstrappingPool.sERC20IsToken0
-                ? await this.sBootstrappingPool.pairPrice()
-                : this.constants.sMinter.DECIMALS.mul(this.constants.sMinter.DECIMALS).div(await this.sBootstrappingPool.pairPrice());
+                ? await this.sBootstrappingPool.getTimeWeightedAverage([{ variable: 0, secs: 86400, ago: 0 }])
+                : this.constants.sMinter.DECIMALS.mul(this.constants.sMinter.DECIMALS).div(
+                    await this.sBootstrappingPool.getTimeWeightedAverage([{ variable: 0, secs: 86400, ago: 0 }])
+                  );
 
               this.data.expectedProtocolFee = this.params.sMinter.value.mul(this.params.sMinter.protocolFee).div(this.constants.sMinter.HUNDRED);
               this.data.expectedFee = this.params.sMinter.value.mul(this.params.sMinter.fee).div(this.constants.sMinter.HUNDRED);
               this.data.expectedReward = this.data.expectedFee
-                .mul(this.params.sMinter.initialPrice)
-                .mul(this.params.sBootstrappingPool.normalizedStartWeight)
-                .div(this.constants.sBootstrappingPool.ONE.sub(this.params.sBootstrappingPool.normalizedStartWeight))
+                .mul(this.params.sMinter.latestPairPrice)
+                .mul(this.params.sBootstrappingPool.sERC20MaxWeight)
+                .div(this.constants.sBootstrappingPool.ONE.sub(this.params.sBootstrappingPool.sERC20MaxWeight))
                 .div(this.constants.sMinter.DECIMALS);
               this.data.expectedBeneficiaryPay = this.params.sMinter.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
               this.data.expectedAmount = this.params.sMinter.value
                 .sub(this.data.expectedProtocolFee)
                 .sub(this.data.expectedFee)
-                .mul(this.params.sMinter.initialPrice)
+                .mul(this.params.sMinter.latestPairPrice)
                 .div(this.constants.sMinter.DECIMALS);
             });
 
             it("it updates pool's balance", async () => {
+              console.log('Expected reward: ' + this.data.expectedReward.toString());
               expect(this.data.latestSBalance.sub(this.data.previousSBalance)).to.equal(this.data.expectedReward);
               expect(this.data.latestEBalance.sub(this.data.previousEBalance)).to.equal(this.data.expectedFee);
             });

@@ -1,9 +1,9 @@
-const _sERC20Splitter_ = require('@spectrexyz/protocol-infrastructure/artifacts/contracts/sERC20Splitter.sol/sERC20Splitter.json');
+const _sSplitter_ = require('@spectrexyz/protocol-infrastructure/artifacts/contracts/sSplitter.sol/sSplitter.json');
 
-class sERC20Splitter {
+class sSplitter {
   constructor(ctx) {
     this.ctx = ctx;
-    this.contract = ctx.contracts.sERC20Splitter;
+    this.contract = ctx.contracts.sSplitter;
     this.hasRole = this.contract.hasRole;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.DEFAULT_ADMIN_ROLE = this.contract.DEFAULT_ADMIN_ROLE;
@@ -14,17 +14,15 @@ class sERC20Splitter {
   }
 
   static async deploy(ctx) {
-    ctx.contracts.sERC20Splitter = await waffle.deployContract(ctx.signers.sERC20Splitter.admin, _sERC20Splitter_, [
-      ctx.signers.sERC20Splitter.registrar.address,
-    ]);
+    ctx.contracts.sSplitter = await waffle.deployContract(ctx.signers.sSplitter.admin, _sSplitter_, [ctx.signers.sSplitter.registrar.address]);
 
-    ctx.sERC20Splitter = new sERC20Splitter(ctx);
+    ctx.sSplitter = new sSplitter(ctx);
   }
 
   async register(opts = {}) {
-    opts.from ??= this.ctx.signers.sERC20Splitter.registrar;
-    opts.beneficiaries ??= this.ctx.signers.sERC20Splitter.beneficiaries;
-    opts.shares ??= this.ctx.params.sERC20Splitter.shares;
+    opts.from ??= this.ctx.signers.sSplitter.registrar;
+    opts.beneficiaries ??= this.ctx.signers.sSplitter.beneficiaries;
+    opts.shares ??= this.ctx.params.sSplitter.shares;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).register(
       this.ctx.sERC20.contract.address,
@@ -35,18 +33,18 @@ class sERC20Splitter {
   }
 
   async withdraw(opts = {}) {
-    opts.from ??= this.ctx.signers.sERC20Splitter.beneficiaries[0];
+    opts.from ??= this.ctx.signers.sSplitter.beneficiaries[0];
 
     this.ctx.data.tx = await this.contract.withdraw(this.ctx.sERC20.contract.address, opts.from.address);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async withdrawBatch(opts = {}) {
-    opts.from ??= this.ctx.signers.sERC20Splitter.beneficiaries[0];
+    opts.from ??= this.ctx.signers.sSplitter.beneficiaries[0];
 
     this.ctx.data.tx = await this.contract.withdrawBatch([this.ctx.data.sERC201.address, this.ctx.data.sERC202.address], opts.from.address);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }
 
-module.exports = sERC20Splitter;
+module.exports = sSplitter;

@@ -16,6 +16,8 @@
   "workspaces": [
     "core",
     "infrastructure",
+    "templates",
+    "buyout/*",
     "distribution/*",
     "pvt/*"
   ]

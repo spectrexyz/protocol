@@ -28,6 +28,7 @@ class sBootstrappingPool {
     this.getOwner = this.contract.getOwner;
     this.getAuthorizer = this.contract.getAuthorizer;
     this.getSwapFeePercentage = this.contract.getSwapFeePercentage;
+    this.getTimeWeightedAverage = this.contract.getTimeWeightedAverage;
   }
 
   static async deploy(ctx, opts) {
@@ -59,7 +60,7 @@ class sBootstrappingPool {
         opts.startWeight = 0;
       }
     } else {
-      opts.startWeight = ctx.params.sBootstrappingPool.normalizedStartWeight;
+      opts.maxWeight = ctx.params.sBootstrappingPool.sERC20MaxWeight;
     }
 
     if (opts.invalidEndWeight) {
@@ -69,7 +70,7 @@ class sBootstrappingPool {
         opts.endWeight = 0;
       }
     } else {
-      opts.endWeight = ctx.params.sBootstrappingPool.normalizedEndWeight;
+      opts.minWeight = ctx.params.sBootstrappingPool.sERC20MinWeight;
     }
 
     if (opts.invalidSwapFee) {
@@ -88,8 +89,8 @@ class sBootstrappingPool {
       ctx.params.sBootstrappingPool.symbol,
       token0,
       token1,
-      opts.startWeight,
-      opts.endWeight,
+      opts.maxWeight,
+      opts.minWeight,
       opts.swapFeePercentage,
       ctx.params.sBootstrappingPool.pauseWindowDuration,
       ctx.params.sBootstrappingPool.bufferPeriodDuration,

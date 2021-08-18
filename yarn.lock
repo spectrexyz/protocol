@@ -1031,6 +1031,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@spectrexyz/protocol-buyout-flash@^1.0.0, @spectrexyz/protocol-buyout-flash@workspace:buyout/flash":
+  version: 0.0.0-use.local
+  resolution: "@spectrexyz/protocol-buyout-flash@workspace:buyout/flash"
+  dependencies:
+    "@openzeppelin/contracts": ^4.0.0
+    "@openzeppelin/contracts-upgradeable": ^4.0.0
+    "@spectrexyz/protocol-commons": ^1.0.0
+    "@spectrexyz/protocol-core": ^1.0.0
+    "@spectrexyz/protocol-helpers": ^1.0.0
+    hardhat: ^2.5.0
+  languageName: unknown
+  linkType: soft
+
 "@spectrexyz/protocol-commons@^1.0.0, @spectrexyz/protocol-commons@workspace:pvt/commons":
   version: 0.0.0-use.local
   resolution: "@spectrexyz/protocol-commons@workspace:pvt/commons"
@@ -1078,6 +1091,20 @@ __metadata:
     "@spectrexyz/protocol-commons": ^1.0.0
     "@spectrexyz/protocol-core": ^1.0.0
     "@spectrexyz/protocol-helpers": ^1.0.0
+  languageName: unknown
+  linkType: soft
+
+"@spectrexyz/protocol-templates@workspace:templates":
+  version: 0.0.0-use.local
+  resolution: "@spectrexyz/protocol-templates@workspace:templates"
+  dependencies:
+    "@openzeppelin/contracts": ^4.0.0
+    "@spectrexyz/protocol-bootstrapping-pool": ^1.0.0
+    "@spectrexyz/protocol-buyout-flash": ^1.0.0
+    "@spectrexyz/protocol-commons": ^1.0.0
+    "@spectrexyz/protocol-core": ^1.0.0
+    "@spectrexyz/protocol-helpers": ^1.0.0
+    "@spectrexyz/protocol-infrastructure": ^1.0.0
   languageName: unknown
   linkType: soft
 

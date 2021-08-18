@@ -12,7 +12,7 @@ const RECEIVER_BATCH_MAGIC_VALUE = '0xbc197c81';
 const sERC721 = require('./models/sERC721');
 const sERC1155 = require('./models/sERC1155');
 const sBootstrappingPool = require('./models/sBootstrappingPool');
-const sERC20Splitter = require('./models/sERC20Splitter');
+const sSplitter = require('./models/sSplitter');
 const sMinter = require('./models/sMinter');
 
 const initialize = async (ctx) => {
@@ -44,13 +44,15 @@ const initialize = async (ctx) => {
       },
       name: 'My SBP Token',
       symbol: '$SBP',
-      normalizedStartWeight: ethers.BigNumber.from('300000000000000000'),
-      normalizedEndWeight: ethers.BigNumber.from('600000000000000000'),
+      // normalizedStartWeight: ethers.BigNumber.from('300000000000000000'),
+      // normalizedEndWeight: ethers.BigNumber.from('600000000000000000'),
+      sERC20MaxWeight: ethers.BigNumber.from('600000000000000000'),
+      sERC20MinWeight: ethers.BigNumber.from('300000000000000000'),
       swapFeePercentage: ethers.BigNumber.from('10000000000000000'),
       pauseWindowDuration: ethers.BigNumber.from('3000'),
       bufferPeriodDuration: ethers.BigNumber.from('1000'),
     },
-    sERC20Splitter: {
+    sSplitter: {
       shares: [ethers.BigNumber.from('300000000000000000'), ethers.BigNumber.from('100000000000000000'), ethers.BigNumber.from('600000000000000000')],
     },
     sMinter: {
@@ -118,7 +120,7 @@ const initialize = async (ctx) => {
     sERC20: {},
     sERC721: { owners: [] },
     sERC1155: {},
-    sERC20Splitter: { beneficiaries: [] },
+    sSplitter: { beneficiaries: [] },
     sMinter: {},
     holders: [],
     owners: [],
@@ -147,11 +149,11 @@ const initialize = async (ctx) => {
     ctx.signers.sERC20.snapshoter,
     ctx.signers.sERC721.owners[0],
     ctx.signers.sERC721.owners[1],
-    ctx.signers.sERC20Splitter.admin,
-    ctx.signers.sERC20Splitter.registrar,
-    ctx.signers.sERC20Splitter.beneficiaries[0],
-    ctx.signers.sERC20Splitter.beneficiaries[1],
-    ctx.signers.sERC20Splitter.beneficiaries[2],
+    ctx.signers.sSplitter.admin,
+    ctx.signers.sSplitter.registrar,
+    ctx.signers.sSplitter.beneficiaries[0],
+    ctx.signers.sSplitter.beneficiaries[1],
+    ctx.signers.sSplitter.beneficiaries[2],
     ctx.signers.sMinter.admin,
     ctx.signers.sMinter.bank,
     ctx.signers.sMinter.splitter,
@@ -208,7 +210,7 @@ const setup = async (ctx, opts = {}) => {
   await sERC721.deploy(ctx);
   await sERC1155.deploy(ctx);
   await ctx.sERC721.mint(opts);
-  await sERC20Splitter.deploy(ctx);
+  await sSplitter.deploy(ctx);
 
   if (opts.spectralize) {
     await ctx.sERC1155.spectralize();
