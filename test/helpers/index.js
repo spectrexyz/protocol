@@ -54,6 +54,7 @@ const initialize = async (ctx) => {
       bufferPeriodDuration: ethers.BigNumber.from("1000"),
     },
     broker: {
+      minimum: ethers.utils.parseEther("2.5"),
       multiplier: ethers.utils.parseEther("1.5"),
       timelock: ethers.BigNumber.from("1209600"), // two weeks
     },

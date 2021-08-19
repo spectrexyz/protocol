@@ -30,6 +30,7 @@ contract FlashBroker is Context, IFlashBroker {
 
     function register(
         address sERC20,
+        uint256 minimum,
         address pool,
         uint256 multiplier,
         uint256 timelock,
@@ -42,9 +43,10 @@ contract FlashBroker is Context, IFlashBroker {
         require(timelock >= MINIMUM_TIMELOCK, "FlashBroker: invalid timelock");
 
         sale._state = Sales.State.Pending;
+        sale.minimum = minimum;
         sale.pool = pool;
         sale.multiplier = multiplier;
-        sale.start = block.timestamp + timelock;
+        sale.opening = block.timestamp + timelock;
         sale.flash = flash;
     }
 
@@ -89,10 +91,10 @@ contract FlashBroker is Context, IFlashBroker {
         view
         returns (
             Sales.State state,
+            uint256 minimum,
             address pool,
             uint256 multiplier,
-            uint256 start,
-            uint256 minimum,
+            uint256 opening,
             uint256 price,
             uint256 nbOfProposals,
             bool flash
@@ -101,10 +103,10 @@ contract FlashBroker is Context, IFlashBroker {
         Sales.Sale storage sale = _sales[sERC20];
 
         state = sale.state();
+        minimum = sale.minimum;
         pool = sale.pool;
         multiplier = sale.multiplier;
-        start = sale.start;
-        minimum = sale.minimumTokenPrice;
+        opening = sale.opening;
         price = sale.price;
         nbOfProposals = sale.nbOfProposals;
         flash = sale.flash;
@@ -132,7 +134,7 @@ contract FlashBroker is Context, IFlashBroker {
         uint256 remaining = supply - balance;
         uint256 price = _price(pool);
         uint256 value = price * remaining * multiplier;
-        uint256 minimum = _sales[address(sERC20)].minimumTokenPrice * sERC20.cap() * multiplier;
+        uint256 minimum = _sales[address(sERC20)].minimum * sERC20.cap() * multiplier;
 
         if (minimum > value) return minimum;
         else return value;

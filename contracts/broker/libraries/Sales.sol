@@ -15,11 +15,11 @@ library Sales {
 
     struct Sale {
         State _state;
+        uint256 minimum;
         address pool;
         uint256 multiplier;
-        uint256 start;
-        uint256 minimumTokenPrice; // in ETH per sERC20
-        uint256 price; // in ETH per SERC20
+        uint256 opening;
+        uint256 price; // in ETH per sERC20 once the NFT has been bought out
         uint256 nbOfProposals;
         mapping(uint256 => Proposals.Proposal) proposals;
         bool flash;
@@ -70,7 +70,7 @@ library Sales {
     function state(Sale storage sale) internal view returns (State) {
         State _state = sale._state;
 
-        if (_state == State.Pending && block.timestamp >= sale.start) {
+        if (_state == State.Pending && block.timestamp >= sale.opening) {
             return State.Opened;
         } else {
             return _state;
