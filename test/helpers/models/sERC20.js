@@ -197,6 +197,10 @@ class sERC20 {
       account: this.ctx.signers.sERC20.minter,
     });
     await this.grantRole({
+      role: this.ctx.constants.sERC20.BURN_ROLE,
+      account: this.ctx.signers.sERC20.burner,
+    });
+    await this.grantRole({
       role: this.ctx.constants.sERC20.PAUSE_ROLE,
       account: this.ctx.signers.sERC20.pauser,
     });

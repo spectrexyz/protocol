@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "../core/sIERC20.sol";
+import "../core/interfaces/sIERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
@@ -13,20 +13,19 @@ contract sSplitter is Context, AccessControlEnumerable {
     struct Split {
         address sERC20; // more efficient than bool to check if a split has been registered
         uint256 totalWithdrawn;
-        mapping (address => uint256) shares;
-        mapping (address => uint256) withdrawn;
+        mapping(address => uint256) shares;
+        mapping(address => uint256) withdrawn;
     }
 
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
-    uint256 public constant PCT_BASE       = 1 ether; // 0% = 0 | 100% = 10^18 | 10% = 10^17
+    uint256 public constant PCT_BASE = 1 ether; // 0% = 0 | 100% = 10^18 | 10% = 10^17
 
-    mapping (address => Split) _splits;
+    mapping(address => Split) _splits;
 
     event Register(address indexed sERC20, address[] beneficiaries, uint256[] shares);
     event Withdraw(address indexed sERC20, address indexed beneficiary, uint256 amount);
 
-
-    constructor(address registrar) { 
+    constructor(address registrar) {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(REGISTRAR_ROLE, registrar);
     }
@@ -40,13 +39,17 @@ contract sSplitter is Context, AccessControlEnumerable {
      * @param beneficiaries The addresses to split the received sERC20s between when received.
      * @param shares The respective shares of the beneficiaries over the received sERC20s [expressed in PCT_BASE].
      */
-    function register(address sERC20, address[] calldata beneficiaries, uint256[] calldata shares) external {
+    function register(
+        address sERC20,
+        address[] calldata beneficiaries,
+        uint256[] calldata shares
+    ) external {
         Split storage split = _splits[sERC20];
 
         require(hasRole(REGISTRAR_ROLE, _msgSender()), "SERC20Splitter: must have register role to register");
         require(split.sERC20 == address(0), "SERC20Splitter: sERC20 split already registered");
         require(beneficiaries.length == shares.length, "SERC20Splitter: beneficiaries and shares length mismatch");
-        
+
         split.sERC20 = sERC20;
         address beneficiary;
         uint256 share;
@@ -77,14 +80,13 @@ contract sSplitter is Context, AccessControlEnumerable {
      */
     function withdraw(address sERC20, address beneficiary) external {
         Split storage split = _splits[sERC20];
-        
+
         require(split.sERC20 != address(0), "SERC20Splitter: unsplit sERC20");
-        
-        uint256 due =
-            (sIERC20(sERC20).balanceOf(address(this)) + split.totalWithdrawn) * split.shares[beneficiary] / PCT_BASE;
+
+        uint256 due = ((sIERC20(sERC20).balanceOf(address(this)) + split.totalWithdrawn) * split.shares[beneficiary]) / PCT_BASE;
         uint256 withdrawn = split.withdrawn[beneficiary];
         require(due > withdrawn, "SERC20Splitter: nothing to withdraw");
-        
+
         uint256 amount = due - withdrawn;
         split.withdrawn[beneficiary] += amount;
         split.totalWithdrawn += amount;
@@ -113,14 +115,13 @@ contract sSplitter is Context, AccessControlEnumerable {
             sERC20 = sERC20s[i];
 
             Split storage split = _splits[sERC20];
-            
+
             require(split.sERC20 != address(0), "SERC20Splitter: unsplit sERC20");
-            
-            due =
-                (sIERC20(sERC20).balanceOf(address(this)) + split.totalWithdrawn) * split.shares[beneficiary] / PCT_BASE;
+
+            due = ((sIERC20(sERC20).balanceOf(address(this)) + split.totalWithdrawn) * split.shares[beneficiary]) / PCT_BASE;
             withdrawn = split.withdrawn[beneficiary];
             require(due > withdrawn, "SERC20Splitter: nothing to withdraw");
-            
+
             uint256 amount = due - withdrawn;
             split.withdrawn[beneficiary] += amount;
             split.totalWithdrawn += amount;
@@ -129,7 +130,6 @@ contract sSplitter is Context, AccessControlEnumerable {
 
             emit Withdraw(sERC20, beneficiary, amount);
         }
-
     }
 
     function isRegistered(address sERC20) external view returns (bool) {
@@ -139,7 +139,7 @@ contract sSplitter is Context, AccessControlEnumerable {
     function splitOf(address sERC20) external view returns (uint256 received, uint256 totalWithdrawn) {
         Split storage split = _splits[sERC20];
 
-        received       = sIERC20(sERC20).balanceOf(address(this)) + split.totalWithdrawn;
+        received = sIERC20(sERC20).balanceOf(address(this)) + split.totalWithdrawn;
         totalWithdrawn = split.totalWithdrawn;
     }
 

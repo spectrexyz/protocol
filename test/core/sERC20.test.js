@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { initialize, setup } = require("../helpers");
 const { sERC20 } = require("../helpers/models");
 
-describe.only("sERC20", () => {
+describe("sERC20", () => {
   before(async () => {
     await initialize(this);
   });

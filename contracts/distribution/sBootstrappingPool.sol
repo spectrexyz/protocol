@@ -13,22 +13,22 @@ contract sBootstrappingPool is WeightedPool2Tokens {
     sIERC20 internal _sERC20;
     uint256 internal _sERC20MaxWeight;
     uint256 internal _delta;
-    bool    internal _sERC20IsToken0;
+    bool internal _sERC20IsToken0;
 
     uint256 internal constant JOIN_REWARD = 3;
 
     constructor(
-        IVault  vault,
-        string  memory name,
-        string  memory symbol,
-        IERC20  token0,
-        IERC20  token1,
+        IVault vault,
+        string memory name,
+        string memory symbol,
+        IERC20 token0,
+        IERC20 token1,
         uint256 sERC20MaxWeight,
         uint256 sERC20MinWeight,
         uint256 swapFeePercentage,
         uint256 pauseWindowDuration,
         uint256 bufferPeriodDuration,
-        bool    sERC20IsToken0
+        bool sERC20IsToken0
     )
         Authentication(bytes32(uint256(msg.sender)))
         BalancerPoolToken(name, symbol)
@@ -36,7 +36,6 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         TemporarilyPausable(pauseWindowDuration, bufferPeriodDuration)
         WeightedPool2Tokens()
     {
-
         // IL FAUT INVERSER L'ORDRE DES POIDS !!!
         // sERC20 COMMENCE AVEC UN GRAND POIDS ET FINIT AVEC UN PETIT !
         _require(sERC20MinWeight >= _MIN_WEIGHT && sERC20MinWeight <= FixedPoint.ONE.sub(_MIN_WEIGHT), Errors.MIN_WEIGHT);
@@ -51,8 +50,8 @@ contract sBootstrappingPool is WeightedPool2Tokens {
 
         // pass in zero addresses for asset managers
         IERC20[] memory tokens = new IERC20[](2);
-        tokens[0]              = token0;
-        tokens[1]              = token1;
+        tokens[0] = token0;
+        tokens[1] = token1;
         vault.registerTokens(poolId, tokens, new address[](2));
 
         _vault = vault;
@@ -87,16 +86,16 @@ contract sBootstrappingPool is WeightedPool2Tokens {
         }
     }
 
-    function _updateWeights() private returns (uint256[] memory weights){
+    function _updateWeights() private returns (uint256[] memory weights) {
         uint256 supply = _sERC20.totalSupply();
         uint256 delta = _delta;
-        uint256 gamma  = delta * supply;
+        uint256 gamma = delta * supply;
         require(gamma / delta == supply, "sBootstrappingPool: math overflow");
 
         uint256 sWeight = _sERC20MaxWeight.sub(gamma / _sERC20.cap()); // cap is always > 0
         uint256 eWeight = FixedPoint.ONE.sub(sWeight);
- console.log("sWeight: %s", sWeight);
-            console.log("eWeight: %s", eWeight);
+        console.log("sWeight: %s", sWeight);
+        console.log("eWeight: %s", eWeight);
         weights = new uint256[](2);
 
         if (_sERC20IsToken0) {
@@ -121,7 +120,6 @@ contract sBootstrappingPool is WeightedPool2Tokens {
     function sERC20IsToken0() external view returns (bool) {
         return _sERC20IsToken0;
     }
-
 
     function maxWeightTokenIndex() external view returns (uint256) {
         return _maxWeightTokenIndex;

@@ -12,36 +12,45 @@ interface sIERC1155 is IERC1155, IERC1155MetadataURI, IERC721Receiver {
         Locked,
         Unlocked
     }
-    
+
     struct Spectre {
         SpectreState state;
-        address      collection;
-        uint256      tokenId;
-        address      guardian;
+        address collection;
+        uint256 tokenId;
+        address guardian;
     }
 
     function spectralize(
-        address        collection,
-        uint256        tokenId,
-        string  memory name,
-        string  memory symbol,
-        uint256        cap,
-        address        admin,
-        address        guardian
-    )
-        external
-        returns (uint256 id);
+        address collection,
+        uint256 tokenId,
+        string memory name,
+        string memory symbol,
+        uint256 cap,
+        address admin,
+        address guardian
+    ) external returns (uint256 id);
 
+    function unlock(
+        uint256 id,
+        address recipient,
+        bytes calldata data
+    ) external;
 
-    function unlock(uint256 id, address recipient, bytes calldata data) external;
-
-    function unlock(address sERC20, address recipient, bytes calldata data) external;
+    function unlock(
+        address sERC20,
+        address recipient,
+        bytes calldata data
+    ) external;
 
     function updateUnavailableURI(string memory unavailableURI_) external;
 
     function updateUnlockedURI(string memory unlockedURI_) external;
 
-    function onSERC20Transferred(address from, address to, uint256 amount) external;
+    function onSERC20Transferred(
+        address from,
+        address to,
+        uint256 amount
+    ) external;
 
     function sERC20Base() external view returns (address);
 

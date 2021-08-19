@@ -1,13 +1,13 @@
-require('@nomiclabs/hardhat-solhint');
-require('@nomiclabs/hardhat-waffle');
-require('hardhat-gas-reporter');
-require('solidity-coverage');
+require("@nomiclabs/hardhat-solhint");
+require("@nomiclabs/hardhat-waffle");
+require("hardhat-gas-reporter");
+require("solidity-coverage");
 
 module.exports = {
   solidity: {
     compilers: [
       {
-        version: '0.8.1',
+        version: "0.8.1",
         settings: {
           optimizer: {
             enabled: true,
@@ -16,11 +16,11 @@ module.exports = {
         },
       },
       {
-        version: '0.7.1',
+        version: "0.7.1",
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 1,
           },
         },
       },

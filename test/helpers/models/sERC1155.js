@@ -137,7 +137,8 @@ class sERC1155 {
 
     this.ctx.sERC20 = await sERC20.at(
       this.ctx,
-      await this.contract.sERC20Of(this.ctx.data.id)
+      await this.contract.sERC20Of(this.ctx.data.id),
+      opts
     );
   }
 

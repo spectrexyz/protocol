@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.7.0;
 
-import "../buyout/interfaces/0.7/sIFlashBuyout.sol";
+import "../broker/interfaces/0.7/IFlashBroker.sol";
 import "../core/interfaces/0.7/sIERC20.sol";
 import "../core/interfaces/0.7/sIERC1155.sol";
 import "../distribution/sBootstrappingPool.sol";
@@ -14,12 +14,12 @@ import "@openzeppelin/contracts-0.7/utils/Context.sol";
  * @title  sSplitter
  * @notice Split sERC20s between registered beneficiaries when received.
  */
-contract sTemplate is Context, AccessControl {
+contract Template is Context, AccessControl {
     bytes32 private constant BURN_ROLE = keccak256("BURN_ROLE");
     bytes32 private constant MINT_ROLE = keccak256("MINT_ROLE");
 
     sIERC1155 private immutable _sERC1155;
-    sIFlashBuyout private immutable _broker;
+    IFlashBroker private immutable _broker;
     sIMinter private immutable _minter;
     sISplitter private immutable _splitter;
     IVault private immutable _vault;
@@ -35,7 +35,7 @@ contract sTemplate is Context, AccessControl {
     ) {
         _sERC1155 = sIERC1155(sERC1155);
         _minter = sIMinter(minter);
-        _broker = sIFlashBuyout(broker);
+        _broker = IFlashBroker(broker);
         _weth = IERC20(weth);
         _splitter = sISplitter(splitter);
         _vault = IVault(vault);
@@ -88,12 +88,28 @@ contract sTemplate is Context, AccessControl {
         _minter.register(sERC20, address(pool), beneficiary, initialPrice, shares[0], fee);
     }
 
-    function _spectralize(        address collection,
+    //     sIERC1155 private immutable _sERC1155;
+    // IFlashBroker private immutable _broker;
+    // sIMinter private immutable _minter;
+    // sISplitter private immutable _splitter;
+    // IVault private immutable _vault;
+    // IERC20 private immutable _weth;
+
+    /* #region getter functions */
+    function sERC1155() public view returns (address) {
+        return address(_sERC1155);
+    }
+
+    /* #endregion */
+
+    function _spectralize(
+        address collection,
         uint256 tokenId,
         string memory name,
         string memory symbol,
-        uint256 cap) private returns (address) {
-            uint256 id = _sERC1155.spectralize(collection, tokenId, name, symbol, cap, address(this), address(_broker));
+        uint256 cap
+    ) private returns (address) {
+        uint256 id = _sERC1155.spectralize(collection, tokenId, name, symbol, cap, address(this), address(_broker));
         return _sERC1155.sERC20Of(id);
     }
 }

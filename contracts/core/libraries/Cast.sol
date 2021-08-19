@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "../sIERC20.sol";
+import "../interfaces/sIERC20.sol";
 
 /**
  * @title  Cast
@@ -23,7 +23,7 @@ library Cast {
 
     function toString(bytes32 _bytes32) internal pure returns (string memory) {
         uint8 i = 0;
-        while(i < 32 && _bytes32[i] != 0) {
+        while (i < 32 && _bytes32[i] != 0) {
             i++;
         }
         bytes memory bytesArray = new bytes(i);

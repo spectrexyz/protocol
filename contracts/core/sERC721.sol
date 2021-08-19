@@ -9,19 +9,12 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract sERC721 is
-    Context,
-    AccessControlEnumerable,
-    ERC721Enumerable,
-    ERC721Pausable,
-    ERC721Burnable,
-    ERC721URIStorage
-{
+contract sERC721 is Context, AccessControlEnumerable, ERC721Enumerable, ERC721Pausable, ERC721Burnable, ERC721URIStorage {
     using Counters for Counters.Counter;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    
+
     Counters.Counter private _tokenIdTracker;
 
     constructor(string memory name, string memory symbol) ERC721(name, symbol) {
@@ -41,7 +34,7 @@ contract sERC721 is
 
         _mint(to, tokenId);
         _setTokenURI(tokenId, _tokenURI);
-        
+
         _tokenIdTracker.increment();
     }
 
@@ -59,19 +52,11 @@ contract sERC721 is
         address from,
         address to,
         uint256 tokenId
-    )
-        internal
-        override(ERC721, ERC721Enumerable, ERC721Pausable)
-    {
+    ) internal override(ERC721, ERC721Enumerable, ERC721Pausable) {
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(AccessControlEnumerable, ERC721, ERC721Enumerable)
-        returns (bool)
-    {
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControlEnumerable, ERC721, ERC721Enumerable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 

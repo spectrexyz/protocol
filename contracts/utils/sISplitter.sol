@@ -2,8 +2,6 @@
 pragma solidity ^0.8.0;
 
 interface sISplitter {
-
-
     /**
      * @notice Register an `sERC20` to split between `beneficiaries` with respect to `shares` when received.
      * @dev - We do not check that `sERC20` actually is an ERC20 to save gas. Indeed, only spectre's trusted template
@@ -13,7 +11,11 @@ interface sISplitter {
      * @param beneficiaries The addresses to split the received sERC20s between when received.
      * @param shares The respective shares of the beneficiaries over the received sERC20s [expressed in PCT_BASE].
      */
-    function register(address sERC20, address[] calldata beneficiaries, uint256[] calldata shares) external;
+    function register(
+        address sERC20,
+        address[] calldata beneficiaries,
+        uint256[] calldata shares
+    ) external;
 
     /**
      * @notice Withdraw `sERC20` tokens due to `beneficiary`.
