@@ -30,6 +30,7 @@ contract FlashBroker is Context, IFlashBroker {
 
     function register(
         address sERC20,
+        address guardian,
         uint256 minimum,
         address pool,
         uint256 multiplier,
@@ -43,6 +44,7 @@ contract FlashBroker is Context, IFlashBroker {
         require(timelock >= MINIMUM_TIMELOCK, "FlashBroker: invalid timelock");
 
         sale._state = Sales.State.Pending;
+        sale.guardian = guardian;
         sale.minimum = minimum;
         sale.pool = pool;
         sale.multiplier = multiplier;
@@ -54,16 +56,24 @@ contract FlashBroker is Context, IFlashBroker {
         Sales.Sale storage sale = _sales[sERC20];
 
         require(sale.state() == Sales.State.Opened, "FlashBroker: invalid sale state");
+        (uint256 value, uint256 price, uint256 supply, uint256 balance) = _priceOfFor(sERC20, sale, _msgSender());
+        console.log("Price: %s", price);
+        require(msg.value >= price, "FlashBroker: insufficient value");
 
-        uint256 price = _price(sale.pool);
-        // uint256 value = _max()
-        // uint256 balance =
-        // 1* burn the tokens owned by buyer
-        // 2* sERC1155.unlock
-        sIERC20(sERC20).burn(_msgSender(), sIERC20(sERC20).balanceOf(_msgSender()));
-        _sERC1155.unlock(sERC20, beneficiary, "");
+        if (sale.flash) {
+            _buyout(sIERC20(sERC20), sale, _msgSender(), beneficiary, value, supply, balance);
+        }
+
+        
     }
 
+    function _buyout(sIERC20 sERC20, Sales.Sale storage sale, address buyer, address beneficiary, uint256 value, uint256 supply, uint256 balance) private {
+        sale._state = Sales.State.Closed;
+        sale.price  = supply > balance ? value / (supply - balance) : 0;
+        sERC20.burn(buyer, balance);
+        _sERC1155.unlock(address(sERC20), beneficiary, "");
+    }
+ 
     /**
      * @dev This function can be re-entered but this would cause no harm.
      */
@@ -91,6 +101,7 @@ contract FlashBroker is Context, IFlashBroker {
         view
         returns (
             Sales.State state,
+            address guardian,
             uint256 minimum,
             address pool,
             uint256 multiplier,
@@ -103,6 +114,7 @@ contract FlashBroker is Context, IFlashBroker {
         Sales.Sale storage sale = _sales[sERC20];
 
         state = sale.state();
+        guardian = sale.guardian;
         minimum = sale.minimum;
         pool = sale.pool;
         multiplier = sale.multiplier;
@@ -121,26 +133,46 @@ contract FlashBroker is Context, IFlashBroker {
         // bool    flash;
     }
 
-    function currentValueOf(address sERC20) public view returns (uint256) {
+    function priceOf(address sERC20) public view returns (uint256) {
         Sales.Sale storage sale = _sales[sERC20];
 
-        return _value(sIERC20(sERC20), sale.pool);
+        return _priceOf(sERC20, sale);
     }
 
-    function _value(sIERC20 sERC20, address pool) private view returns (uint256) {
-        uint256 multiplier = _sales[address(sERC20)].multiplier;
-        uint256 supply = sERC20.totalSupply();
-        uint256 balance = sERC20.balanceOf(_msgSender());
-        uint256 remaining = supply - balance;
-        uint256 price = _price(pool);
-        uint256 value = price * remaining * multiplier;
-        uint256 minimum = _sales[address(sERC20)].minimum * sERC20.cap() * multiplier;
+    function _priceOf(address sERC20, Sales.Sale storage sale) private view returns (uint256) {
+        uint256 minimum = sale.minimum;
+        uint256 multiplier = sale.multiplier;
+        uint256 supply = sIERC20(sERC20).totalSupply();
+        uint256 price = _priceOf(sale.pool);
+        uint256 value = price * supply * multiplier;
 
         if (minimum > value) return minimum;
         else return value;
     }
 
-    function _price(address pool) private view returns (uint256) {
-        return 2 * DECIMALS;
+    function _priceOfFor(address sERC20, Sales.Sale storage sale, address buyer) private view returns (uint256 value, uint256 price, uint256 supply, uint256 balance) {
+        balance = sIERC20(sERC20).balanceOf(buyer);
+        supply = sIERC20(sERC20).totalSupply();
+        
+        uint256 tokenPrice = _priceOf(sale.pool);
+        uint256 marketValue = tokenPrice * supply / DECIMALS * sale.multiplier / DECIMALS;        
+        uint256 minimum = sale.minimum;
+
+        value = minimum >= marketValue ? minimum : marketValue;
+        price = supply == 0 ? value : value * ( DECIMALS - balance * DECIMALS / supply) / DECIMALS;
+        // 750
+        // 2250
+        // cap = 1000
+        // minted = 250 + 250 = 500
+        // price = 2
+        // MarketCap = 500 * 0.01 = 5 
+        // multiplier = 1.5
+        // MarketValue = MarketCap * multiplier = 7.5 
+     
+        // to pay = 1 / 2 * 2250 = 750
+    }
+
+    function _priceOf(address pool) private view returns (uint256) {
+        return 1e16;
     }
 }

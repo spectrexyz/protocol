@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 interface IFlashBroker {
     function register(
         address sERC20,
+        address guardian,
         uint256 minimum,
         address pool,
         uint256 multiplier,

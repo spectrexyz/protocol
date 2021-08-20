@@ -1,3 +1,4 @@
+const { ethers } = require("ethers");
 const _Broker_ = require("../../../artifacts/contracts/broker/FlashBroker.sol/FlashBroker.json");
 
 class Broker {
@@ -16,13 +17,32 @@ class Broker {
 
   async register(opts = {}) {
     opts.sERC20 ??= this.ctx.sERC20.contract;
+    opts.guardian ??= this.ctx.signers.broker.guardian;
     opts.minimum ??= this.ctx.params.broker.minimum;
     opts.pool ??= this.ctx.signers.others[1];
     opts.multiplier ??= this.ctx.params.broker.multiplier;
     opts.timelock ??= this.ctx.params.broker.timelock;
     opts.flash ??= true;
 
-    this.ctx.data.tx = await this.contract.register(opts.sERC20.address, opts.minimum, opts.pool.address, opts.multiplier, opts.timelock, opts.flash);
+    this.ctx.data.tx = await this.contract.register(
+      opts.sERC20.address,
+      opts.guardian.address,
+      opts.minimum,
+      opts.pool.address,
+      opts.multiplier,
+      opts.timelock,
+      opts.flash
+    );
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async buyout(opts = {}) {
+    opts.sERC20 ??= this.ctx.sERC20.contract;
+    opts.from ??= this.ctx.signers.broker.buyer;
+    opts.beneficiary ??= this.ctx.signers.broker.beneficiary;
+    opts.value ??= ethers.utils.parseEther("10");
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).buyout(opts.sERC20.address, opts.beneficiary.address, { value: opts.value });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }

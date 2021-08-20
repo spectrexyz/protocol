@@ -96,6 +96,8 @@ const initialize = async (ctx) => {
       sales: {
         state: {
           PENDING: 1,
+          OPEN: 2,
+          CLOSED: 3,
         },
       },
     },
@@ -140,6 +142,7 @@ const initialize = async (ctx) => {
     owners: [],
     beneficiaries: [],
     others: [],
+    broker: {},
   };
 
   [
@@ -175,6 +178,9 @@ const initialize = async (ctx) => {
     ctx.signers.sMinter.beneficiary,
     ctx.signers.sMinter.recipient,
     ctx.signers.sMinter.registerer,
+    ctx.signers.broker.guardian,
+    ctx.signers.broker.buyer,
+    ctx.signers.broker.beneficiary,
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
@@ -249,6 +255,9 @@ const setup = async (ctx, opts = {}) => {
 
   if (opts.broker || opts.template) {
     await Broker.deploy(ctx, opts);
+    await ctx.sERC721.mint(opts);
+    await ctx.sERC1155.spectralize({ guardian: ctx.broker.contract });
+
     await ctx.sERC20.grantRole({
       role: ctx.constants.sERC20.BURN_ROLE,
       account: ctx.broker.contract,

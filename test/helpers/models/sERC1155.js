@@ -22,15 +22,11 @@ class sERC1155 {
   }
 
   static async deploy(ctx) {
-    ctx.contracts.sERC1155 = await waffle.deployContract(
-      ctx.signers.sERC1155.admin,
-      _sERC1155_,
-      [
-        ctx.contracts.sERC20Base.address,
-        ctx.params.sERC1155.unavailableURI,
-        ctx.params.sERC1155.unlockedURI,
-      ]
-    );
+    ctx.contracts.sERC1155 = await waffle.deployContract(ctx.signers.sERC1155.admin, _sERC1155_, [
+      ctx.contracts.sERC20Base.address,
+      ctx.params.sERC1155.unavailableURI,
+      ctx.params.sERC1155.unlockedURI,
+    ]);
 
     ctx.sERC1155 = new sERC1155(ctx);
   }
@@ -40,9 +36,7 @@ class sERC1155 {
     opts.operator ??= this.ctx.signers.sERC1155.operator;
     opts.approve ??= true;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.from)
-      .setApprovalForAll(opts.operator.address, opts.approve);
+    this.ctx.data.tx = await this.contract.connect(opts.from).setApprovalForAll(opts.operator.address, opts.approve);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -54,15 +48,7 @@ class sERC1155 {
     opts.amount = opts.amount ? opts.amount : this.ctx.params.sERC1155.amount;
     opts.data = opts.data ? opts.data : ethers.constants.HashZero;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.operator)
-      .safeTransferFrom(
-        opts.from.address,
-        opts.to.address,
-        opts.id,
-        opts.amount,
-        opts.data
-      );
+    this.ctx.data.tx = await this.contract.connect(opts.operator).safeTransferFrom(opts.from.address, opts.to.address, opts.id, opts.amount, opts.data);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -71,21 +57,10 @@ class sERC1155 {
     opts.operator ??= opts.from;
     opts.to ??= this.ctx.signers.others[0];
     opts.ids ??= [this.ctx.data.id1, this.ctx.data.id2];
-    opts.amounts ??= [
-      this.ctx.params.sERC1155.amount1,
-      this.ctx.params.sERC1155.amount2,
-    ];
+    opts.amounts ??= [this.ctx.params.sERC1155.amount1, this.ctx.params.sERC1155.amount2];
     opts.data ??= ethers.constants.HashZero;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.operator)
-      .safeBatchTransferFrom(
-        opts.from.address,
-        opts.to.address,
-        opts.ids,
-        opts.amounts,
-        opts.data
-      );
+    this.ctx.data.tx = await this.contract.connect(opts.operator).safeBatchTransferFrom(opts.from.address, opts.to.address, opts.ids, opts.amounts, opts.data);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -93,12 +68,10 @@ class sERC1155 {
     opts.collection ??= this.ctx.contracts.sERC721;
     opts.transfer ??= false;
     opts.mock ??= false;
+    opts.guardian ??= this.ctx.signers.sERC1155.guardian;
 
     if (opts.mock) {
-      this.ctx.contracts.ERC721Mock = await waffle.deployContract(
-        this.ctx.signers.root,
-        _ERC721Mock_
-      );
+      this.ctx.contracts.ERC721Mock = await waffle.deployContract(this.ctx.signers.root, _ERC721Mock_);
 
       this.ctx.data.tx = await this.contract.spectralize(
         this.ctx.contracts.ERC721Mock.address,
@@ -107,7 +80,7 @@ class sERC1155 {
         this.ctx.params.sERC20.symbol,
         this.ctx.params.sERC20.cap,
         this.ctx.signers.sERC20.admin.address,
-        this.ctx.signers.sERC1155.guardian.address
+        opts.guardian.address
       );
 
       this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -127,7 +100,7 @@ class sERC1155 {
             this.ctx.params.sERC20.symbol,
             this.ctx.params.sERC20.cap,
             this.ctx.signers.sERC20.admin.address,
-            this.ctx.signers.sERC1155.guardian.address
+            opts.guardian.address
           );
         this.ctx.data.tx2 = this.ctx.data.tx; // fix a bug where an un-waited tx overrides the current tx somewhere
         this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -135,11 +108,7 @@ class sERC1155 {
       }
     }
 
-    this.ctx.sERC20 = await sERC20.at(
-      this.ctx,
-      await this.contract.sERC20Of(this.ctx.data.id),
-      opts
-    );
+    this.ctx.sERC20 = await sERC20.at(this.ctx, await this.contract.sERC20Of(this.ctx.data.id), opts);
   }
 
   async unlock(opts = {}) {
@@ -149,19 +118,11 @@ class sERC1155 {
     if (opts.byAddress) {
       this.ctx.data.tx = await this.contract
         .connect(opts.from)
-        ["unlock(address,address,bytes)"](
-          this.ctx.contracts.sERC20.address,
-          this.ctx.signers.sERC721.owners[1].address,
-          ethers.constants.HashZero
-        );
+        ["unlock(address,address,bytes)"](this.ctx.contracts.sERC20.address, this.ctx.signers.sERC721.owners[1].address, ethers.constants.HashZero);
     } else {
       this.ctx.data.tx = await this.contract
         .connect(opts.from)
-        ["unlock(uint256,address,bytes)"](
-          this.ctx.data.id,
-          this.ctx.signers.sERC721.owners[1].address,
-          ethers.constants.HashZero
-        );
+        ["unlock(uint256,address,bytes)"](this.ctx.data.id, this.ctx.signers.sERC721.owners[1].address, ethers.constants.HashZero);
     }
 
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -170,18 +131,14 @@ class sERC1155 {
   async updateUnavailableURI(uri, opts = {}) {
     opts.from ??= this.ctx.signers.sERC1155.admin;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.from)
-      .updateUnavailableURI(uri);
+    this.ctx.data.tx = await this.contract.connect(opts.from).updateUnavailableURI(uri);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async updateUnlockedURI(uri, opts = {}) {
     opts.from ??= this.ctx.signers.sERC1155.admin;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.from)
-      .updateUnlockedURI(uri);
+    this.ctx.data.tx = await this.contract.connect(opts.from).updateUnlockedURI(uri);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -193,34 +150,16 @@ class sERC1155 {
       ? ethers.utils.concat([
           ethers.utils.formatBytes32String(this.ctx.params.sERC20.name),
           ethers.utils.formatBytes32String(this.ctx.params.sERC20.symbol),
-          ethers.utils.defaultAbiCoder.encode(
-            ["uint256"],
-            [this.ctx.params.sERC20.cap]
-          ),
-          ethers.utils.defaultAbiCoder.encode(
-            ["address"],
-            [this.ctx.signers.sERC20.admin.address]
-          ),
-          ethers.utils.defaultAbiCoder.encode(
-            ["address"],
-            [this.ctx.signers.sERC1155.guardian.address]
-          ),
+          ethers.utils.defaultAbiCoder.encode(["uint256"], [this.ctx.params.sERC20.cap]),
+          ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC20.admin.address]),
+          ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC1155.guardian.address]),
         ])
       : ethers.utils.concat([
           ethers.utils.formatBytes32String(this.ctx.constants.name),
           ethers.utils.formatBytes32String(this.ctx.constants.symbol),
-          ethers.utils.defaultAbiCoder.encode(
-            ["uint256"],
-            [this.ctx.constants.cap]
-          ),
-          ethers.utils.defaultAbiCoder.encode(
-            ["address"],
-            [this.ctx.signers.sERC20.admin.address]
-          ),
-          ethers.utils.defaultAbiCoder.encode(
-            ["address"],
-            [this.ctx.signers.sERC1155.guardian.address]
-          ),
+          ethers.utils.defaultAbiCoder.encode(["uint256"], [this.ctx.constants.cap]),
+          ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC20.admin.address]),
+          ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC1155.guardian.address]),
           ethers.utils.defaultAbiCoder.encode(["bytes32"], [opts.derrida]),
         ]);
   }
@@ -229,15 +168,10 @@ class sERC1155 {
     opts.transfer ??= false;
 
     if (opts.transfer)
-      return (
-        await this.ctx.contracts.sERC1155.queryFilter(
-          this.ctx.contracts.sERC1155.filters.Spectralize()
-        )
-      ).filter((event) => event.event === "Spectralize")[0].args.id;
-    else
-      return this.ctx.data.receipt.events.filter(
+      return (await this.ctx.contracts.sERC1155.queryFilter(this.ctx.contracts.sERC1155.filters.Spectralize())).filter(
         (event) => event.event === "Spectralize"
       )[0].args.id;
+    else return this.ctx.data.receipt.events.filter((event) => event.event === "Spectralize")[0].args.id;
   }
 }
 

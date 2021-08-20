@@ -1,5 +1,7 @@
 const { expect } = require("chai");
 const { initialize, setup } = require("../helpers");
+const { sERC20 } = require("../helpers/models");
+const { advanceTime } = require("../helpers/time");
 
 describe("FlashBroker", () => {
   before(async () => {
@@ -28,6 +30,7 @@ describe("FlashBroker", () => {
 
           it("# it registers sale", async () => {
             expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.PENDING);
+            expect(this.data.sale.guardian).to.equal(this.signers.broker.guardian.address);
             expect(this.data.sale.minimum).to.equal(this.params.broker.minimum);
             expect(this.data.sale.pool).to.equal(this.signers.others[1].address);
             expect(this.data.sale.multiplier).to.equal(this.params.broker.multiplier);
@@ -59,6 +62,7 @@ describe("FlashBroker", () => {
 
         it("it reverts", async () => {
           await expect(this.broker.register()).to.be.revertedWith("FlashBroker: invalid spectre state");
+          await expect(this.broker.register({ sERC20: this.signers.others[0] })).to.be.revertedWith("FlashBroker: invalid spectre state");
         });
       });
     });
@@ -71,6 +75,29 @@ describe("FlashBroker", () => {
 
       it("it reverts", async () => {
         await expect(this.broker.register()).to.be.revertedWith("FlashBroker: sERC20 already registered");
+      });
+    });
+  });
+
+  describe.only("# buyout", () => {
+    describe("» sale is open", () => {
+      describe("» and buyout value is sufficient", () => {
+        describe("» and flash buyout is enabled", () => {
+          before(async () => {
+            await setup(this, { broker: true });
+            await this.broker.register();
+            await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
+            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
+
+            await advanceTime(this.params.broker.timelock);
+            await this.broker.buyout();
+            this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+          });
+
+          it("# it updates sale state", async () => {
+            expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.CLOSED);
+          });
+        });
       });
     });
   });

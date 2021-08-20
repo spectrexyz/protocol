@@ -15,6 +15,7 @@ library Sales {
 
     struct Sale {
         State _state;
+        address guardian;
         uint256 minimum;
         address pool;
         uint256 multiplier;
