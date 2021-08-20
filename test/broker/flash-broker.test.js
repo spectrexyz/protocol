@@ -88,14 +88,29 @@ describe("FlashBroker", () => {
             await this.broker.register();
             await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
             await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
-
             await advanceTime(this.params.broker.timelock);
+            this.data.previousTotalSupply = await this.sERC20.totalSupply();
             await this.broker.buyout();
             this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+            this.data.lastTotalSupply = await this.sERC20.totalSupply();
           });
 
           it("# it updates sale state", async () => {
             expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.CLOSED);
+          });
+
+          it("# it updates sale price", async () => {
+            expect(this.data.sale.price).to.equal(
+              ethers.BigNumber.from(this.params.broker.value).mul(this.constants.broker.DECIMALS).div(this.data.lastTotalSupply)
+            );
+          });
+
+          it("# it burns buyer's tokens", async () => {
+            expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(0);
+          });
+
+          it("# it transfers NFT", async () => {
+            expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.beneficiary.address);
           });
         });
       });

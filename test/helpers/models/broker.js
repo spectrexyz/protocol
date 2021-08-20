@@ -40,7 +40,7 @@ class Broker {
     opts.sERC20 ??= this.ctx.sERC20.contract;
     opts.from ??= this.ctx.signers.broker.buyer;
     opts.beneficiary ??= this.ctx.signers.broker.beneficiary;
-    opts.value ??= ethers.utils.parseEther("10");
+    opts.value ??= this.ctx.params.broker.value;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).buyout(opts.sERC20.address, opts.beneficiary.address, { value: opts.value });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();

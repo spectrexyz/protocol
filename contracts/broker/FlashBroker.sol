@@ -57,19 +57,18 @@ contract FlashBroker is Context, IFlashBroker {
 
         require(sale.state() == Sales.State.Opened, "FlashBroker: invalid sale state");
         (uint256 value, uint256 price, uint256 supply, uint256 balance) = _priceOfFor(sERC20, sale, _msgSender());
-        console.log("Price: %s", price);
         require(msg.value >= price, "FlashBroker: insufficient value");
 
         if (sale.flash) {
-            _buyout(sIERC20(sERC20), sale, _msgSender(), beneficiary, value, supply, balance);
+            _buyout(sIERC20(sERC20), sale, _msgSender(), beneficiary, supply, balance);
         }
 
         
     }
 
-    function _buyout(sIERC20 sERC20, Sales.Sale storage sale, address buyer, address beneficiary, uint256 value, uint256 supply, uint256 balance) private {
+    function _buyout(sIERC20 sERC20, Sales.Sale storage sale, address buyer, address beneficiary, uint256 supply, uint256 balance) private {
         sale._state = Sales.State.Closed;
-        sale.price  = supply > balance ? value / (supply - balance) : 0;
+        sale.price  = supply > balance ? msg.value * DECIMALS / (supply - balance) : 0;
         sERC20.burn(buyer, balance);
         _sERC1155.unlock(address(sERC20), beneficiary, "");
     }
@@ -150,26 +149,26 @@ contract FlashBroker is Context, IFlashBroker {
         else return value;
     }
 
+    // we don't need to return value, only price
+    // we may rename it valueOfFor to enforce value = overall price, price = price per token
     function _priceOfFor(address sERC20, Sales.Sale storage sale, address buyer) private view returns (uint256 value, uint256 price, uint256 supply, uint256 balance) {
         balance = sIERC20(sERC20).balanceOf(buyer);
         supply = sIERC20(sERC20).totalSupply();
         
+        require(supply > 0, "FlashBroker: invalid supply state");
+
         uint256 tokenPrice = _priceOf(sale.pool);
         uint256 marketValue = tokenPrice * supply / DECIMALS * sale.multiplier / DECIMALS;        
         uint256 minimum = sale.minimum;
 
         value = minimum >= marketValue ? minimum : marketValue;
-        price = supply == 0 ? value : value * ( DECIMALS - balance * DECIMALS / supply) / DECIMALS;
-        // 750
-        // 2250
-        // cap = 1000
-        // minted = 250 + 250 = 500
-        // price = 2
-        // MarketCap = 500 * 0.01 = 5 
-        // multiplier = 1.5
-        // MarketValue = MarketCap * multiplier = 7.5 
-     
-        // to pay = 1 / 2 * 2250 = 750
+        price = value * ( DECIMALS - balance * DECIMALS / supply) / DECIMALS;
+
+        // 250
+        // 1000 .03 250 * 0.03
+
+        // 0.04
+
     }
 
     function _priceOf(address pool) private view returns (uint256) {

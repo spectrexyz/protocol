@@ -57,6 +57,7 @@ const initialize = async (ctx) => {
       minimum: ethers.utils.parseEther("2.5"),
       multiplier: ethers.utils.parseEther("1.5"),
       timelock: ethers.BigNumber.from("1209600"), // two weeks
+      value: ethers.utils.parseEther("10"),
     },
     sSplitter: {
       shares: [ethers.BigNumber.from("300000000000000000"), ethers.BigNumber.from("100000000000000000"), ethers.BigNumber.from("600000000000000000")],
@@ -93,6 +94,7 @@ const initialize = async (ctx) => {
       },
     },
     broker: {
+      DECIMALS: ethers.BigNumber.from("1000000000000000000"),
       sales: {
         state: {
           PENDING: 1,
