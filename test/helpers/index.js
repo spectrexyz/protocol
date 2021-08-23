@@ -58,6 +58,7 @@ const initialize = async (ctx) => {
       multiplier: ethers.utils.parseEther("1.5"),
       timelock: ethers.BigNumber.from("1209600"), // two weeks
       value: ethers.utils.parseEther("10"),
+      balance: ethers.utils.parseEther("1"),
     },
     sSplitter: {
       shares: [ethers.BigNumber.from("300000000000000000"), ethers.BigNumber.from("100000000000000000"), ethers.BigNumber.from("600000000000000000")],
@@ -101,6 +102,18 @@ const initialize = async (ctx) => {
           OPEN: 2,
           CLOSED: 3,
         },
+      },
+      proposals: {
+        state: {
+          Null: 0,
+          Pending: 1,
+          Accepted: 2,
+          Rejected: 3,
+          Lapsed: 4,
+          Cancelled: 5,
+          Refunded: 6,
+        },
+        duration: ethers.BigNumber.from("604800"), // one
       },
     },
     SpectreState: {

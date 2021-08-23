@@ -26,48 +26,6 @@ library Sales {
         bool flash;
     }
 
-    function propose(
-        Sale storage sale,
-        address payable from,
-        uint256 value,
-        uint256 expiration
-    ) internal returns (uint256) {
-        sale.proposals[sale.nbOfProposals] = Proposals.Proposal({_state: Proposals.State.Pending, from: from, value: value, expiration: expiration});
-        sale.nbOfProposals++;
-    }
-
-    function accept(Sale storage sale, uint256 id) internal {
-        Proposals.Proposal storage proposal = sale.proposals[id];
-
-        require(proposal.state() == Proposals.State.Pending, "FlashBroker: invalid proposal state");
-
-        proposal._state = Proposals.State.Accepted;
-    }
-
-    function reject(Sale storage sale, uint256 id) internal {
-        Proposals.Proposal storage proposal = sale.proposals[id];
-
-        require(proposal.state() == Proposals.State.Pending, "FlashBroker: invalid proposal state");
-
-        proposal._state = Proposals.State.Rejected;
-    }
-
-    function cancel(Sale storage sale, uint256 id) internal {
-        Proposals.Proposal storage proposal = sale.proposals[id];
-
-        require(proposal.state() == Proposals.State.Pending, "FlashBroker: invalid proposal state");
-
-        proposal._state = Proposals.State.Cancelled;
-    }
-
-    function refund(Sale storage sale, uint256 id) internal {
-        Proposals.Proposal storage proposal = sale.proposals[id];
-
-        require(proposal.state() == Proposals.State.Lapsed || proposal.state() == Proposals.State.Rejected, "FlashBroker: invalid proposal state");
-
-        proposal._state = Proposals.State.Refunded;
-    }
-
     function state(Sale storage sale) internal view returns (State) {
         State _state = sale._state;
 

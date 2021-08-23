@@ -14,8 +14,10 @@ library Proposals {
 
     struct Proposal {
         State _state;
-        address payable from;
+        address buyer;
+        address beneficiary;
         uint256 value;
+        uint256 balance;
         uint256 expiration;
     }
 

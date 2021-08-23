@@ -79,7 +79,7 @@ describe("FlashBroker", () => {
     });
   });
 
-  describe.only("# buyout", () => {
+  describe("# buyout", () => {
     describe("» sale is open", () => {
       describe("» and buyout value is sufficient", () => {
         describe("» and flash buyout is enabled", () => {
@@ -113,6 +113,133 @@ describe("FlashBroker", () => {
             expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.beneficiary.address);
           });
         });
+
+        describe("» but flash buyout is not enabled", () => {
+          before(async () => {
+            await setup(this, { broker: true });
+            await this.broker.register({ flash: false });
+            await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
+            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
+            await advanceTime(this.params.broker.timelock);
+            await this.sERC20.approve({
+              from: this.signers.broker.buyer,
+              spender: this.broker.contract,
+              amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")),
+            });
+            await this.broker.buyout();
+            this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+            this.data.proposal = await this.broker.proposal(this.sERC20.contract.address, 0);
+          });
+
+          it("it creates a new proposal", async () => {
+            expect(this.data.sale.nbOfProposals).to.equal(1);
+            expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Pending);
+            expect(this.data.proposal.buyer).to.equal(this.signers.broker.buyer.address);
+            expect(this.data.proposal.beneficiary).to.equal(this.signers.broker.beneficiary.address);
+            expect(this.data.proposal.value).to.equal(this.params.broker.value);
+            expect(this.data.proposal.balance).to.equal(this.params.sERC20.cap.div(ethers.BigNumber.from("4")));
+            expect(this.data.proposal.expiration).to.equal(
+              ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(this.constants.broker.proposals.duration)
+            );
+
+            //             enum State {
+            //     Null,
+            //     Pending,
+            //     Accepted,
+            //     Rejected,
+            //     Lapsed,proposal.
+            //     Cancelled,
+            //     Refunded
+            // }
+
+            // struct Proposal {
+            //     State _state;
+            //     address payable from;
+            //     uint256 value;
+            //     uint256 expiration;
+            // }
+          });
+        });
+      });
+    });
+  });
+
+  describe.only("# cancel", () => {
+    describe("» proposal is pending", () => {
+      describe("» and caller is proposal's buyer", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register({ flash: false });
+          await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+          await advanceTime(this.params.broker.timelock);
+          await this.sERC20.approve({
+            from: this.signers.broker.buyer,
+            spender: this.broker.contract,
+            amount: this.params.broker.balance,
+          });
+          await this.broker.buyout();
+          this.data.previousBuyerETHBalance = await this.signers.broker.buyer.getBalance();
+          await this.broker.cancel();
+          this.data.lastBuyerETHBalance = await this.signers.broker.buyer.getBalance();
+          this.data.proposal = await this.broker.proposal(this.sERC20.contract.address, 0);
+        });
+
+        it("it updates proposal's state", async () => {
+          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Cancelled);
+        });
+
+        it("it refunds sERC20s", async () => {
+          expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(this.params.broker.balance);
+        });
+
+        it("it refunds ETH", async () => {
+          expect(this.data.lastBuyerETHBalance.sub(this.data.previousBuyerETHBalance).add(this.data.receipt.gasUsed.mul(this.data.tx.gasPrice))).to.equal(
+            this.params.broker.value
+          );
+        });
+
+        it("it emits a CancelProposal event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "CancelProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
+        });
+      });
+
+      describe("» but caller is not proposal's buyer", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register({ flash: false });
+          await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+          await advanceTime(this.params.broker.timelock);
+          await this.sERC20.approve({
+            from: this.signers.broker.buyer,
+            spender: this.broker.contract,
+            amount: this.params.broker.balance,
+          });
+          await this.broker.buyout();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.cancel({ from: this.signers.others[0] })).to.be.revertedWith("FlashBroker: must be buyer to cancel proposal");
+        });
+      });
+    });
+
+    describe("» proposal is not pending", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register({ flash: false });
+        await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+        await advanceTime(this.params.broker.timelock);
+        await this.sERC20.approve({
+          from: this.signers.broker.buyer,
+          spender: this.broker.contract,
+          amount: this.params.broker.balance,
+        });
+        await this.broker.buyout();
+        await this.broker.cancel();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.cancel()).to.be.revertedWith("FlashBroker: invalid proposal state");
       });
     });
   });

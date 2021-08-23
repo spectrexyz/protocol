@@ -7,6 +7,7 @@ class Broker {
     this.contract = ctx.contracts.broker;
     this.sERC1155 = this.contract.sERC1155;
     this.saleOf = this.contract.saleOf;
+    this.proposal = this.contract.proposal;
   }
 
   static async deploy(ctx, opts) {
@@ -43,6 +44,16 @@ class Broker {
     opts.value ??= this.ctx.params.broker.value;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).buyout(opts.sERC20.address, opts.beneficiary.address, { value: opts.value });
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+    this.ctx.data.proposalId = this.ctx.data.receipt.events.filter((event) => event.event === "CreateProposal")[0].args.proposalId;
+  }
+
+  async cancel(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.buyer;
+    opts.sERC20 ??= this.ctx.sERC20.contract;
+    opts.proposalId ??= this.ctx.data.proposalId;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).cancel(opts.sERC20.address, opts.proposalId);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }
