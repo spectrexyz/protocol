@@ -5,7 +5,6 @@ import "../../core/interfaces/sIERC20.sol";
 
 interface ISplitter {
     struct Split {
-        address sERC20; // storing an address is more efficient than storing a bool to check if a split is registered
         uint256 totalWithdrawn;
         mapping(address => uint256) shares;
         mapping(address => uint256) withdrawn;
@@ -23,8 +22,6 @@ interface ISplitter {
     function withdraw(sIERC20 sERC20, address beneficiary) external;
 
     function withdrawBatch(sIERC20[] calldata sERC20s, address beneficiary) external;
-
-    function isRegistered(sIERC20 sERC20) external view returns (bool);
 
     function stateOf(sIERC20 sERC20) external view returns (uint256 received, uint256 totalWithdrawn);
 

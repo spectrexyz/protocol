@@ -23,8 +23,9 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
     /**
      * @notice Register an `sERC20` whose received tokens are to split between `beneficiaries` with respect to `shares`.
-     * @dev - We do not check that `sERC20` actually is an NFT-pegged sERC20 to save gas. Indeed, only spectre's trusted template is supposed to be granted
-     *        REGISTER_ROLE - and it passes the sERC20 address out of the NFT spectralization.
+     * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an NFT-pegged sERC20 to save gas.
+     *        Indeed, only trusted templates, registering sERC20s out of actual NFT spectralizations, are supposed to be granted REGISTER_ROLE.
+     *      - The same rational applies to `pool`.
      *      - Other parameters are checked because they are passed by users and forwarded unchecked by the template.
      * @param sERC20 The sERC20 whose received tokens are to split between beneficiaries.
      * @param beneficiaries The addresses to split the received sERC20s between.
@@ -38,11 +39,8 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
         Split storage split = _splits[sERC20];
 
         require(hasRole(REGISTER_ROLE, _msgSender()), "Splitter: must have REGISTER_ROLE to register");
-        require(split.sERC20 == address(0), "Splitter: sERC20 already registered");
-        // maybe we can remove this one too ... this way we do not even have to store the sERC20 address
         require(beneficiaries.length == shares.length, "Splitter: beneficiaries and shares length mismatch");
 
-        split.sERC20 = address(sERC20);
         address beneficiary;
         uint256 share;
         uint256 total;
@@ -72,8 +70,6 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
      */
     function withdraw(sIERC20 sERC20, address beneficiary) external override {
         Split storage split = _splits[sERC20];
-
-        require(split.sERC20 != address(0), "Splitter: unregistered sERC20");
 
         uint256 due = ((sERC20.balanceOf(address(this)) + split.totalWithdrawn) * split.shares[beneficiary]) / HUNDRED;
         uint256 withdrawn = split.withdrawn[beneficiary];
@@ -109,8 +105,6 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
             sERC20 = sERC20s[i];
             Split storage split = _splits[sERC20];
 
-            require(split.sERC20 != address(0), "Splitter: unregistered sERC20");
-
             due = ((sERC20.balanceOf(address(this)) + split.totalWithdrawn) * split.shares[beneficiary]) / HUNDRED;
             withdrawn = split.withdrawn[beneficiary];
             amount = due - withdrawn;
@@ -124,10 +118,6 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
             emit Withdraw(sERC20, beneficiary, amount);
         }
-    }
-
-    function isRegistered(sIERC20 sERC20) public view override returns (bool) {
-        return _splits[sERC20].sERC20 != address(0);
     }
 
     function stateOf(sIERC20 sERC20) public view override returns (uint256 received, uint256 totalWithdrawn) {

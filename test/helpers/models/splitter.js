@@ -10,7 +10,6 @@ class Splitter {
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.stateOf = this.contract.stateOf;
     this.shareOf = this.contract.shareOf;
-    this.isRegistered = this.contract.isRegistered;
     this.withdrawnBy = this.contract.withdrawnBy;
   }
 

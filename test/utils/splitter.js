@@ -17,62 +17,45 @@ describe("Splitter", () => {
     });
   });
 
-  describe.only("# register", () => {
+  describe("# register", () => {
     describe("» sender has REGISTER_ROLE", () => {
-      describe("» and sERC20 is not yet registered", () => {
-        describe("» and beneficiaries and shares arrays have the same length", () => {
-          describe("» and no beneficiary is the zero address", () => {
-            describe("» and no share is worth zero", () => {
-              describe("» and shares add up to 100%", () => {
-                before(async () => {
-                  await setup(this);
-                  await this.splitter.register();
-                });
-
-                it("it registers split", async () => {
-                  const split = await this.splitter.stateOf(this.sERC20.contract.address);
-
-                  expect(await this.splitter.isRegistered(this.sERC20.contract.address)).to.equal(true);
-                  expect(split.received).to.equal(0);
-                  expect(split.totalWithdrawn).to.equal(0);
-                  expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[0].address)).to.equal(
-                    this.params.splitter.shares[0]
-                  );
-                  expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[1].address)).to.equal(
-                    this.params.splitter.shares[1]
-                  );
-                  expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[2].address)).to.equal(
-                    this.params.splitter.shares[2]
-                  );
-                });
-
-                it("it emits a Register event", async () => {
-                  await expect(this.data.tx)
-                    .to.emit(this.splitter.contract, "Register")
-                    .withArgs(
-                      this.sERC20.contract.address,
-                      this.signers.splitter.beneficiaries.map((beneficiary) => beneficiary.address),
-                      this.params.splitter.shares
-                    );
-                });
+      describe("» and beneficiaries and shares arrays have the same length", () => {
+        describe("» and no beneficiary is the zero address", () => {
+          describe("» and no share is worth zero", () => {
+            describe("» and shares add up to 100%", () => {
+              before(async () => {
+                await setup(this);
+                await this.splitter.register();
               });
 
-              describe("» but shares do not add up 100%", () => {
-                before(async () => {
-                  await setup(this);
-                });
+              it("it registers split", async () => {
+                const split = await this.splitter.stateOf(this.sERC20.contract.address);
 
-                it("it reverts", async () => {
-                  await expect(
-                    this.splitter.register({
-                      shares: [this.params.splitter.shares[0], this.params.splitter.shares[1], "10"],
-                    })
-                  ).to.be.revertedWith("Splitter: shares must add up to 100%");
-                });
+                expect(split.received).to.equal(0);
+                expect(split.totalWithdrawn).to.equal(0);
+                expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[0].address)).to.equal(
+                  this.params.splitter.shares[0]
+                );
+                expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[1].address)).to.equal(
+                  this.params.splitter.shares[1]
+                );
+                expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[2].address)).to.equal(
+                  this.params.splitter.shares[2]
+                );
+              });
+
+              it("it emits a Register event", async () => {
+                await expect(this.data.tx)
+                  .to.emit(this.splitter.contract, "Register")
+                  .withArgs(
+                    this.sERC20.contract.address,
+                    this.signers.splitter.beneficiaries.map((beneficiary) => beneficiary.address),
+                    this.params.splitter.shares
+                  );
               });
             });
 
-            describe("» but one share is worth zero", () => {
+            describe("» but shares do not add up 100%", () => {
               before(async () => {
                 await setup(this);
               });
@@ -80,14 +63,14 @@ describe("Splitter", () => {
               it("it reverts", async () => {
                 await expect(
                   this.splitter.register({
-                    shares: [this.params.splitter.shares[0], this.params.splitter.shares[1], 0],
+                    shares: [this.params.splitter.shares[0], this.params.splitter.shares[1], "10"],
                   })
-                ).to.be.revertedWith("Splitter: share cannot be worth zero");
+                ).to.be.revertedWith("Splitter: shares must add up to 100%");
               });
             });
           });
 
-          describe("» but one beneficiary is the zero address", () => {
+          describe("» but one share is worth zero", () => {
             before(async () => {
               await setup(this);
             });
@@ -95,14 +78,14 @@ describe("Splitter", () => {
             it("it reverts", async () => {
               await expect(
                 this.splitter.register({
-                  beneficiaries: [this.signers.splitter.beneficiaries[0], this.signers.splitter.beneficiaries[1], { address: ethers.constants.AddressZero }],
+                  shares: [this.params.splitter.shares[0], this.params.splitter.shares[1], 0],
                 })
-              ).to.be.revertedWith("Splitter: beneficiary cannot be the zero address");
+              ).to.be.revertedWith("Splitter: share cannot be worth zero");
             });
           });
         });
 
-        describe("» but beneficiaries and shares arrays do not have the same length", () => {
+        describe("» but one beneficiary is the zero address", () => {
           before(async () => {
             await setup(this);
           });
@@ -110,21 +93,24 @@ describe("Splitter", () => {
           it("it reverts", async () => {
             await expect(
               this.splitter.register({
-                shares: [this.params.splitter.shares[0], this.params.splitter.shares[1]],
+                beneficiaries: [this.signers.splitter.beneficiaries[0], this.signers.splitter.beneficiaries[1], { address: ethers.constants.AddressZero }],
               })
-            ).to.be.revertedWith("Splitter: beneficiaries and shares length mismatch");
+            ).to.be.revertedWith("Splitter: beneficiary cannot be the zero address");
           });
         });
       });
 
-      describe("» but sERC20 is already registered", () => {
+      describe("» but beneficiaries and shares arrays do not have the same length", () => {
         before(async () => {
           await setup(this);
-          await this.splitter.register();
         });
 
         it("it reverts", async () => {
-          await expect(this.splitter.register()).to.be.revertedWith("Splitter: sERC20 already registered");
+          await expect(
+            this.splitter.register({
+              shares: [this.params.splitter.shares[0], this.params.splitter.shares[1]],
+            })
+          ).to.be.revertedWith("Splitter: beneficiaries and shares length mismatch");
         });
       });
     });
@@ -230,7 +216,7 @@ describe("Splitter", () => {
       });
 
       it("it reverts", async () => {
-        await expect(this.splitter.withdraw()).to.be.revertedWith("Splitter: unregistered sERC20");
+        await expect(this.splitter.withdraw()).to.be.revertedWith("Splitter: nothing to withdraw");
       });
     });
   });
@@ -324,7 +310,7 @@ describe("Splitter", () => {
       });
 
       it("it reverts", async () => {
-        await expect(this.splitter.withdrawBatch()).to.be.revertedWith("Splitter: unregistered sERC20");
+        await expect(this.splitter.withdrawBatch()).to.be.revertedWith("Splitter: nothing to withdraw");
       });
     });
   });

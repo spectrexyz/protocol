@@ -24,8 +24,6 @@ interface ISplitter {
 
     function withdrawBatch(sIERC20[] calldata sERC20s, address beneficiary) external;
 
-    function isRegistered(sIERC20 sERC20) external view returns (bool);
-
     function stateOf(sIERC20 sERC20) external view returns (uint256 received, uint256 totalWithdrawn);
 
     function shareOf(sIERC20 sERC20, address beneficiary) external view returns (uint256);
