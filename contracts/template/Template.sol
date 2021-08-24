@@ -77,13 +77,13 @@ contract Template is Context, AccessControl {
         //register sERC20 in sSplitter
         _splitter.register(sIERC20(sERC20), beneficiaries, shares);
         // register sERC20 in sFlashBuyout
-        _broker.register(
-            sERC20,
-            /* to update when pool are ready */
-            address(this),
-            multiplier,
-            timeframe
-        );
+        // _broker.register(
+        //     sERC20,
+        //     /* to update when pool are ready */
+        //     address(this),
+        //     multiplier,
+        //     timeframe
+        // );
         // register sERC20 in sMinter
         _minter.register(sERC20, address(pool), beneficiary, initialPrice, shares[0], fee);
     }
