@@ -36,7 +36,7 @@ contract sERC20 is
     bytes32 public constant SNAPSHOT_ROLE = keccak256("SNAPSHOT_ROLE");
 
     address private _sERC1155;
-    bool private _hooked;
+    bool private _isHooked;
 
     /**
      * @dev - This contract is meant to be used as the implementation contract of EIP-1167 minimal proxies.
@@ -132,9 +132,9 @@ contract sERC20 is
     ) external override {
         require(_msgSender() == _sERC1155, "sERC20: must be sERC1155 to use transfer hook");
 
-        _hooked = true;
+        _isHooked = true;
         _transfer(from, to, amount);
-        _hooked = false;
+        _isHooked = false;
     }
 
     /* #enregion */
@@ -174,7 +174,7 @@ contract sERC20 is
     ) internal override(ERC20Upgradeable, ERC20PausableUpgradeable, ERC20SnapshotUpgradeable) {
         super._beforeTokenTransfer(from, to, amount);
 
-        if (!_hooked) sIERC1155(_sERC1155).onSERC20Transferred(from, to, amount);
+        if (!_isHooked) sIERC1155(_sERC1155).onSERC20Transferred(from, to, amount); // onERC20Transferred
     }
     /* #endregion */
 }

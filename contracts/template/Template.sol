@@ -6,7 +6,7 @@ import "../core/interfaces/0.7/sIERC20.sol";
 import "../core/interfaces/0.7/sIERC1155.sol";
 import "../distribution/sBootstrappingPool.sol";
 import "../distribution/interfaces/sIMinter.sol";
-import "../utils/interfaces/0.7/sISplitter.sol";
+import "../utils/interfaces/0.7/ISplitter.sol";
 import "@openzeppelin/contracts-0.7/access/AccessControl.sol";
 import "@openzeppelin/contracts-0.7/utils/Context.sol";
 
@@ -21,7 +21,7 @@ contract Template is Context, AccessControl {
     sIERC1155 private immutable _sERC1155;
     IFlashBroker private immutable _broker;
     sIMinter private immutable _minter;
-    sISplitter private immutable _splitter;
+    ISplitter private immutable _splitter;
     IVault private immutable _vault;
     IERC20 private immutable _weth;
 
@@ -37,7 +37,7 @@ contract Template is Context, AccessControl {
         _minter = sIMinter(minter);
         _broker = IFlashBroker(broker);
         _weth = IERC20(weth);
-        _splitter = sISplitter(splitter);
+        _splitter = ISplitter(splitter);
         _vault = IVault(vault);
     }
 
@@ -75,7 +75,7 @@ contract Template is Context, AccessControl {
         //     bool    sERC20IsToken0
         // )
         //register sERC20 in sSplitter
-        _splitter.register(sERC20, beneficiaries, shares);
+        _splitter.register(sIERC20(sERC20), beneficiaries, shares);
         // register sERC20 in sFlashBuyout
         _broker.register(
             sERC20,

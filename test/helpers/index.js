@@ -12,9 +12,8 @@ const RECEIVER_BATCH_MAGIC_VALUE = "0xbc197c81";
 const sERC721 = require("./models/sERC721");
 const sERC1155 = require("./models/sERC1155");
 const sBootstrappingPool = require("./models/sBootstrappingPool");
-const sSplitter = require("./models/sSplitter");
 const sMinter = require("./models/sMinter");
-const { Broker, Template } = require("./models");
+const { Broker, Template, Splitter } = require("./models");
 
 const initialize = async (ctx) => {
   ctx.params = {
@@ -60,8 +59,8 @@ const initialize = async (ctx) => {
       value: ethers.utils.parseEther("10"),
       balance: ethers.utils.parseEther("1"),
     },
-    sSplitter: {
-      shares: [ethers.BigNumber.from("300000000000000000"), ethers.BigNumber.from("100000000000000000"), ethers.BigNumber.from("600000000000000000")],
+    splitter: {
+      shares: [ethers.utils.parseEther("30"), ethers.utils.parseEther("10"), ethers.utils.parseEther("60")],
     },
     sMinter: {
       protocolFee: ethers.BigNumber.from("2000000000000000000"), // 2e18 = 2%
@@ -151,7 +150,7 @@ const initialize = async (ctx) => {
     sERC20: {},
     sERC721: { owners: [] },
     sERC1155: {},
-    sSplitter: { beneficiaries: [] },
+    splitter: { beneficiaries: [] },
     sMinter: {},
     holders: [],
     owners: [],
@@ -182,11 +181,11 @@ const initialize = async (ctx) => {
     ctx.signers.sERC20.snapshoter,
     ctx.signers.sERC721.owners[0],
     ctx.signers.sERC721.owners[1],
-    ctx.signers.sSplitter.admin,
-    ctx.signers.sSplitter.registrar,
-    ctx.signers.sSplitter.beneficiaries[0],
-    ctx.signers.sSplitter.beneficiaries[1],
-    ctx.signers.sSplitter.beneficiaries[2],
+    ctx.signers.splitter.admin,
+    ctx.signers.splitter.registrar,
+    ctx.signers.splitter.beneficiaries[0],
+    ctx.signers.splitter.beneficiaries[1],
+    ctx.signers.splitter.beneficiaries[2],
     ctx.signers.sMinter.admin,
     ctx.signers.sMinter.bank,
     ctx.signers.sMinter.splitter,
@@ -248,7 +247,7 @@ const setup = async (ctx, opts = {}) => {
   await sERC721.deploy(ctx);
   await sERC1155.deploy(ctx);
   await ctx.sERC721.mint(opts);
-  await sSplitter.deploy(ctx);
+  await Splitter.deploy(ctx);
 
   if (opts.spectralize) {
     await ctx.sERC1155.spectralize();

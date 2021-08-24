@@ -284,7 +284,7 @@ contract sERC1155 is Context, ERC165, AccessControlEnumerable, sIERC1155 {
     /**
      * @notice Spectralize the ERC721-compliant NFT belonging to `collection` and identified by `tokenId` into an sERC20.
      * @dev - This contract must be approved to transfer the NFT before this function is called.
-     *      - sERC20-related parameters are checked in SERC20.initialize().
+     *      - sERC20-related parameters are checked in sERC20.initialize().
      *      - This contract is open to re-entrancy for it would be harmless.
      * @param collection The address of the ERC721 contract the NFT to spectralize belongs to.
      * @param tokenId    The tokenId of the NFT to spectralize.

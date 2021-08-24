@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
+/*NFT*/
 contract sERC721 is Context, AccessControlEnumerable, ERC721Enumerable, ERC721Pausable, ERC721Burnable, ERC721URIStorage {
     using Counters for Counters.Counter;
 

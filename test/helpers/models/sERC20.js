@@ -21,10 +21,7 @@ class sERC20 {
   }
 
   static async deploy(ctx) {
-    ctx.contracts.sERC20 = await waffle.deployContract(
-      ctx.signers.sERC20.admin,
-      _sERC20_
-    );
+    ctx.contracts.sERC20 = await waffle.deployContract(ctx.signers.sERC20.admin, _sERC20_);
 
     ctx.sERC20 = new sERC20(ctx);
   }
@@ -33,11 +30,7 @@ class sERC20 {
     opts.permissions ??= true;
     opts.root ??= ctx.signers.root;
 
-    ctx.contracts.sERC20 = new ethers.Contract(
-      address,
-      _sERC20_.abi,
-      opts.root
-    );
+    ctx.contracts.sERC20 = new ethers.Contract(address, _sERC20_.abi, opts.root);
 
     const sERC20_ = new sERC20(ctx);
 
@@ -66,12 +59,7 @@ class sERC20 {
     opts.cap ??= this.ctx.params.sERC20.cap;
     opts.admin ??= this.ctx.signers.sERC20.admin;
 
-    this.ctx.data.tx = await this.contract.initialize(
-      this.ctx.params.sERC20.name,
-      this.ctx.params.sERC20.symbol,
-      opts.cap,
-      opts.admin.address
-    );
+    this.ctx.data.tx = await this.contract.initialize(this.ctx.params.sERC20.name, this.ctx.params.sERC20.symbol, opts.cap, opts.admin.address);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -88,9 +76,7 @@ class sERC20 {
     opts.role ??= this.ctx.constants.sERC20.MINT_ROLE;
     opts.adminRole ??= this.ctx.constants.sERC20.MINT_ROLE;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.from)
-      .setRoleAdmin(opts.role, opts.adminRole);
+    this.ctx.data.tx = await this.contract.connect(opts.from).setRoleAdmin(opts.role, opts.adminRole);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -113,9 +99,7 @@ class sERC20 {
     opts.role ?? _throw("sERC20 » grantRole » role required");
     opts.from ??= this.ctx.signers.sERC20.admin;
 
-    this.ctx.data.tx = await this.ctx.contracts.sERC20
-      .connect(opts.from)
-      .grantRole(opts.role, opts.account.address);
+    this.ctx.data.tx = await this.ctx.contracts.sERC20.connect(opts.from).grantRole(opts.role, opts.account.address);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -124,9 +108,7 @@ class sERC20 {
     opts.spender ??= this.ctx.contracts.Vault;
     opts.amount ??= this.ctx.params.sERC20.cap;
 
-    this.ctx.data.tx = await this.ctx.contracts.sERC20
-      .connect(opts.from)
-      .approve(opts.spender.address, opts.amount);
+    this.ctx.data.tx = await this.ctx.contracts.sERC20.connect(opts.from).approve(opts.spender.address, opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -135,20 +117,16 @@ class sERC20 {
     opts.to ??= this.ctx.signers.holders[0];
     opts.amount ??= this.ctx.params.sERC20.balance;
 
-    this.ctx.data.tx = await this.ctx.contracts.sERC20
-      .connect(opts.from)
-      .mint(opts.to.address, opts.amount);
+    this.ctx.data.tx = await this.ctx.contracts.sERC20.connect(opts.from).mint(opts.to.address, opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async transfer(opts = {}) {
     opts.from ??= this.ctx.signers.holders[0];
-    opts.to ??= this.ctx.contracts.sERC20Splitter;
+    opts.to ??= this.ctx.contracts.splitter;
     opts.amount ??= this.ctx.params.sERC20.amount;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.from)
-      .transfer(opts.to.address, opts.amount);
+    this.ctx.data.tx = await this.contract.connect(opts.from).transfer(opts.to.address, opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -158,9 +136,7 @@ class sERC20 {
     opts.to ??= this.ctx.signers.holders[1];
     opts.amount ??= this.ctx.params.sERC20.amount;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.from)
-      .transferFrom(opts.owner.address, opts.to.address, opts.amount);
+    this.ctx.data.tx = await this.contract.connect(opts.from).transferFrom(opts.owner.address, opts.to.address, opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -169,9 +145,7 @@ class sERC20 {
     opts.owner ??= this.ctx.signers.holders[0];
     opts.amount ??= this.ctx.params.sERC20.amount;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.from)
-      .burnFrom(opts.owner.address, opts.amount);
+    this.ctx.data.tx = await this.contract.connect(opts.from).burnFrom(opts.owner.address, opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
