@@ -16,11 +16,11 @@ library Sales {
     struct Sale {
         State _state;
         address guardian;
-        uint256 minimum;
+        uint256 reserve;
         address pool;
         uint256 multiplier;
         uint256 opening;
-        uint256 price; // in ETH per sERC20 once the NFT has been bought out
+        uint256 stock;
         uint256 nbOfProposals;
         mapping(uint256 => Proposals.Proposal) proposals;
         bool flash;

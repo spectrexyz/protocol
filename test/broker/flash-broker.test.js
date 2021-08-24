@@ -38,8 +38,11 @@ describe("FlashBroker", () => {
               ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(this.params.broker.timelock)
             );
             expect(this.data.sale.price).to.equal(0);
-            expect(this.data.sale.nbOfProposals).to.equal(0);
+            expect(this.data.sale.nbOfProposals).to.equal(0); // SHOULD EQUAL 1
             expect(this.data.sale.flash).to.equal(true);
+
+            // check that it updates the number of proposals
+            // MAKE SURE IT UPDATES THE NUMBER OF PROPOSALS
           });
         });
 
