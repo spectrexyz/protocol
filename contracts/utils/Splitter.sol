@@ -23,8 +23,8 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
     /**
      * @notice Register an `sERC20` whose received tokens are to split between `beneficiaries` with respect to `shares`.
-     * @dev - We do not check that `sERC20` actually is an ERC20 to save gas. Indeed, only spectre's trusted template
-     *        is supposed to be granted REGISTER_ROLE - and it passes the sERC20 address out of the sERC20 deployment.
+     * @dev - We do not check that `sERC20` actually is an NFT-pegged sERC20 to save gas. Indeed, only spectre's trusted template is supposed to be granted
+     *        REGISTER_ROLE - and it passes the sERC20 address out of the NFT spectralization.
      *      - Other parameters are checked because they are passed by users and forwarded unchecked by the template.
      * @param sERC20 The sERC20 whose received tokens are to split between beneficiaries.
      * @param beneficiaries The addresses to split the received sERC20s between.
@@ -39,6 +39,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
         require(hasRole(REGISTER_ROLE, _msgSender()), "Splitter: must have REGISTER_ROLE to register");
         require(split.sERC20 == address(0), "Splitter: sERC20 already registered");
+        // maybe we can remove this one too ... this way we do not even have to store the sERC20 address
         require(beneficiaries.length == shares.length, "Splitter: beneficiaries and shares length mismatch");
 
         split.sERC20 = address(sERC20);
@@ -82,7 +83,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
         split.withdrawn[beneficiary] += amount;
         split.totalWithdrawn += amount;
-        
+
         sERC20.transfer(beneficiary, amount);
 
         emit Withdraw(sERC20, beneficiary, amount);
