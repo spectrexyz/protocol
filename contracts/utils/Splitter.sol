@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 
 /**
  * @title Splitter
- * @notice Split received sERC20s between registered beneficiaries.
+ * @notice Splits received sERC20s between registered beneficiaries.
  */
 contract Splitter is Context, AccessControlEnumerable, ISplitter {
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
