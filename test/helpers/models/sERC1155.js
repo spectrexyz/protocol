@@ -1,4 +1,4 @@
-const _sERC1155_ = require("../../../artifacts/contracts/core/sERC1155.sol/sERC1155.json");
+const _sERC1155_ = require("../../../artifacts/contracts/vault/Vault.sol/Vault.json");
 const _ERC721Mock_ = require("../../../artifacts/contracts/test/ERC721Mock.sol/ERC721Mock.json");
 const sERC20 = require("./sERC20");
 // const { _throw } = require('../errors');

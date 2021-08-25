@@ -1,7 +1,7 @@
 const _Authorizer_ = require("../../../artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json");
 const _Vault_ = require("../../../artifacts/@balancer-labs/v2-vault/contracts/Vault.sol/Vault.json");
 const _OracleMock_ = require("../../../artifacts/contracts/test/OracleMock.sol/OracleMock.json");
-const _sBootstrappingPool_ = require("../../../artifacts/contracts/distribution/sBootstrappingPool.sol/sBootstrappingPool.json");
+const _sBootstrappingPool_ = require("../../../artifacts/contracts/market/sBootstrappingPool.sol/sBootstrappingPool.json");
 const _WETH_ = require("../../../artifacts/contracts/test/WETH.sol/WETH.json");
 const Decimal = require("decimal.js");
 const { ethers } = require("ethers");
@@ -35,30 +35,15 @@ class sBootstrappingPool {
     let token0, token1, sERC20IsToken0;
     opts.mint ??= opts.minter ? false : true;
 
-    ctx.contracts.Authorizer = await waffle.deployContract(
-      ctx.signers.root,
-      _Authorizer_,
-      [ctx.signers.root.address]
-    );
-    ctx.contracts.OracleMock = await waffle.deployContract(
-      ctx.signers.root,
-      _OracleMock_
-    );
+    ctx.contracts.Authorizer = await waffle.deployContract(ctx.signers.root, _Authorizer_, [ctx.signers.root.address]);
+    ctx.contracts.OracleMock = await waffle.deployContract(ctx.signers.root, _OracleMock_);
     ctx.contracts.WETH = await waffle.deployContract(ctx.signers.root, _WETH_);
-    ctx.contracts.Vault = await waffle.deployContract(
-      ctx.signers.root,
-      _Vault_,
-      [ctx.contracts.Authorizer.address, ctx.contracts.WETH.address, 0, 0]
-    );
+    ctx.contracts.Vault = await waffle.deployContract(ctx.signers.root, _Vault_, [ctx.contracts.Authorizer.address, ctx.contracts.WETH.address, 0, 0]);
 
     if (!opts.spectralize) await ctx.sERC1155.spectralize();
     if (opts.mint) await ctx.sERC20.mint();
 
-    if (
-      ethers.BigNumber.from(ctx.contracts.WETH.address).lte(
-        ethers.BigNumber.from(ctx.contracts.sERC20.address)
-      )
-    ) {
+    if (ethers.BigNumber.from(ctx.contracts.WETH.address).lte(ethers.BigNumber.from(ctx.contracts.sERC20.address))) {
       token0 = ctx.contracts.WETH.address;
       token1 = ctx.contracts.sERC20.address;
       sERC20IsToken0 = false;
@@ -98,23 +83,19 @@ class sBootstrappingPool {
       opts.swapFeePercentage = ctx.params.sBootstrappingPool.swapFeePercentage;
     }
 
-    ctx.contracts.sBootstrappingPool = await waffle.deployContract(
-      ctx.signers.root,
-      _sBootstrappingPool_,
-      [
-        ctx.contracts.Vault.address,
-        ctx.params.sBootstrappingPool.name,
-        ctx.params.sBootstrappingPool.symbol,
-        token0,
-        token1,
-        opts.maxWeight,
-        opts.minWeight,
-        opts.swapFeePercentage,
-        ctx.params.sBootstrappingPool.pauseWindowDuration,
-        ctx.params.sBootstrappingPool.bufferPeriodDuration,
-        sERC20IsToken0,
-      ]
-    );
+    ctx.contracts.sBootstrappingPool = await waffle.deployContract(ctx.signers.root, _sBootstrappingPool_, [
+      ctx.contracts.Vault.address,
+      ctx.params.sBootstrappingPool.name,
+      ctx.params.sBootstrappingPool.symbol,
+      token0,
+      token1,
+      opts.maxWeight,
+      opts.minWeight,
+      opts.swapFeePercentage,
+      ctx.params.sBootstrappingPool.pauseWindowDuration,
+      ctx.params.sBootstrappingPool.bufferPeriodDuration,
+      sERC20IsToken0,
+    ]);
 
     await ctx.sERC20.approve();
 
@@ -138,11 +119,7 @@ class sBootstrappingPool {
 
     let token0, token1, amount0, amount1;
 
-    if (
-      ethers.BigNumber.from(this.ctx.contracts.WETH.address).lte(
-        ethers.BigNumber.from(this.ctx.contracts.sERC20.address)
-      )
-    ) {
+    if (ethers.BigNumber.from(this.ctx.contracts.WETH.address).lte(ethers.BigNumber.from(this.ctx.contracts.sERC20.address))) {
       token0 = ethers.constants.AddressZero;
       token1 = this.ctx.contracts.sERC20.address;
       amount0 = opts.reward ? 0 : this.ctx.params.sBootstrappingPool.pooled.ETH;
@@ -165,40 +142,23 @@ class sBootstrappingPool {
     const joinPoolRequest = {
       assets: [token0, token1],
       maxAmountsIn: [amount0, amount1],
-      userData: ethers.utils.defaultAbiCoder.encode(
-        ["uint256", "uint256[]"],
-        [opts.joinKind, [amount0, amount1]]
-      ),
+      userData: ethers.utils.defaultAbiCoder.encode(["uint256", "uint256[]"], [opts.joinKind, [amount0, amount1]]),
       fromInternalBalance: false,
     };
 
-    this.ctx.data.tx = await this.ctx.contracts.Vault.connect(
-      opts.from
-    ).joinPool(
-      this.ctx.data.poolId,
-      opts.from.address,
-      opts.from.address,
-      joinPoolRequest,
-      {
-        value: this.ctx.params.sBootstrappingPool.pooled.ETH,
-      }
-    );
+    this.ctx.data.tx = await this.ctx.contracts.Vault.connect(opts.from).joinPool(this.ctx.data.poolId, opts.from.address, opts.from.address, joinPoolRequest, {
+      value: this.ctx.params.sBootstrappingPool.pooled.ETH,
+    });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async pairPrice() {
     const BASE = new Decimal(10).pow(new Decimal(18));
-    const { balances } = await this.ctx.contracts.Vault.getPoolTokens(
-      this.ctx.data.poolId
-    );
+    const { balances } = await this.ctx.contracts.Vault.getPoolTokens(this.ctx.data.poolId);
     const weights = await this.getNormalizedWeights();
 
-    const numerator = this._decimal(balances[0]).div(
-      this._decimal(weights[0]).div(BASE)
-    );
-    const denominator = this._decimal(balances[1]).div(
-      this._decimal(weights[1]).div(BASE)
-    );
+    const numerator = this._decimal(balances[0]).div(this._decimal(weights[0]).div(BASE));
+    const denominator = this._decimal(balances[1]).div(this._decimal(weights[1]).div(BASE));
 
     return this._bn(numerator.mul(BASE).div(denominator));
   }
@@ -207,35 +167,18 @@ class sBootstrappingPool {
     opts.sERC20 ??= false;
 
     const BASE = new Decimal(10).pow(new Decimal(18));
-    const { balances } = await this.ctx.contracts.Vault.getPoolTokens(
-      this.ctx.data.poolId
-    );
+    const { balances } = await this.ctx.contracts.Vault.getPoolTokens(this.ctx.data.poolId);
     const weights = await this.getNormalizedWeights();
     const totalSupply = await this.totalSupply();
 
     if (opts.sERC20) {
       if (this.sERC20IsToken0) {
-        return this._bn(
-          this._decimal(balances[0])
-            .mul(BASE)
-            .div(this._decimal(weights[0]).div(BASE))
-            .div(this._decimal(totalSupply))
-        );
+        return this._bn(this._decimal(balances[0]).mul(BASE).div(this._decimal(weights[0]).div(BASE)).div(this._decimal(totalSupply)));
       } else {
-        return this._bn(
-          this._decimal(balances[1])
-            .mul(BASE)
-            .div(this._decimal(weights[1]).div(BASE))
-            .div(this._decimal(totalSupply))
-        );
+        return this._bn(this._decimal(balances[1]).mul(BASE).div(this._decimal(weights[1]).div(BASE)).div(this._decimal(totalSupply)));
       }
     } else {
-      return this._bn(
-        this._decimal(balances[0])
-          .mul(BASE)
-          .div(this._decimal(weights[0]).div(BASE))
-          .div(this._decimal(totalSupply))
-      );
+      return this._bn(this._decimal(balances[0]).mul(BASE).div(this._decimal(weights[0]).div(BASE)).div(this._decimal(totalSupply)));
     }
   }
 
@@ -245,21 +188,13 @@ class sBootstrappingPool {
     const cap = this._decimal(await this.ctx.sERC20.cap());
     const supply = this._decimal(await this.ctx.sERC20.totalSupply());
 
-    const delta = this._decimal(
-      this.ctx.params.sBootstrappingPool.normalizedEndWeight.sub(
-        this.ctx.params.sBootstrappingPool.normalizedStartWeight
-      )
-    );
+    const delta = this._decimal(this.ctx.params.sBootstrappingPool.normalizedEndWeight.sub(this.ctx.params.sBootstrappingPool.normalizedStartWeight));
     const gamma = delta.mul(supply);
 
-    const sWeight = this._decimal(
-      this.ctx.params.sBootstrappingPool.normalizedStartWeight
-    ).add(gamma.div(cap));
+    const sWeight = this._decimal(this.ctx.params.sBootstrappingPool.normalizedStartWeight).add(gamma.div(cap));
     const eWeight = ONE.sub(sWeight);
 
-    return this.sERC20IsToken0
-      ? [this._bn(sWeight), this._bn(eWeight)]
-      : [this._bn(eWeight), this._bn(sWeight)];
+    return this.sERC20IsToken0 ? [this._bn(sWeight), this._bn(eWeight)] : [this._bn(eWeight), this._bn(sWeight)];
   }
 
   async expectedMaxWeightTokenIndex() {

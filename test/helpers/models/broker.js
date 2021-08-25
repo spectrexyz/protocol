@@ -1,5 +1,5 @@
 const { ethers } = require("ethers");
-const _Broker_ = require("../../../artifacts/contracts/broker/FlashBroker.sol/FlashBroker.json");
+const _Broker_ = require("../../../artifacts/contracts/broker/Broker.sol/Broker.json");
 
 class Broker {
   constructor(ctx) {

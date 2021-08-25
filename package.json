@@ -11,6 +11,7 @@
     "compile": "npx hardhat compile",
     "lint": "npx prettier --write contracts/",
     "test:coverage": "npx hardhat coverage",
+    "test:token": "npx hardhat test test/token/*",
     "test:core": "npx hardhat test test/core/*",
     "test:broker": "npx hardhat test test/broker/*",
     "test:utils": "npx hardhat test test/utils/*",

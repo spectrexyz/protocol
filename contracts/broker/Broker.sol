@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "../core/interfaces/sIERC20.sol";
-import {sIERC1155 as IVault} from "../core/interfaces/sIERC1155.sol";
-import "./interfaces/IFlashBroker.sol";
+import "./interfaces/IBroker.sol";
 import "./libraries/Sales.sol";
+import "../token/interfaces/sIERC20.sol";
+import "../vault/interfaces/IVault.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
 /**
- * @title FlashBroker
- * @notice Handles sERC20-pegged NFTs buyouts.
+ * @title Broker
+ * @notice Handles the buyout of spectralized ERC721.
  */
-contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
+contract Broker is Context, AccessControlEnumerable, IBroker {
     using Address for address payable;
     using Proposals for Proposals.Proposal;
     using Sales for Sales.Sale;
@@ -25,6 +25,7 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
     bytes32 private constant BURN_ROLE = keccak256("BURN_ROLE");
 
     IVault private immutable _vault;
+    // IMarket private immutable _market;
     mapping(sIERC20 => Sales.Sale) private _sales;
 
     constructor(IVault vault_, address registrar) {
@@ -41,12 +42,10 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
      * @notice Register an NFT to be put on sale.
      * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an NFT-pegged sERC20 to save gas.
      *        Indeed, only trusted templates, registering sERC20s out of actual NFT spectralizations, are supposed to be granted REGISTER_ROLE.
-     *      - The same rational applies to `pool`.
      *      - Other parameters are checked because they are passed by users and forwarded unchecked by templates.
      * @param sERC20 The sERC20 whose pegged NFT is put on sale.
      * @param guardian The account authorized to enable flash buyout and accept / reject proposals otherwise.
      * @param reserve The reserve price above which the NFT can be bought out.
-     * @param pool The address of the sERC20's SpectralizationBootstrappingPool.
      * @param multiplier The sale's buyout multiplier.
      * @param timelock The period of time after which the sale opens.
      * @param flash True if flash buyout is enabled, false otherwise.
@@ -55,7 +54,6 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
         sIERC20 sERC20,
         address guardian,
         uint256 reserve,
-        address pool,
         uint256 multiplier,
         uint256 timelock,
         bool flash
@@ -69,8 +67,7 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
         sale._state = Sales.State.Pending;
         sale.guardian = guardian;
         sale.reserve = reserve;
-        sale.pool = pool;
-        sale.multiplier = multiplier;
+        sale.multiplier = multiplier; // le multiplier il est enregistrer dans le market !
         sale.opening = block.timestamp + timelock;
 
         if (flash) _enableFlashBuyout(sERC20, sale);
@@ -187,11 +184,11 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
     }
 
     /**
-     * @notice Transfer `sERC20s` pegged NFTs to `beneficiaries` with `datas` as ERC-721#transfer callback datas.
+     * @notice Transfer `sERC20s` pegged NFTs to `beneficiaries` with `datas` as ERC721#transfer callback datas.
      * @dev This function is only meant to be used in case of emergency / hacks to move sERC20s pegged NFTs to a safer place.
      * @param sERC20s The sERC20s whose pegged NFT are to escape.
      * @param beneficiaries The addresses escaped NFTs are transferred to.
-     * @param datas The ERC-721#transfer callback datas.
+     * @param datas The ERC721#transfer callback datas.
      */
     function escape(
         sIERC20[] calldata sERC20s,
@@ -202,7 +199,7 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
         require(sERC20s.length == beneficiaries.length && sERC20s.length == datas.length, "FlashBroker: parameters lengths mismatch");
 
         for (uint256 i = 0; i < sERC20s.length; i++) {
-            _vault.unlock(address(sERC20s[i]), beneficiaries[i], datas[i]);
+            _vault.unlock(sERC20s[i], beneficiaries[i], datas[i]);
 
             emit Escape(sERC20s[i], beneficiaries[i], datas[i]);
         }
@@ -224,7 +221,6 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
             Sales.State state,
             address guardian,
             uint256 reserve,
-            address pool,
             uint256 multiplier,
             uint256 opening,
             uint256 stock,
@@ -237,7 +233,6 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
         state = sale.state();
         guardian = sale.guardian;
         reserve = sale.reserve;
-        pool = sale.pool;
         multiplier = sale.multiplier;
         opening = sale.opening;
         stock = sale.stock;
@@ -263,7 +258,7 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
         sale.stock = value;
 
         sERC20.burn(burnFrom, collateral);
-        _vault.unlock(address(sERC20), buyer, "");
+        _vault.unlock(sERC20, buyer, "");
 
         emit Buyout(sERC20, buyer, value, collateral);
         // we should disable minting once bought-out???
@@ -279,7 +274,7 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
 
         require(supply > 0, "FlashBroker: invalid supply state");
 
-        uint256 tokenPrice = _priceOf(sale.pool);
+        uint256 tokenPrice = _priceOf(sERC20);
         uint256 marketValue = (((tokenPrice * supply) / DECIMALS) * sale.multiplier) / DECIMALS;
         uint256 reserve = sale.reserve;
         uint256 rawValue = reserve >= marketValue ? reserve : marketValue;
@@ -288,7 +283,7 @@ contract FlashBroker is Context, AccessControlEnumerable, IFlashBroker {
         value = (rawValue * (DECIMALS - (collateral * DECIMALS) / supply)) / DECIMALS;
     }
 
-    function _priceOf(address pool) private view returns (uint256) {
+    function _priceOf(sIERC20 sERC20) private view returns (uint256) {
         return 1e16;
     }
 }

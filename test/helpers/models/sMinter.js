@@ -1,4 +1,4 @@
-const _sMinter_ = require("../../../artifacts/contracts/distribution/sMinter.sol/sMinter.json");
+const _sMinter_ = require("../../../artifacts/contracts/market/sMinter.sol/sMinter.json");
 const { ethers } = require("ethers");
 
 class sMinter {
@@ -23,24 +23,17 @@ class sMinter {
     opts.splitter ??= ctx.signers.sMinter.splitter;
     opts.protocolFee ??= ctx.params.sMinter.protocolFee;
 
-    ctx.contracts.sMinter = await waffle.deployContract(
-      ctx.signers.sMinter.admin,
-      _sMinter_,
-      [
-        opts.vault.address,
-        opts.bank.address,
-        opts.splitter.address,
-        opts.protocolFee,
-      ]
-    );
+    ctx.contracts.sMinter = await waffle.deployContract(ctx.signers.sMinter.admin, _sMinter_, [
+      opts.vault.address,
+      opts.bank.address,
+      opts.splitter.address,
+      opts.protocolFee,
+    ]);
 
     await (
       await ctx.contracts.sMinter
         .connect(ctx.signers.sMinter.admin)
-        .grantRole(
-          await ctx.contracts.sMinter.REGISTER_ROLE(),
-          ctx.signers.sMinter.registerer.address
-        )
+        .grantRole(await ctx.contracts.sMinter.REGISTER_ROLE(), ctx.signers.sMinter.registerer.address)
     ).wait();
 
     ctx.sMinter = new sMinter(ctx);
@@ -56,14 +49,7 @@ class sMinter {
 
     this.ctx.data.tx = await this.contract
       .connect(opts.from)
-      .register(
-        this.ctx.sERC20.contract.address,
-        opts.pool.address,
-        opts.beneficiary.address,
-        opts.initialPrice,
-        opts.allocation,
-        opts.fee
-      );
+      .register(this.ctx.sERC20.contract.address, opts.pool.address, opts.beneficiary.address, opts.initialPrice, opts.allocation, opts.fee);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -75,12 +61,7 @@ class sMinter {
 
     this.ctx.data.tx = await this.contract
       .connect(opts.from)
-      .mint(
-        this.ctx.sERC20.contract.address,
-        opts.expected,
-        opts.recipient.address,
-        { value: opts.value }
-      );
+      .mint(this.ctx.sERC20.contract.address, opts.expected, opts.recipient.address, { value: opts.value });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }

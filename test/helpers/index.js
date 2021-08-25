@@ -1,4 +1,4 @@
-const SERC20 = require("../../artifacts/contracts/core/sERC20.sol/sERC20.json");
+const SERC20 = require("../../artifacts/contracts/token/sERC20.sol/sERC20.json");
 const ERC1155Receiver = require("../../artifacts/contracts/test/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json");
 const ERC721Mock = require("../../artifacts/contracts/test/ERC721Mock.sol/ERC721Mock.json");
 

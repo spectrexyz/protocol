@@ -17,7 +17,6 @@ library Sales {
         State _state;
         address guardian;
         uint256 reserve;
-        address pool;
         uint256 multiplier;
         uint256 opening;
         uint256 stock;

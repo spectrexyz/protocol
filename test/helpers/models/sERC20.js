@@ -1,4 +1,4 @@
-const _sERC20_ = require("../../../artifacts/contracts/core/sERC20.sol/sERC20.json");
+const _sERC20_ = require("../../../artifacts/contracts/token/sERC20.sol/sERC20.json");
 const { _throw } = require("../errors");
 
 class sERC20 {
@@ -16,7 +16,7 @@ class sERC20 {
     this.balanceOfAt = this.contract.balanceOfAt;
     this.paused = this.contract.paused;
     this.allowance = this.contract.allowance;
-    this.sERC1155 = this.contract.sERC1155;
+    this.vault = this.contract.vault;
     this.getRoleAdmin = this.contract.getRoleAdmin;
   }
 
@@ -150,10 +150,12 @@ class sERC20 {
   }
 
   async burn(opts = {}) {
-    opts.from ??= this.ctx.signers.holders[0];
+    opts.from ??= opts.account ? this.ctx.signers.sERC20.burner : this.ctx.signers.holders[0];
     opts.amount ??= this.ctx.params.sERC20.amount;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).burn(opts.amount);
+    this.ctx.data.tx = opts.account
+      ? await this.contract.connect(opts.from)["burn(address,uint256)"](opts.account.address, opts.amount)
+      : await this.contract.connect(opts.from)["burn(uint256)"](opts.amount);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
