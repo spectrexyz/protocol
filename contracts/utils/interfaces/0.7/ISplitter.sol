@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.7.0;
 
-import "../../../core/interfaces/0.7/sIERC20.sol";
+import "../../../token/interfaces/0.7/sIERC20.sol";
 
 interface ISplitter {
     struct Split {
-        address sERC20; // storing an address is more efficient than storing a bool to check if a split is registered
         uint256 totalWithdrawn;
         mapping(address => uint256) shares;
         mapping(address => uint256) withdrawn;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "../../core/interfaces/sIERC20.sol";
+import "../../token/interfaces/sIERC20.sol";
 
 interface ISplitter {
     struct Split {

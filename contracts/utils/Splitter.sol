@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "../core/interfaces/sIERC20.sol";
 import "./interfaces/ISplitter.sol";
+import "../token/interfaces/sIERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
@@ -23,12 +23,11 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
     /**
      * @notice Register an `sERC20` whose received tokens are to split between `beneficiaries` with respect to `shares`.
-     * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an NFT-pegged sERC20 to save gas.
+     * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an sERC20 to save gas.
      *        Indeed, only trusted templates, registering sERC20s out of actual NFT spectralizations, are supposed to be granted REGISTER_ROLE.
-     *      - The same rational applies to `pool`.
      *      - Other parameters are checked because they are passed by users and forwarded unchecked by the template.
      * @param sERC20 The sERC20 whose received tokens are to split between beneficiaries.
-     * @param beneficiaries The addresses to split the received sERC20s between.
+     * @param beneficiaries The addresses between which to split the received sERC20s.
      * @param shares The respective shares of the beneficiaries over the received sERC20s [expressed with 1e18 decimals].
      */
     function register(
@@ -63,10 +62,10 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
     /**
      * @notice Withdraw `sERC20` tokens due to `beneficiary`.
-     * @dev - We do not check that split.shares[beneficiary] != 0 as the contract already reverts in such a situation
-     *        for due == withdrawn == 0.
+     * @dev - We do not check neither that `sERC20` is registered nor that split.shares[beneficiary] != 0.
+     *      - Indeed, the contract already reverts in such a situation for due == withdrawn == 0.
      * @param sERC20 The sERC20 to withdraw.
-     * @param beneficiary The beneficiary to withdraw the due sERC20 tokens of.
+     * @param beneficiary The beneficiary from whom to withdraw the due sERC20 tokens.
      */
     function withdraw(sIERC20 sERC20, address beneficiary) external override {
         Split storage split = _splits[sERC20];
@@ -87,13 +86,12 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
     /**
      * @notice Batch withdraw `sERC20s` tokens due to `beneficiary`.
-     * @dev - The same security remarks apply as above, plus:
-     *      - It's up to the user not to include the same sERC20 twice in the sERC20s array - in which case the
-     *        transaction reverts.
-     *      - We do not check the sERC20s array length as the gas limit can rise in the future. Therefore, it is up to
-     *        the user to make sure he does not run out of gas.
+     * @dev - The same security remarks as apply as, plus:
+     *      - It is up to the user not to include the same sERC20 twice in `sERC20s` - otherwise the transaction reverts.
+     *      - We do not check the sERC20s array length as the gas limit can rise in the future. 
+     *      - Therefore, it is up to the user to make sure he does not run out of gas.
      * @param sERC20s The sERC20s to withdraw.
-     * @param beneficiary The beneficiary to withdraw the due sERC20s tokens of.
+     * @param beneficiary The beneficiary from whom to withdraw the due sERC20s tokens.
      */
     function withdrawBatch(sIERC20[] calldata sERC20s, address beneficiary) external override {
         sIERC20 sERC20;
@@ -120,6 +118,9 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
         }
     }
 
+    /**
+     * @notice Return the amount of `sERC20` tokens received and whithdrawn.
+     */
     function stateOf(sIERC20 sERC20) public view override returns (uint256 received, uint256 totalWithdrawn) {
         Split storage split = _splits[sERC20];
 
@@ -127,10 +128,16 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
         received = sERC20.balanceOf(address(this)) + totalWithdrawn;
     }
 
+    /**
+     * @notice Return the share of `beneficiary` over the received `sERC20` tokens [expressed with 1e18 decimals].
+     */
     function shareOf(sIERC20 sERC20, address beneficiary) public view override returns (uint256) {
         return _splits[sERC20].shares[beneficiary];
     }
 
+    /**
+     * @notice Return the amount of `sERC20` tokens already withdrawn by `beneficiary`.
+     */
     function withdrawnBy(sIERC20 sERC20, address beneficiary) public view override returns (uint256) {
         return _splits[sERC20].withdrawn[beneficiary];
     }
