@@ -88,7 +88,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
      * @notice Batch withdraw `sERC20s` tokens due to `beneficiary`.
      * @dev - The same security remarks as apply as, plus:
      *      - It is up to the user not to include the same sERC20 twice in `sERC20s` - otherwise the transaction reverts.
-     *      - We do not check the sERC20s array length as the gas limit can rise in the future. 
+     *      - We do not check the sERC20s array length as the gas limit can rise in the future.
      *      - Therefore, it is up to the user to make sure he does not run out of gas.
      * @param sERC20s The sERC20s to withdraw.
      * @param beneficiary The beneficiary from whom to withdraw the due sERC20s tokens.
