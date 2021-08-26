@@ -1,96 +1,153 @@
 const { expect } = require("chai");
+// const { ethers } = require("ethers");
 const { initialize, setup } = require("../helpers");
-const { sERC20 } = require("../helpers/models");
 const { advanceTime } = require("../helpers/time");
 
-describe("FlashBroker", () => {
+describe("Broker", () => {
   before(async () => {
     await initialize(this);
   });
 
-  describe("# constructor", () => {
+  describe.only("# constructor", () => {
     before(async () => {
       await setup(this, { broker: true });
     });
 
-    it("# it initializes FlashBroker", async () => {
-      expect(await this.broker.sERC1155()).to.equal(this.sERC1155.contract.address);
+    it("it initializes broker", async () => {
+      expect(await this.broker.vault()).to.equal(this.sERC1155.contract.address);
+      expect(await this.broker.market()).to.equal(this.contracts.marketMock.address);
+    });
+
+    it("it sets up permissions", async () => {
+      expect(await this.broker.hasRole(ethers.constants.HashZero, this.signers.broker.admin.address)).to.equal(true);
     });
   });
 
   describe("# register", () => {
-    describe("» sERC20 is not registered yet", () => {
-      describe("» and sERC20 is pegged to a locked NFT", () => {
-        describe("» and timelock period is valid", () => {
-          before(async () => {
-            await setup(this, { broker: true });
-            await this.broker.register();
-            this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
-          });
-
-          it("# it registers sale", async () => {
-            expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.PENDING);
-            expect(this.data.sale.guardian).to.equal(this.signers.broker.guardian.address);
-            expect(this.data.sale.minimum).to.equal(this.params.broker.minimum);
-            expect(this.data.sale.pool).to.equal(this.signers.others[1].address);
-            expect(this.data.sale.multiplier).to.equal(this.params.broker.multiplier);
-            expect(this.data.sale.opening).to.equal(
-              ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(this.params.broker.timelock)
-            );
-            expect(this.data.sale.price).to.equal(0);
-            expect(this.data.sale.nbOfProposals).to.equal(0); // SHOULD EQUAL 1
-            expect(this.data.sale.flash).to.equal(true);
-
-            // check that it updates the number of proposals
-            // MAKE SURE IT UPDATES THE NUMBER OF PROPOSALS
-          });
-        });
-
-        describe("» but timelock period is invalid", () => {
-          before(async () => {
-            await setup(this, { broker: true });
-          });
-
-          it("it reverts", async () => {
-            await expect(this.broker.register({ timelock: "100" })).to.be.revertedWith("FlashBroker: invalid timelock");
-          });
-        });
-      });
-
-      describe("» but sERC20 is not pegged to a locked NFT", () => {
-        before(async () => {
-          await setup(this, { broker: true });
-          await this.sERC1155.unlock();
-        });
-
-        it("it reverts", async () => {
-          await expect(this.broker.register()).to.be.revertedWith("FlashBroker: invalid spectre state");
-          await expect(this.broker.register({ sERC20: this.signers.others[0] })).to.be.revertedWith("FlashBroker: invalid spectre state");
-        });
-      });
-    });
-
-    describe("» sERC20 is already registered", () => {
-      before(async () => {
-        await setup(this, { broker: true });
-        await this.broker.register();
-      });
-
-      it("it reverts", async () => {
-        await expect(this.broker.register()).to.be.revertedWith("FlashBroker: sERC20 already registered");
-      });
-    });
-  });
-
-  describe("# buyout", () => {
-    describe("» sale is open", () => {
-      describe("» and buyout value is sufficient", () => {
+    describe("» caller has REGISTER_ROLE", () => {
+      describe("» and timelock period is valid", () => {
         describe("» and flash buyout is enabled", () => {
           before(async () => {
             await setup(this, { broker: true });
             await this.broker.register();
-            await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
-            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
+            this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+            this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+              this.params.broker.timelock
+            );
+          });
+
+          it("it registers sale", async () => {
+            expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.PENDING);
+            expect(this.data.sale.guardian).to.equal(this.signers.broker.guardian.address);
+            expect(this.data.sale.reserve).to.equal(this.params.broker.reserve);
+            expect(this.data.sale.multiplier).to.equal(this.params.broker.multiplier);
+            expect(this.data.sale.opening).to.equal(this.data.expectedOpening);
+            expect(this.data.sale.stock).to.equal(0);
+            expect(this.data.sale.nbOfProposals).to.equal(0);
+            expect(this.data.sale.flash).to.equal(true);
+          });
+
+          it("it emits a Register event", async () => {
+            await expect(this.data.tx)
+              .to.emit(this.broker.contract, "Register")
+              .withArgs(
+                this.sERC20.contract.address,
+                this.signers.broker.guardian.address,
+                this.params.broker.reserve,
+                this.params.broker.multiplier,
+                this.data.expectedOpening
+              );
+          });
+
+          it("it emits a EnableFlashBuyout event", async () => {
+            await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
+          });
+        });
+
+        describe("» but flash buyout is disabled", () => {
+          describe("» and guardian is not the zero address", () => {
+            before(async () => {
+              await setup(this, { broker: true });
+              await this.broker.register({ flash: false });
+              this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+              this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+                this.params.broker.timelock
+              );
+            });
+
+            it("it registers sale", async () => {
+              expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.PENDING);
+              expect(this.data.sale.guardian).to.equal(this.signers.broker.guardian.address);
+              expect(this.data.sale.reserve).to.equal(this.params.broker.reserve);
+              expect(this.data.sale.multiplier).to.equal(this.params.broker.multiplier);
+              expect(this.data.sale.opening).to.equal(this.data.expectedOpening);
+              expect(this.data.sale.stock).to.equal(0);
+              expect(this.data.sale.nbOfProposals).to.equal(0);
+              expect(this.data.sale.flash).to.equal(false);
+            });
+
+            it("it emits a Register event", async () => {
+              await expect(this.data.tx)
+                .to.emit(this.broker.contract, "Register")
+                .withArgs(
+                  this.sERC20.contract.address,
+                  this.signers.broker.guardian.address,
+                  this.params.broker.reserve,
+                  this.params.broker.multiplier,
+                  this.data.expectedOpening
+                );
+            });
+
+            it("it does not emit a EnableFlashBuyout event", async () => {
+              await expect(this.data.tx).to.not.emit(this.broker.contract, "EnableFlashBuyout");
+            });
+          });
+
+          describe("» but guardian is the zero address", () => {
+            before(async () => {
+              await setup(this, { broker: true });
+            });
+
+            it("it reverts", async () => {
+              await expect(this.broker.register({ flash: false, guardian: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
+                "Broker: guardian cannot be the zero address if flash buyout is not enabled"
+              );
+            });
+          });
+        });
+      });
+
+      describe("» but timelock period is invalid", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.register({ timelock: "100" })).to.be.revertedWith("Broker: invalid timelock");
+        });
+      });
+    });
+
+    describe("» caller does not have REGISTER_ROLE", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.register({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must have REGISTER_ROLE to register");
+      });
+    });
+  });
+
+  describe.only("# buyout", () => {
+    describe("» sale is open", () => {
+      describe("» and flash buyout is enabled", () => {
+        describe("» and buyout value is sufficient [with collateral]", () => {
+          before(async () => {
+            await setup(this, { broker: true });
+            await this.broker.register();
+            await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
             this.data.previousTotalSupply = await this.sERC20.totalSupply();
             await this.broker.buyout();
@@ -102,10 +159,8 @@ describe("FlashBroker", () => {
             expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.CLOSED);
           });
 
-          it("# it updates sale price", async () => {
-            expect(this.data.sale.price).to.equal(
-              ethers.BigNumber.from(this.params.broker.value).mul(this.constants.broker.DECIMALS).div(this.data.lastTotalSupply)
-            );
+          it("# it updates sale stock", async () => {
+            expect(this.data.sale.stock).to.equal(this.params.broker.value);
           });
 
           it("# it burns buyer's tokens", async () => {
@@ -113,63 +168,160 @@ describe("FlashBroker", () => {
           });
 
           it("# it transfers NFT", async () => {
-            expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.beneficiary.address);
+            expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
+          });
+
+          it("# it revokes market's MINT_ROLE over sERC20", async () => {
+            expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
+          });
+
+          it("it emits a Buyout event", async () => {
+            await expect(this.data.tx)
+              .to.emit(this.broker.contract, "Buyout")
+              .withArgs(this.sERC20.contract.address, this.signers.broker.buyer.address, this.params.broker.value, this.params.broker.balance);
           });
         });
 
-        describe("» but flash buyout is not enabled", () => {
+        describe("» and buyout value is sufficient [with no collateral]", () => {
           before(async () => {
             await setup(this, { broker: true });
-            await this.broker.register({ flash: false });
-            await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
-            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
+            await this.broker.register();
+            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
-            await this.sERC20.approve({
-              from: this.signers.broker.buyer,
-              spender: this.broker.contract,
-              amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")),
-            });
+            this.data.previousTotalSupply = await this.sERC20.totalSupply();
             await this.broker.buyout();
             this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
-            this.data.proposal = await this.broker.proposal(this.sERC20.contract.address, 0);
+            this.data.lastTotalSupply = await this.sERC20.totalSupply();
           });
 
-          it("it creates a new proposal", async () => {
-            expect(this.data.sale.nbOfProposals).to.equal(1);
-            expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Pending);
-            expect(this.data.proposal.buyer).to.equal(this.signers.broker.buyer.address);
-            expect(this.data.proposal.beneficiary).to.equal(this.signers.broker.beneficiary.address);
-            expect(this.data.proposal.value).to.equal(this.params.broker.value);
-            expect(this.data.proposal.balance).to.equal(this.params.sERC20.cap.div(ethers.BigNumber.from("4")));
-            expect(this.data.proposal.expiration).to.equal(
-              ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(this.constants.broker.proposals.duration)
-            );
+          it("# it updates sale state", async () => {
+            expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.CLOSED);
+          });
 
-            //             enum State {
-            //     Null,
-            //     Pending,
-            //     Accepted,
-            //     Rejected,
-            //     Lapsed,proposal.
-            //     Cancelled,
-            //     Refunded
-            // }
+          it("# it updates sale stock", async () => {
+            expect(this.data.sale.stock).to.equal(this.params.broker.value);
+          });
 
-            // struct Proposal {
-            //     State _state;
-            //     address payable from;
-            //     uint256 value;
-            //     uint256 expiration;
-            // }
+          it("# it transfers NFT", async () => {
+            expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
+          });
+
+          it("# it revokes market's MINT_ROLE over sERC20", async () => {
+            expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
+          });
+
+          it("it emits a Buyout event", async () => {
+            await expect(this.data.tx)
+              .to.emit(this.broker.contract, "Buyout")
+              .withArgs(this.sERC20.contract.address, this.signers.broker.buyer.address, this.params.broker.value, 0);
           });
         });
+
+        describe("» but buyout value is insufficient", () => {
+          before(async () => {
+            await setup(this, { broker: true });
+            await this.broker.register();
+            await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+            await advanceTime(this.params.broker.timelock);
+          });
+
+          it("it reverts", async () => {
+            await expect(this.broker.buyout({ value: "1" })).to.be.revertedWith("Broker: insufficient value");
+          });
+        });
+
+        //   before(async () => {
+        //     await setup(this, { broker: true });
+        //     await this.broker.register({ flash: false });
+        //     await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
+        //     await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")) });
+        //     await advanceTime(this.params.broker.timelock);
+        //     await this.sERC20.approve({
+        //       from: this.signers.broker.buyer,
+        //       spender: this.broker.contract,
+        //       amount: this.params.sERC20.cap.div(ethers.BigNumber.from("4")),
+        //     });
+        //     await this.broker.buyout();
+        //     this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+        //     this.data.proposal = await this.broker.proposal(this.sERC20.contract.address, 0);
+        //   });
+
+        //   it("it creates a new proposal", async () => {
+        //     expect(this.data.sale.nbOfProposals).to.equal(1);
+        //     expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Pending);
+        //     expect(this.data.proposal.buyer).to.equal(this.signers.broker.buyer.address);
+        //     expect(this.data.proposal.beneficiary).to.equal(this.signers.broker.beneficiary.address);
+        //     expect(this.data.proposal.value).to.equal(this.params.broker.value);
+        //     expect(this.data.proposal.balance).to.equal(this.params.sERC20.cap.div(ethers.BigNumber.from("4")));
+        //     expect(this.data.proposal.expiration).to.equal(
+        //       ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(this.constants.broker.proposals.duration)
+        //     );
+        //     // CHECK FOR NUMBER OF PROPOSALS : IT SHOULD BE INCREMENTED
+        //   });
+        // });
+      });
+
+      describe("» but flash buyout is disabled", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register({ flash: false });
+          await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+          await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+          await advanceTime(this.params.broker.timelock);
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.buyout()).to.be.revertedWith("Broker: flash buyout is disabled");
+        });
+      });
+    });
+
+    describe("» but sale is not opened", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register();
+        await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+        await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.buyout()).to.be.revertedWith("Broker: invalid sale state");
       });
     });
   });
 
-  describe.only("# cancel", () => {
-    describe("» proposal is pending", () => {
-      describe("» and caller is proposal's buyer", () => {
+  describe("# acceptProposal", () => {
+    // tester sans collateral pour être sur que ça revert pas
+  });
+
+  describe("# acceptProposal", () => {
+    describe("» caller is sale's guardian", () => {
+      describe("» and sale is opened", () => {
+        describe("» and proposal is pending", () => {});
+
+        describe("» but proposal is not pending", () => {});
+      });
+
+      describe("» but sale is not opened", () => {});
+    });
+
+    describe("» caller is not sale's guardian", () => {});
+  });
+
+  describe("# rejectProposal", () => {
+    describe("» caller is sale's guardian", () => {
+      describe("» and proposal is pending", () => {});
+
+      describe("» but proposal is not pending", () => {});
+    });
+
+    describe("» caller is not sale's guardian", () => {});
+  });
+
+  describe("# cancelProposal", () => {
+    describe("» and caller is proposal's buyer", () => {
+      describe("» proposal is pending", () => {
         before(async () => {
           await setup(this, { broker: true });
           await this.broker.register({ flash: false });
@@ -206,7 +358,7 @@ describe("FlashBroker", () => {
         });
       });
 
-      describe("» but caller is not proposal's buyer", () => {
+      describe("» but proposal is not pending", () => {
         before(async () => {
           await setup(this, { broker: true });
           await this.broker.register({ flash: false });
@@ -218,15 +370,16 @@ describe("FlashBroker", () => {
             amount: this.params.broker.balance,
           });
           await this.broker.buyout();
+          await this.broker.cancel();
         });
 
         it("it reverts", async () => {
-          await expect(this.broker.cancel({ from: this.signers.others[0] })).to.be.revertedWith("FlashBroker: must be buyer to cancel proposal");
+          await expect(this.broker.cancel()).to.be.revertedWith("FlashBroker: invalid proposal state");
         });
       });
     });
 
-    describe("» proposal is not pending", () => {
+    describe("» caller is not proposal's buyer", () => {
       before(async () => {
         await setup(this, { broker: true });
         await this.broker.register({ flash: false });
@@ -238,11 +391,10 @@ describe("FlashBroker", () => {
           amount: this.params.broker.balance,
         });
         await this.broker.buyout();
-        await this.broker.cancel();
       });
 
       it("it reverts", async () => {
-        await expect(this.broker.cancel()).to.be.revertedWith("FlashBroker: invalid proposal state");
+        await expect(this.broker.cancel({ from: this.signers.others[0] })).to.be.revertedWith("FlashBroker: must be buyer to cancel proposal");
       });
     });
   });

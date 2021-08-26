@@ -2,9 +2,12 @@
 pragma solidity ^0.8.0;
 
 import "../libraries/Sales.sol";
+import "../../market/interfaces/IMarket.sol";
 import "../../token/interfaces/sIERC20.sol";
+import "../../vault/interfaces/IVault.sol";
 
 interface IBroker {
+    event Register(sIERC20 indexed sERC20, address indexed guardian, uint256 reserve, uint256 multiplier, uint256 opening);
     event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 collateral);
     event AcceptProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event RejectProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
@@ -24,6 +27,8 @@ interface IBroker {
 
     function buyout(sIERC20 sERC20) external payable;
 
+    function createProposal(sIERC20 sERC20, uint256 lifespan) external payable returns (uint256);
+
     function acceptProposal(sIERC20 sERC20, uint256 proposalId) external;
 
     function rejectProposal(sIERC20 sERC20, uint256 proposalId) external;
@@ -40,7 +45,9 @@ interface IBroker {
         bytes[] calldata datas
     ) external;
 
-    function vault() external view returns (address);
+    function vault() external view returns (IVault);
+
+    function market() external view returns (IMarket);
 
     function proposalFor(sIERC20 sERC20, uint256 proposalId) external view returns (Proposals.Proposal memory);
 

@@ -53,7 +53,7 @@ const initialize = async (ctx) => {
       bufferPeriodDuration: ethers.BigNumber.from("1000"),
     },
     broker: {
-      minimum: ethers.utils.parseEther("2.5"),
+      reserve: ethers.utils.parseEther("2.5"),
       multiplier: ethers.utils.parseEther("1.5"),
       timelock: ethers.BigNumber.from("1209600"), // two weeks
       value: ethers.utils.parseEther("10"),
@@ -192,9 +192,11 @@ const initialize = async (ctx) => {
     ctx.signers.sMinter.beneficiary,
     ctx.signers.sMinter.recipient,
     ctx.signers.sMinter.registerer,
+    ctx.signers.broker.admin,
     ctx.signers.broker.guardian,
     ctx.signers.broker.buyer,
-    ctx.signers.broker.beneficiary,
+    ctx.signers.broker.registrar,
+    ctx.signers.broker.escaper,
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
