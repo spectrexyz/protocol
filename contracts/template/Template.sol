@@ -11,20 +11,18 @@ import "@openzeppelin/contracts-0.7/access/AccessControl.sol";
 import "@openzeppelin/contracts-0.7/utils/Context.sol";
 
 /**
- * @title  sSplitter
+ * @title Template
  * @notice Split sERC20s between registered beneficiaries when received.
  */
 contract Template is Context, AccessControl {
     // bytes32 private constant BURN_ROLE = keccak256("BURN_ROLE");
     // bytes32 private constant MINT_ROLE = keccak256("MINT_ROLE");
-
     // sIERC1155 private immutable _sERC1155;
     // IFlashBroker private immutable _broker;
     // sIMinter private immutable _minter;
     // ISplitter private immutable _splitter;
     // IVault private immutable _vault;
     // IERC20 private immutable _weth;
-
     // constructor(
     //     address sERC1155,
     //     address minter,
@@ -40,7 +38,6 @@ contract Template is Context, AccessControl {
     //     _splitter = ISplitter(splitter);
     //     _vault = IVault(vault);
     // }
-
     // function spectralize(
     //     address collection,
     //     uint256 tokenId,
@@ -59,6 +56,7 @@ contract Template is Context, AccessControl {
     //     // grant sERC20 roles
     //     sIERC20(sERC20).grantRole(MINT_ROLE, address(_minter));
     //     sIERC20(sERC20).grantRole(BURN_ROLE, address(_broker));
+    // ALSO GRANT ADMIN ROLE TO BROKER
     //     // deploy pool
     //     sBootstrappingPool pool = new sBootstrappingPool(_vault, name, symbol, IERC20(sERC20), _weth, 0, 0, 10, 0, 0, true);
     //     // constructor(
@@ -87,21 +85,17 @@ contract Template is Context, AccessControl {
     //     // register sERC20 in sMinter
     //     _minter.register(sERC20, address(pool), beneficiary, initialPrice, shares[0], fee);
     // }
-
     // //     sIERC1155 private immutable _sERC1155;
     // // IFlashBroker private immutable _broker;
     // // sIMinter private immutable _minter;
     // // sISplitter private immutable _splitter;
     // // IVault private immutable _vault;
     // // IERC20 private immutable _weth;
-
     // /* #region getter functions */
     // function sERC1155() public view returns (address) {
     //     return address(_sERC1155);
     // }
-
     // /* #endregion */
-
     // function _spectralize(
     //     address collection,
     //     uint256 tokenId,
