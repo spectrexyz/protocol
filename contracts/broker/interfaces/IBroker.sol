@@ -8,7 +8,7 @@ import "../../vault/interfaces/IVault.sol";
 
 interface IBroker {
     event Register(sIERC20 indexed sERC20, address indexed guardian, uint256 reserve, uint256 multiplier, uint256 opening);
-    event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 collateral);
+    event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 collateral, uint256 expiration);
     event AcceptProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event RejectProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event CancelProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
@@ -49,7 +49,16 @@ interface IBroker {
 
     function market() external view returns (IMarket);
 
-    function proposalFor(sIERC20 sERC20, uint256 proposalId) external view returns (Proposals.Proposal memory);
+    function proposalFor(sIERC20 sERC20, uint256 proposalId)
+        external
+        view
+        returns (
+            Proposals.State state,
+            address buyer,
+            uint256 value,
+            uint256 collateral,
+            uint256 expiration
+        );
 
     function saleOf(sIERC20 sERC20)
         external

@@ -96,6 +96,11 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         _buyout(sERC20, sale, buyer, msg.value, buyer, collateral);
     }
 
+    /**
+     * @notice Create a proposal to buyout the NFT pegged to `sERC20`.
+     * @param sERC20 The sERC20 whose pegged NFT is proposed to be bought out.
+     * @param lifespan The lifespan of the proposal [in seconds].
+     */
     function createProposal(sIERC20 sERC20, uint256 lifespan) external payable override returns (uint256) {
         Sales.Sale storage sale = _sales[sERC20];
 
@@ -108,10 +113,18 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         require(msg.value >= value, "Broker: insufficient value");
 
         if (collateral > 0) sERC20.transferFrom(buyer, address(this), collateral);
-        sale.proposals[sale.nbOfProposals] = Proposals.Proposal({_state: Proposals.State.Pending, buyer: buyer, value: msg.value, collateral: collateral, expiration: lifespan == 0 ? 0 : block.timestamp + lifespan});
-        uint256 proposalId = ++sale.nbOfProposals;
         
-        emit CreateProposal(sERC20, proposalId, buyer, msg.value, collateral);
+        uint256 proposalId = sale.nbOfProposals++;
+        uint256 expiration = lifespan == 0 ? 0 : block.timestamp + lifespan;
+        sale.proposals[proposalId] = Proposals.Proposal({
+            _state: Proposals.State.Pending,
+            buyer: buyer,
+            value: msg.value,
+            collateral: collateral,
+            expiration: expiration
+        });
+
+        emit CreateProposal(sERC20, proposalId, buyer, msg.value, collateral, expiration);
 
         return proposalId;
     }
@@ -128,7 +141,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to accept proposals");
         require(sale.state() == Sales.State.Opened, "Broker: invalid sale state");
         require(proposal.state() == Proposals.State.Pending, "Broker: invalid proposal state");
-        // Et si Flash buyout a été enable entre temps ? IL FAUT REFUSER
+        require(!sale.flash, "Broker: flash buyout is enabled");
+
         proposal._state = Proposals.State.Accepted;
 
         emit AcceptProposal(sERC20, proposalId);
@@ -252,8 +266,25 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     /**
      * @notice Return the proposal #`proposalId` to buyout the NFT pegged to `sERC20`.
      */
-    function proposalFor(sIERC20 sERC20, uint256 proposalId) public view override returns (Proposals.Proposal memory) {
-        return _sales[sERC20].proposals[proposalId];
+    function proposalFor(sIERC20 sERC20, uint256 proposalId)
+        public
+        view
+        override
+        returns (
+            Proposals.State state,
+            address buyer,
+            uint256 value,
+            uint256 collateral,
+            uint256 expiration
+        )
+    {
+        Proposals.Proposal storage proposal = _sales[sERC20].proposals[proposalId];
+
+        state = proposal.state();
+        buyer = proposal.buyer;
+        value = proposal.value;
+        collateral = proposal.collateral;
+        expiration = proposal.expiration;
     }
 
     /**
@@ -306,7 +337,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         sERC20.revokeRole(_MINT_ROLE, address(_market));
         if (collateral > 0) sERC20.burnFrom(burnFrom, collateral);
         _vault.unlock(sERC20, buyer, "");
-        
+
         emit Buyout(sERC20, buyer, value, collateral);
     }
 

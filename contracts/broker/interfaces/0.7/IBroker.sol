@@ -43,7 +43,16 @@ interface IBroker {
 
     function vault() external view returns (address);
 
-    function proposalFor(sIERC20 sERC20, uint256 proposalId) external view returns (Proposals.Proposal memory);
+    function proposalFor(sIERC20 sERC20, uint256 proposalId)
+        external
+        view
+        returns (
+            Proposals.State state,
+            address buyer,
+            uint256 value,
+            uint256 collateral,
+            uint256 expiration
+        );
 
     function saleOf(sIERC20 sERC20)
         external

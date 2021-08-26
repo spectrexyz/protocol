@@ -26,7 +26,7 @@ library Cast {
         while (i < 32 && _bytes32[i] != 0) {
             i++;
         }
-        
+
         bytes memory characters = new bytes(i);
         for (i = 0; i < 32 && _bytes32[i] != 0; i++) {
             characters[i] = _bytes32[i];

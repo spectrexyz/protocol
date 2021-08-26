@@ -58,6 +58,7 @@ const initialize = async (ctx) => {
       timelock: ethers.BigNumber.from("1209600"), // two weeks
       value: ethers.utils.parseEther("10"),
       balance: ethers.utils.parseEther("1"),
+      lifespan: ethers.BigNumber.from("3600"),
     },
     splitter: {
       shares: [ethers.utils.parseEther("30"), ethers.utils.parseEther("10"), ethers.utils.parseEther("60")],
