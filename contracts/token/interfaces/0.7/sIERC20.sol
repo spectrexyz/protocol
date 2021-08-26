@@ -34,8 +34,6 @@ interface sIERC20 is IERC20Upgradeable {
 
     function burn(uint256 amount) external;
 
-    function burn(address account, uint256 amount) external;
-
     function burnFrom(address account, uint256 amount) external;
 
     function mint(address to, uint256 amount) external;

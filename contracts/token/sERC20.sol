@@ -30,7 +30,6 @@ contract sERC20 is
     ERC20PermitUpgradeable,
     sIERC20
 {
-    bytes32 public constant BURN_ROLE = keccak256("BURN_ROLE");
     bytes32 public constant MINT_ROLE = keccak256("MINT_ROLE");
     bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
     bytes32 public constant SNAPSHOT_ROLE = keccak256("SNAPSHOT_ROLE");
@@ -91,18 +90,6 @@ contract sERC20 is
      */
     function burn(uint256 amount) public override(ERC20BurnableUpgradeable, sIERC20) {
         ERC20BurnableUpgradeable.burn(amount);
-    }
-
-    /**
-     * @notice Destroy `amount` tokens from `account`.
-     * @dev Caller must have BURN_ROLE.
-     * @param account The account whose tokens to destroy.
-     * @param amount The amount of tokens to destroy.
-     */
-    function burn(address account, uint256 amount) external override {
-        require(hasRole(BURN_ROLE, _msgSender()), "sERC20: must have BURN_ROLE to burn");
-
-        _burn(account, amount);
     }
 
     /**
