@@ -92,12 +92,38 @@ class Broker {
     this.ctx.data.proposalId = this.ctx.data.receipt.events.filter((event) => event.event === "CreateProposal")[0].args.proposalId;
   }
 
-  async cancel(opts = {}) {
+  async acceptProposal(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.guardian;
+    opts.sERC20 ??= this.ctx.sERC20.contract;
+    opts.proposalId ??= this.ctx.data.proposalId;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).acceptProposal(opts.sERC20.address, opts.proposalId);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async rejectProposal(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.guardian;
+    opts.sERC20 ??= this.ctx.sERC20.contract;
+    opts.proposalId ??= this.ctx.data.proposalId;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).rejectProposal(opts.sERC20.address, opts.proposalId);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async cancelProposal(opts = {}) {
     opts.from ??= this.ctx.signers.broker.buyer;
     opts.sERC20 ??= this.ctx.sERC20.contract;
     opts.proposalId ??= this.ctx.data.proposalId;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).cancel(opts.sERC20.address, opts.proposalId);
+    this.ctx.data.tx = await this.contract.connect(opts.from).cancelProposal(opts.sERC20.address, opts.proposalId);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async enableFlashBuyout(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.guardian;
+    opts.sERC20 ??= this.ctx.sERC20.contract;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).enableFlashBuyout(opts.sERC20.address);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }

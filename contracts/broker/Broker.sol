@@ -93,7 +93,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
 
         require(msg.value >= value, "Broker: insufficient value");
 
-        _buyout(sERC20, sale, buyer, msg.value, buyer, collateral);
+        _buyout(sERC20, sale, buyer, msg.value, collateral, false);
     }
 
     /**
@@ -113,7 +113,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         require(msg.value >= value, "Broker: insufficient value");
 
         if (collateral > 0) sERC20.transferFrom(buyer, address(this), collateral);
-        
+
         uint256 proposalId = sale.nbOfProposals++;
         uint256 expiration = lifespan == 0 ? 0 : block.timestamp + lifespan;
         sale.proposals[proposalId] = Proposals.Proposal({
@@ -147,20 +147,22 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
 
         emit AcceptProposal(sERC20, proposalId);
 
-        _buyout(sERC20, sale, proposal.buyer, proposal.value, address(this), proposal.collateral);
+        _buyout(sERC20, sale, proposal.buyer, proposal.value, proposal.collateral, true);
     }
 
     /**
      * @notice Reject proposal #`proposalId` to buyout the NFT pegged to `sERC20`.
+     * @dev This function is open to re-entrancy for it would be harmless.
      * @param sERC20 The sERC20 whose pegged NFT was proposed to be bought out.
      * @param proposalId The id of the buyout proposal.
      */
     function rejectProposal(sIERC20 sERC20, uint256 proposalId) external override {
         Sales.Sale storage sale = _sales[sERC20];
         Proposals.Proposal storage proposal = sale.proposals[proposalId];
+        Proposals.State state = proposal.state();
 
         require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to reject proposal");
-        require(proposal.state() == Proposals.State.Pending, "Broker: invalid proposal state");
+        require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Broker: invalid proposal state");
 
         address buyer = proposal.buyer;
         proposal._state = Proposals.State.Rejected;
@@ -207,8 +209,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         address holder = _msgSender();
         uint256 balance = sERC20.balanceOf(holder);
 
-        require(sale.state() == Sales.State.Closed, "FlashBuyout: invalid sale state");
-        require(balance > 0, "FlashBuyout: nothing to claim");
+        require(sale.state() == Sales.State.Closed, "Broker: invalid sale state");
+        require(balance > 0, "Broker: nothing to claim");
 
         uint256 value = (sale.stock * balance) / sERC20.totalSupply();
         sale.stock -= value;
@@ -220,9 +222,9 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         Sales.Sale storage sale = _sales[sERC20];
         Sales.State state = sale.state();
 
-        require(_msgSender() == sale.guardian, "FlashBuyout: must be sale's guardian to enable flash buyout");
+        require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to enable flash buyout");
         require(state == Sales.State.Pending || state == Sales.State.Opened, "Broker: invalid sale state");
-        require(sale.flash, "FlashBuyout: flash buyout already enabled");
+        require(!sale.flash, "Broker: flash buyout already enabled");
 
         _enableFlashBuyout(sERC20, sale);
     }
@@ -328,14 +330,17 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         Sales.Sale storage sale,
         address buyer,
         uint256 value,
-        address burnFrom,
-        uint256 collateral
+        uint256 collateral,
+        bool locked
     ) private {
         sale._state = Sales.State.Closed;
         sale.stock = value;
 
         sERC20.revokeRole(_MINT_ROLE, address(_market));
-        if (collateral > 0) sERC20.burnFrom(burnFrom, collateral);
+        if (collateral > 0) {
+            if (locked) sERC20.burn(collateral);
+            else sERC20.burnFrom(buyer, collateral);
+        }
         _vault.unlock(sERC20, buyer, "");
 
         emit Buyout(sERC20, buyer, value, collateral);
@@ -346,16 +351,16 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         Sales.Sale storage sale,
         address buyer
     ) private view returns (uint256 value, uint256 collateral) {
+        collateral = sERC20.balanceOf(buyer);
         uint256 supply = sERC20.totalSupply();
-
-        require(supply > 0, "Broker: invalid supply state");
-
         uint256 tokenPrice = 1e16;
         uint256 marketValue = (((tokenPrice * supply) / DECIMALS) * sale.multiplier) / DECIMALS;
         uint256 reserve = sale.reserve;
         uint256 rawValue = reserve >= marketValue ? reserve : marketValue;
 
-        collateral = sERC20.balanceOf(buyer);
-        value = (rawValue * (DECIMALS - (collateral * DECIMALS) / supply)) / DECIMALS;
+        // PEUT ETRE ON MET MOINS DE DECIMALS POUR ÊTRE SUR QUE CA OVERFLOW PAS
+        // AUSSI DECIMALS ON PEUT LE PASSER EN PRIVATE CAR C UN TRUC INTERNE
+
+        value = supply > 0 ? (rawValue * (DECIMALS - (collateral * DECIMALS) / supply)) / DECIMALS : rawValue;
     }
 }

@@ -155,23 +155,23 @@ describe("Broker", () => {
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
           });
 
-          it("# it updates sale state", async () => {
+          it("it updates sale state", async () => {
             expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.CLOSED);
           });
 
-          it("# it updates sale stock", async () => {
+          it("it updates sale stock", async () => {
             expect(this.data.sale.stock).to.equal(this.params.broker.value);
           });
 
-          it("# it burns buyer's tokens", async () => {
+          it("it burns buyer's tokens", async () => {
             expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(0);
           });
 
-          it("# it transfers NFT", async () => {
+          it("it transfers NFT", async () => {
             expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
           });
 
-          it("# it revokes market's MINT_ROLE over sERC20", async () => {
+          it("it revokes market's MINT_ROLE over sERC20", async () => {
             expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
           });
 
@@ -194,23 +194,23 @@ describe("Broker", () => {
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
           });
 
-          it("# it updates sale state", async () => {
+          it("it updates sale state", async () => {
             expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.CLOSED);
           });
 
-          it("# it updates sale stock", async () => {
+          it("it updates sale stock", async () => {
             expect(this.data.sale.stock).to.equal(0);
           });
 
-          it("# it burns buyer's tokens", async () => {
+          it("it burns buyer's tokens", async () => {
             expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(0);
           });
 
-          it("# it transfers NFT", async () => {
+          it("it transfers NFT", async () => {
             expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
           });
 
-          it("# it revokes market's MINT_ROLE over sERC20", async () => {
+          it("it revokes market's MINT_ROLE over sERC20", async () => {
             expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
           });
 
@@ -233,19 +233,19 @@ describe("Broker", () => {
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
           });
 
-          it("# it updates sale state", async () => {
+          it("it updates sale state", async () => {
             expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.CLOSED);
           });
 
-          it("# it updates sale stock", async () => {
+          it("it updates sale stock", async () => {
             expect(this.data.sale.stock).to.equal(this.params.broker.value);
           });
 
-          it("# it transfers NFT", async () => {
+          it("it transfers NFT", async () => {
             expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
           });
 
-          it("# it revokes market's MINT_ROLE over sERC20", async () => {
+          it("it revokes market's MINT_ROLE over sERC20", async () => {
             expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
           });
 
@@ -435,28 +435,211 @@ describe("Broker", () => {
   describe("# acceptProposal", () => {
     describe("» caller is sale's guardian", () => {
       describe("» and sale is opened", () => {
-        describe("» and proposal is pending", () => {});
+        describe("» and proposal is pending", () => {
+          describe("» and flash buyout is disabled", () => {
+            before(async () => {
+              await setup(this, { broker: true });
+              await this.broker.register({ flash: false });
+              await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+              await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+              await advanceTime(this.params.broker.timelock);
+              await this.broker.createProposal();
+              await this.broker.acceptProposal();
+              this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+              this.data.proposal = await this.broker.proposalFor(this.sERC20.contract.address, this.data.proposalId);
+            });
 
-        describe("» but proposal is not pending", () => {});
+            it("it updates proposal state", async () => {
+              expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Accepted);
+            });
+
+            it("it updates sale state", async () => {
+              expect(this.data.sale.state).to.equal(this.constants.broker.sales.state.CLOSED);
+            });
+
+            it("it updates sale stock", async () => {
+              expect(this.data.sale.stock).to.equal(this.params.broker.value);
+            });
+
+            it("it burns locked tokens", async () => {
+              expect(await this.sERC20.balanceOf(this.contracts.broker)).to.equal(0);
+            });
+
+            it("it transfers NFT", async () => {
+              expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
+            });
+
+            it("it revokes market's MINT_ROLE over sERC20", async () => {
+              expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
+            });
+
+            it("it emits a AcceptProposal event", async () => {
+              await expect(this.data.tx).to.emit(this.broker.contract, "AcceptProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
+            });
+
+            it("it emits a Buyout event", async () => {
+              await expect(this.data.tx)
+                .to.emit(this.broker.contract, "Buyout")
+                .withArgs(this.sERC20.contract.address, this.signers.broker.buyer.address, this.params.broker.value, this.params.broker.balance);
+            });
+          });
+
+          describe("» but flash buyout is enabled", () => {
+            before(async () => {
+              await setup(this, { broker: true });
+              await this.broker.register({ flash: false });
+              await advanceTime(this.params.broker.timelock);
+              await this.broker.createProposal();
+              await this.broker.enableFlashBuyout();
+            });
+
+            it("it reverts", async () => {
+              await expect(this.broker.acceptProposal()).to.be.revertedWith("Broker: flash buyout is enabled");
+            });
+          });
+        });
+
+        describe("» but proposal is not pending", () => {
+          before(async () => {
+            await setup(this, { broker: true });
+            await this.broker.register({ flash: false });
+            await advanceTime(this.params.broker.timelock);
+            await this.broker.createProposal();
+            await advanceTime(this.params.broker.lifespan.add(ethers.BigNumber.from("1")));
+          });
+
+          it("it reverts", async () => {
+            await expect(this.broker.acceptProposal()).to.be.revertedWith("Broker: invalid proposal state");
+          });
+        });
       });
 
-      describe("» but sale is not opened", () => {});
+      describe("» but sale is not opened", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register({ flash: false });
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.createProposal();
+          this.data.firstProposalId = this.data.proposalId;
+          await this.broker.createProposal();
+          await this.broker.acceptProposal({ proposalId: this.data.firstProposalId });
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.acceptProposal()).to.be.revertedWith("Broker: invalid sale state");
+        });
+      });
     });
 
-    describe("» caller is not sale's guardian", () => {});
+    describe("» caller is not sale's guardian", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register({ flash: false });
+        await advanceTime(this.params.broker.timelock);
+        await this.broker.createProposal();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.acceptProposal({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must be sale's guardian to accept proposal");
+      });
+    });
   });
 
-  describe("# rejectProposal", () => {
+  describe.only("# rejectProposal", () => {
     describe("» caller is sale's guardian", () => {
-      describe("» and proposal is pending", () => {});
+      describe("» and proposal is pending", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register({ flash: false });
+          await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+          await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.createProposal();
+          this.data.previousBuyerETHBalance = await this.signers.broker.buyer.getBalance();
+          await this.broker.rejectProposal();
+          this.data.proposal = await this.broker.proposalFor(this.sERC20.contract.address, this.data.proposalId);
+        });
 
-      describe("» but proposal is not pending", () => {});
+        it("it updates proposal state", async () => {
+          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Rejected);
+        });
+
+        it("it refunds locked tokens", async () => {
+          expect(await this.sERC20.balanceOf(this.contracts.broker)).to.equal(0);
+          expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(this.params.broker.balance);
+        });
+
+        it("it refunds locked ETH", async () => {
+          expect(await this.signers.broker.buyer.getBalance()).to.equal(this.data.previousBuyerETHBalance.add(this.params.broker.value));
+        });
+
+        it("it emits a RejectProposal event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "RejectProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
+        });
+      });
+
+      describe("» and proposal is lapsed", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register({ flash: false });
+          await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+          await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.createProposal();
+          this.data.previousBuyerETHBalance = await this.signers.broker.buyer.getBalance();
+          await advanceTime(this.params.broker.lifespan.add(ethers.BigNumber.from("1")));
+          await this.broker.rejectProposal();
+          this.data.proposal = await this.broker.proposalFor(this.sERC20.contract.address, this.data.proposalId);
+        });
+
+        it("it updates proposal state", async () => {
+          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Rejected);
+        });
+
+        it("it refunds locked tokens", async () => {
+          expect(await this.sERC20.balanceOf(this.contracts.broker)).to.equal(0);
+          expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(this.params.broker.balance);
+        });
+
+        it("it refunds locked ETH", async () => {
+          expect(await this.signers.broker.buyer.getBalance()).to.equal(this.data.previousBuyerETHBalance.add(this.params.broker.value));
+        });
+
+        it("it emits a RejectProposal event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "RejectProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
+        });
+      });
+
+      describe("» but proposal is neither pending nor lapsed", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register({ flash: false });
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.createProposal();
+          await this.broker.acceptProposal();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.rejectProposal()).to.be.revertedWith("Broker: invalid proposal state");
+        });
+      });
     });
 
-    describe("» caller is not sale's guardian", () => {});
+    describe("» caller is not sale's guardian", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register({ flash: false });
+        await advanceTime(this.params.broker.timelock);
+        await this.broker.createProposal();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.rejectProposal({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must be sale's guardian to reject proposal");
+      });
+    });
   });
 
-  describe("# cancelProposal", () => {
+  describe.skip("# cancelProposal", () => {
     describe("» and caller is proposal's buyer", () => {
       describe("» proposal is pending", () => {
         before(async () => {
