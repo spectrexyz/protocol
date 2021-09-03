@@ -9,7 +9,7 @@ class Broker {
     this.vault = this.contract.vault;
     this.saleOf = this.contract.saleOf;
     this.proposalFor = this.contract.proposalFor;
-    this.market = this.contract.market;
+    this.forge = this.contract.forge;
     this.ADMIN_ROLE = this.contract.ADMIN_ROLE;
     this.REGISTER_ROLE = this.contract.REGISTER_ROLE;
     this.hasRole = this.contract.hasRole;

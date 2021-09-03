@@ -15,7 +15,7 @@ describe("Broker", () => {
 
     it("it initializes broker", async () => {
       expect(await this.broker.vault()).to.equal(this.sERC1155.contract.address);
-      expect(await this.broker.market()).to.equal(this.contracts.marketMock.address);
+      expect(await this.broker.forge()).to.equal(this.contracts.marketMock.address);
     });
 
     it("it sets up permissions", async () => {
@@ -639,24 +639,19 @@ describe("Broker", () => {
     });
   });
 
-  describe.skip("# cancelProposal", () => {
-    describe("» and caller is proposal's buyer", () => {
+  describe.only("# cancelProposal", () => {
+    describe("» caller is proposal's buyer", () => {
       describe("» proposal is pending", () => {
         before(async () => {
           await setup(this, { broker: true });
           await this.broker.register({ flash: false });
           await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
           await advanceTime(this.params.broker.timelock);
-          await this.sERC20.approve({
-            from: this.signers.broker.buyer,
-            spender: this.broker.contract,
-            amount: this.params.broker.balance,
-          });
-          await this.broker.buyout();
+          await this.broker.createProposal();
           this.data.previousBuyerETHBalance = await this.signers.broker.buyer.getBalance();
-          await this.broker.cancel();
+          await this.broker.cancelProposal();
           this.data.lastBuyerETHBalance = await this.signers.broker.buyer.getBalance();
-          this.data.proposal = await this.broker.proposal(this.sERC20.contract.address, 0);
+          this.data.proposal = await this.broker.proposalFor(this.sERC20.contract.address, 0);
         });
 
         it("it updates proposal's state", async () => {
@@ -678,23 +673,50 @@ describe("Broker", () => {
         });
       });
 
-      describe("» but proposal is not pending", () => {
+      describe("» proposal is lapsed", () => {
         before(async () => {
           await setup(this, { broker: true });
           await this.broker.register({ flash: false });
           await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
           await advanceTime(this.params.broker.timelock);
-          await this.sERC20.approve({
-            from: this.signers.broker.buyer,
-            spender: this.broker.contract,
-            amount: this.params.broker.balance,
-          });
-          await this.broker.buyout();
-          await this.broker.cancel();
+          await this.broker.createProposal();
+          this.data.previousBuyerETHBalance = await this.signers.broker.buyer.getBalance();
+          await advanceTime(this.params.broker.lifespan.add(ethers.BigNumber.from("1")));
+          await this.broker.cancelProposal();
+          this.data.lastBuyerETHBalance = await this.signers.broker.buyer.getBalance();
+          this.data.proposal = await this.broker.proposalFor(this.sERC20.contract.address, 0);
+        });
+
+        it("it updates proposal's state", async () => {
+          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Cancelled);
+        });
+
+        it("it refunds sERC20s", async () => {
+          expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(this.params.broker.balance);
+        });
+
+        it("it refunds ETH", async () => {
+          expect(this.data.lastBuyerETHBalance.sub(this.data.previousBuyerETHBalance).add(this.data.receipt.gasUsed.mul(this.data.tx.gasPrice))).to.equal(
+            this.params.broker.value
+          );
+        });
+
+        it("it emits a CancelProposal event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "CancelProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
+        });
+      });
+
+      describe("» but proposal is neither pending not lapsed", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register({ flash: false });
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.createProposal();
+          await this.broker.acceptProposal();
         });
 
         it("it reverts", async () => {
-          await expect(this.broker.cancel()).to.be.revertedWith("FlashBroker: invalid proposal state");
+          await expect(this.broker.cancelProposal()).to.be.revertedWith("Broker: invalid proposal state");
         });
       });
     });
@@ -703,18 +725,12 @@ describe("Broker", () => {
       before(async () => {
         await setup(this, { broker: true });
         await this.broker.register({ flash: false });
-        await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
         await advanceTime(this.params.broker.timelock);
-        await this.sERC20.approve({
-          from: this.signers.broker.buyer,
-          spender: this.broker.contract,
-          amount: this.params.broker.balance,
-        });
-        await this.broker.buyout();
+        await this.broker.createProposal();
       });
 
       it("it reverts", async () => {
-        await expect(this.broker.cancel({ from: this.signers.others[0] })).to.be.revertedWith("FlashBroker: must be buyer to cancel proposal");
+        await expect(this.broker.cancelProposal({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must be proposal's buyer to cancel proposal");
       });
     });
   });
@@ -798,7 +814,7 @@ describe("Broker", () => {
     });
   });
 
-  describe.only("# escape", () => {
+  describe("# escape", () => {
     describe("» caller has ESCAPE_ROLE", () => {
       describe("» and parameters lengths match", () => {
         before(async () => {
