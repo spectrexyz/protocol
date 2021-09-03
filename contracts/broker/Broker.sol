@@ -173,25 +173,25 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
-     * @notice Cancel proposal #`proposalId` to buyout the NFT pegged to `sERC20`.
+     * @notice Withdraw proposal #`proposalId` to buyout the NFT pegged to `sERC20`.
      * @dev This function is open to re-entrancy for it would be harmless.
      * @param sERC20 The sERC20 whose pegged NFT was proposed to be bought out.
      * @param proposalId The id of the buyout proposal.
      */
-    function cancelProposal(sIERC20 sERC20, uint256 proposalId) external override {
+    function withdrawProposal(sIERC20 sERC20, uint256 proposalId) external override {
         Sales.Sale storage sale = _sales[sERC20];
         Proposals.Proposal storage proposal = sale.proposals[proposalId];
         Proposals.State state = proposal.state();
 
-        require(_msgSender() == proposal.buyer, "Broker: must be proposal's buyer to cancel proposal");
+        require(_msgSender() == proposal.buyer, "Broker: must be proposal's buyer to withdraw proposal");
         require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Broker: invalid proposal state");
 
         address buyer = proposal.buyer;
-        proposal._state = Proposals.State.Cancelled;
+        proposal._state = Proposals.State.Withdrawn;
         sERC20.transfer(buyer, proposal.collateral);
         payable(buyer).sendValue(proposal.value);
 
-        emit CancelProposal(sERC20, proposalId);
+        emit WithdrawProposal(sERC20, proposalId);
     }
 
     /**

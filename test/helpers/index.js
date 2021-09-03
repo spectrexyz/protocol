@@ -110,8 +110,7 @@ const initialize = async (ctx) => {
           Accepted: 2,
           Rejected: 3,
           Lapsed: 4,
-          Cancelled: 5,
-          Refunded: 6,
+          Withdrawn: 5,
         },
         duration: ethers.BigNumber.from("604800"), // one
       },

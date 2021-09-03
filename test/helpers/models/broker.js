@@ -110,12 +110,12 @@ class Broker {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
-  async cancelProposal(opts = {}) {
+  async withdrawProposal(opts = {}) {
     opts.from ??= this.ctx.signers.broker.buyer;
     opts.sERC20 ??= this.ctx.sERC20.contract;
     opts.proposalId ??= this.ctx.data.proposalId;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).cancelProposal(opts.sERC20.address, opts.proposalId);
+    this.ctx.data.tx = await this.contract.connect(opts.from).withdrawProposal(opts.sERC20.address, opts.proposalId);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 

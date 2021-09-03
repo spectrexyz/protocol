@@ -11,7 +11,7 @@ interface IBroker {
     event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 collateral, uint256 expiration);
     event AcceptProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event RejectProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
-    event CancelProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
+    event WithdrawProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event Buyout(sIERC20 indexed sERC20, address indexed buyer, uint256 value, uint256 collateral);
     event EnableFlashBuyout(sIERC20 indexed sERC20);
     event Escape(sIERC20 indexed sERC20, address indexed beneficiary, bytes data);
@@ -33,7 +33,7 @@ interface IBroker {
 
     function rejectProposal(sIERC20 sERC20, uint256 proposalId) external;
 
-    function cancelProposal(sIERC20 sERC20, uint256 proposalId) external;
+    function withdrawProposal(sIERC20 sERC20, uint256 proposalId) external;
 
     function claim(sIERC20 sERC20) external;
 

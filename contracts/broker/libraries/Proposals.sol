@@ -8,7 +8,7 @@ library Proposals {
         Accepted,
         Rejected,
         Lapsed,
-        Cancelled
+        Withdrawn
     }
 
     struct Proposal {

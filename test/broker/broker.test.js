@@ -639,7 +639,7 @@ describe("Broker", () => {
     });
   });
 
-  describe.only("# cancelProposal", () => {
+  describe.only("# withdrawProposal", () => {
     describe("» caller is proposal's buyer", () => {
       describe("» proposal is pending", () => {
         before(async () => {
@@ -649,13 +649,13 @@ describe("Broker", () => {
           await advanceTime(this.params.broker.timelock);
           await this.broker.createProposal();
           this.data.previousBuyerETHBalance = await this.signers.broker.buyer.getBalance();
-          await this.broker.cancelProposal();
+          await this.broker.withdrawProposal();
           this.data.lastBuyerETHBalance = await this.signers.broker.buyer.getBalance();
           this.data.proposal = await this.broker.proposalFor(this.sERC20.contract.address, 0);
         });
 
         it("it updates proposal's state", async () => {
-          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Cancelled);
+          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Withdrawn);
         });
 
         it("it refunds sERC20s", async () => {
@@ -668,8 +668,8 @@ describe("Broker", () => {
           );
         });
 
-        it("it emits a CancelProposal event", async () => {
-          await expect(this.data.tx).to.emit(this.broker.contract, "CancelProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
+        it("it emits a WithdrawProposal event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "WithdrawProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
         });
       });
 
@@ -682,13 +682,13 @@ describe("Broker", () => {
           await this.broker.createProposal();
           this.data.previousBuyerETHBalance = await this.signers.broker.buyer.getBalance();
           await advanceTime(this.params.broker.lifespan.add(ethers.BigNumber.from("1")));
-          await this.broker.cancelProposal();
+          await this.broker.withdrawProposal();
           this.data.lastBuyerETHBalance = await this.signers.broker.buyer.getBalance();
           this.data.proposal = await this.broker.proposalFor(this.sERC20.contract.address, 0);
         });
 
         it("it updates proposal's state", async () => {
-          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Cancelled);
+          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Withdrawn);
         });
 
         it("it refunds sERC20s", async () => {
@@ -701,8 +701,8 @@ describe("Broker", () => {
           );
         });
 
-        it("it emits a CancelProposal event", async () => {
-          await expect(this.data.tx).to.emit(this.broker.contract, "CancelProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
+        it("it emits a WithdrawProposal event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "WithdrawProposal").withArgs(this.sERC20.contract.address, this.data.proposalId);
         });
       });
 
@@ -716,7 +716,7 @@ describe("Broker", () => {
         });
 
         it("it reverts", async () => {
-          await expect(this.broker.cancelProposal()).to.be.revertedWith("Broker: invalid proposal state");
+          await expect(this.broker.withdrawProposal()).to.be.revertedWith("Broker: invalid proposal state");
         });
       });
     });
@@ -730,7 +730,9 @@ describe("Broker", () => {
       });
 
       it("it reverts", async () => {
-        await expect(this.broker.cancelProposal({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must be proposal's buyer to cancel proposal");
+        await expect(this.broker.withdrawProposal({ from: this.signers.others[0] })).to.be.revertedWith(
+          "Broker: must be proposal's buyer to withdraw proposal"
+        );
       });
     });
   });
