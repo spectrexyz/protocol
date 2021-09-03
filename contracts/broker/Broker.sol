@@ -229,7 +229,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
-     * @notice Transfer NFTs pegged to `sERC20s `to `beneficiaries` with `datas` as ERC721#transfer callback datas.
+     * @notice Transfer all the NFTs pegged to `sERC20s `to `beneficiaries` with `datas` as ERC721#transfer callback datas.
      * @dev This function is only meant to be used in case of an emergency or upgrade to transfer NFTs to a safer or up-to-date place.
      * @param sERC20s The sERC20s whose pegged NFTs are transferred.
      * @param beneficiaries The addresses escaped NFTs are transferred to.
