@@ -2,7 +2,6 @@
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
-// import "../core/interfaces/0.7/sIERC20.sol";
 import "./interfaces/sIMinter.sol";
 import "./sBootstrappingPool.sol"; // pass it as an interface or directly as a BaseWeightPoolTwotokens
 import "@balancer-labs/v2-pool-weighted/contracts/IPriceOracle.sol";
@@ -19,7 +18,7 @@ contract sMinter is Context, AccessControl, sIMinter {
     using Address         for address payable;
     using OZMath.SafeMath for uint256;
 
-    bytes32 public constant ADMIN_ROLE    = keccak256("ADMIN_ROLE");
+    bytes32 public constant ADMIN_ROLE    = keccak256("ADMIN_ROLE"); // ON PEUT UTILISER DEFAULT_ADMIN_ROLE A LA PLACE
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     uint256 public constant DECIMALS      = 1e18;
     uint256 public constant HUNDRED       = 1e20;
@@ -60,10 +59,13 @@ contract sMinter is Context, AccessControl, sIMinter {
         bool               sERC20IsToken0 = pit.sERC20IsToken0;
 
         require(poolId != bytes32(0), "sMinter: no pit registered for sERC20");
-        require(msg.value  != 0,          "sMinter: minted value must not be null");
+        require(msg.value  != 0,          "sMinter: minted value cannot be null");
         require(recipient  != address(0), "sMinter: recipient cannot be the zero address");
 
         
+
+        // le protocolFee il faut l'enregistrer comme une variable d'état générale - pas comme une variable par market ou pit
+        // et le protocol Fee il faut l'appliquer sur la valeur qu'il reste APRES avoir appliqué le minting fee.
 
         uint256 price       = _price(pool, initialPrice, sERC20IsToken0);
         uint256 protocolFee = (msg.value.mul(pit.protocolFee)).div(HUNDRED);
@@ -71,12 +73,19 @@ contract sMinter is Context, AccessControl, sIMinter {
         uint256 value       = msg.value.sub(protocolFee).sub(fee);
         uint256 amount      = (value.mul(price)).div(DECIMALS);
 
+        // nouvelle version avec le nouveau Fee
+        // uint256 price       = _price(pool, initialPrice, sERC20IsToken0);
+        // uint256 fee         = (msg.value.mul(pit.fee)).div(HUNDRED);
+        // uint256 protocolFee = ((msg.value - fee).mul(pit.protocolFee)).div(HUNDRED);
+        // uint256 value       = msg.value.sub(protocolFee).sub(fee);
+        // uint256 amount      = (value.mul(price)).div(DECIMALS);
+
         require(amount >= expected, "sMinter: insufficient minting return");
 
         // collect protocol fee
         _bank.sendValue(protocolFee);
         // pay beneficiary
-        pit.beneficiary.sendValue(value);
+        pit.beneficiary.sendValue(value); // market.guardian
         // pool LP reward
         uint256 reward = _doReward(sERC20, pool, poolId, fee, initialPrice, sERC20IsToken0);
         // mint recipient tokens
@@ -111,6 +120,7 @@ contract sMinter is Context, AccessControl, sIMinter {
         emit Register(sERC20, pool, address(beneficiary), initialPrice, allocation, fee, protocolFee);
     }
 
+    // Peut être pas necessaire
     function withdraw(address token) external override {
         if (token == address(0)) {
             _bank.sendValue(address(this).balance);

@@ -126,6 +126,16 @@ class Broker {
     this.ctx.data.tx = await this.contract.connect(opts.from).enableFlashBuyout(opts.sERC20.address);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
+
+  async escape(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.escaper;
+    opts.sERC20s ??= [this.ctx.data.sERC20.contract.address, this.ctx.sERC20.contract.address];
+    opts.beneficiaries ??= [this.ctx.signers.broker.beneficiaries[0].address, this.ctx.signers.broker.beneficiaries[1].address];
+    opts.datas ??= [ethers.constants.HashZero, ethers.constants.HashZero];
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).escape(opts.sERC20s, opts.beneficiaries, opts.datas);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
 }
 
 module.exports = Broker;

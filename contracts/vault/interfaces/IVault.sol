@@ -17,7 +17,7 @@ interface IVault is IERC1155, IERC1155MetadataURI, IERC721Receiver {
         SpectreState state;
         address collection;
         uint256 tokenId;
-        address guardian;
+        address guardian; // on peut remplacer par broker
     }
 
     function spectralize(

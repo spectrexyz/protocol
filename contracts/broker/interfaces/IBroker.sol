@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../libraries/Sales.sol";
-import "../../market/interfaces/IMarket.sol";
+import {IForge} from "../../market/interfaces/IForge.sol";
 import "../../token/interfaces/sIERC20.sol";
 import "../../vault/interfaces/IVault.sol";
 
@@ -47,7 +47,7 @@ interface IBroker {
 
     function vault() external view returns (IVault);
 
-    function market() external view returns (IMarket);
+    function forge() external view returns (IForge);
 
     function proposalFor(sIERC20 sERC20, uint256 proposalId)
         external

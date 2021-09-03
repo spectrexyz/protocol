@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./interfaces/IBroker.sol";
 import "./libraries/Proposals.sol";
 import "./libraries/Sales.sol";
-import "../market/interfaces/IMarket.sol";
+import { IForge } from "../market/interfaces/IForge.sol";
 import "../token/interfaces/sIERC20.sol";
 import "../vault/interfaces/IVault.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
@@ -24,19 +24,19 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     bytes32 public constant ESCAPE_ROLE = keccak256("ESCAPE_ROLE");
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     uint256 public constant DECIMALS = 1e18;
-    uint256 public constant MINIMUM_TIMELOCK = 1 weeks;
+    uint256 public constant MINIMUM_TIMELOCK = 1 weeks; // On le passe en variable plutôt qu'en constante ?
     bytes32 private constant _MINT_ROLE = keccak256("MINT_ROLE");
 
     IVault private immutable _vault;
-    IMarket private immutable _market;
+    IForge private immutable _forge;
     mapping(sIERC20 => Sales.Sale) private _sales;
 
-    constructor(IVault vault_, IMarket market_) {
+    constructor(IVault vault_, IForge forge_) {
         require(address(vault_) != address(0), "Broker: vault cannot be the zero address");
-        require(address(market_) != address(0), "Broker: market cannot be the zero address");
+        require(address(forge_) != address(0), "Broker: forge cannot be the zero address");
 
         _vault = vault_;
-        _market = market_;
+        _forge = forge_;
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
@@ -174,15 +174,17 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
 
     /**
      * @notice Cancel proposal #`proposalId` to buyout the NFT pegged to `sERC20`.
+     * @dev This function is open to re-entrancy for it would be harmless.
      * @param sERC20 The sERC20 whose pegged NFT was proposed to be bought out.
      * @param proposalId The id of the buyout proposal.
      */
     function cancelProposal(sIERC20 sERC20, uint256 proposalId) external override {
         Sales.Sale storage sale = _sales[sERC20];
         Proposals.Proposal storage proposal = sale.proposals[proposalId];
+        Proposals.State state = proposal.state();
 
         require(_msgSender() == proposal.buyer, "Broker: must be proposal's buyer to cancel proposal");
-        require(proposal.state() == Proposals.State.Pending, "Broker: invalid proposal state");
+        require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Broker: invalid proposal state");
 
         address buyer = proposal.buyer;
         proposal._state = Proposals.State.Cancelled;
@@ -198,13 +200,6 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
      * @param sERC20 The sERC20 whose buyout shares are claimed.
      */
     function claim(sIERC20 sERC20) external override {
-        // vérifier ce qui arrive si:
-        // 1. Y'a une proposal de buyout chere.
-        // 2. Du coup tout le monde achete du token.
-        // 3. Du coup ça fait baisser le prix par token.
-        // 4. Est-ce qu'on snapshot le token à ce moment là pour ne rémunérer que les gens qui ont acheté avant la proposal de buyout ?
-        // 5. Mais du coup ils font quoi les autres - ceux qui ont acheté après - avec leur token.
-
         Sales.Sale storage sale = _sales[sERC20];
         address holder = _msgSender();
         uint256 balance = sERC20.balanceOf(holder);
@@ -218,21 +213,25 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         payable(holder).sendValue(value);
     }
 
+    /**
+     * @notice Enable flash buyout for the NFT pegged to `sERC20`.
+     * @param sERC20 The sERC20 whose pegged NFT is to be offered to flash buyout.
+     */
     function enableFlashBuyout(sIERC20 sERC20) external override {
         Sales.Sale storage sale = _sales[sERC20];
         Sales.State state = sale.state();
 
         require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to enable flash buyout");
-        require(state == Sales.State.Pending || state == Sales.State.Opened, "Broker: invalid sale state");
         require(!sale.flash, "Broker: flash buyout already enabled");
+        require(state == Sales.State.Pending || state == Sales.State.Opened, "Broker: invalid sale state");
 
         _enableFlashBuyout(sERC20, sale);
     }
 
     /**
-     * @notice Transfer `sERC20s` pegged NFTs to `beneficiaries` with `datas` as ERC721#transfer callback datas.
-     * @dev This function is only meant to be used in case of emergency / hacks to move sERC20s pegged NFTs to a safer place.
-     * @param sERC20s The sERC20s whose pegged NFT are to escape.
+     * @notice Transfer NFTs pegged to `sERC20s `to `beneficiaries` with `datas` as ERC721#transfer callback datas.
+     * @dev This function is only meant to be used in case of an emergency or upgrade to transfer NFTs to a safer or up-to-date place.
+     * @param sERC20s The sERC20s whose pegged NFTs are transferred.
      * @param beneficiaries The addresses escaped NFTs are transferred to.
      * @param datas The ERC721#transfer callback datas.
      */
@@ -259,10 +258,10 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
-     * @notice Return the broker's market.
+     * @notice Return the broker's forge.
      */
-    function market() public view override returns (IMarket) {
-        return _market;
+    function forge() public view override returns (IForge) {
+        return _forge;
     }
 
     /**
@@ -319,12 +318,6 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         flash = sale.flash;
     }
 
-    function _enableFlashBuyout(sIERC20 sERC20, Sales.Sale storage sale) private {
-        sale.flash = true;
-
-        emit EnableFlashBuyout(sERC20);
-    }
-
     function _buyout(
         sIERC20 sERC20,
         Sales.Sale storage sale,
@@ -336,7 +329,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         sale._state = Sales.State.Closed;
         sale.stock = value;
 
-        sERC20.revokeRole(_MINT_ROLE, address(_market));
+        sERC20.revokeRole(_MINT_ROLE, address(_forge)); // sinon on crée une fonction spécifique sur le forge pour interrompre le minting
         if (collateral > 0) {
             if (locked) sERC20.burn(collateral);
             else sERC20.burnFrom(buyer, collateral);
@@ -344,6 +337,12 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         _vault.unlock(sERC20, buyer, "");
 
         emit Buyout(sERC20, buyer, value, collateral);
+    }
+
+    function _enableFlashBuyout(sIERC20 sERC20, Sales.Sale storage sale) private {
+        sale.flash = true;
+
+        emit EnableFlashBuyout(sERC20);
     }
 
     function _priceOfFor(

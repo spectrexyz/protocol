@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 import "./Proposals.sol";
 
 library Sales {
-    using Proposals for Proposals.Proposal;
-
     enum State {
         Null,
         Pending,

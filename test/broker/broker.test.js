@@ -545,7 +545,7 @@ describe("Broker", () => {
     });
   });
 
-  describe.only("# rejectProposal", () => {
+  describe("# rejectProposal", () => {
     describe("» caller is sale's guardian", () => {
       describe("» and proposal is pending", () => {
         before(async () => {
@@ -715,6 +715,152 @@ describe("Broker", () => {
 
       it("it reverts", async () => {
         await expect(this.broker.cancel({ from: this.signers.others[0] })).to.be.revertedWith("FlashBroker: must be buyer to cancel proposal");
+      });
+    });
+  });
+
+  describe("# enableFlashBuyout", () => {
+    describe("» caller is sale's guardian", () => {
+      describe("» and flash buyout is not enabled", () => {
+        describe("» and sale is pending", () => {
+          before(async () => {
+            await setup(this, { broker: true });
+            await this.broker.register({ flash: false });
+            await this.broker.enableFlashBuyout();
+            this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+          });
+
+          it("it enables flash buyout", async () => {
+            expect(this.data.sale.flash).to.equal(true);
+          });
+
+          it("it emits a EnableFlashBuyout event", async () => {
+            await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout").withArgs(this.sERC20.contract.address);
+          });
+        });
+
+        describe("» and sale is opened", () => {
+          before(async () => {
+            await setup(this, { broker: true });
+            await this.broker.register({ flash: false });
+            await advanceTime(this.params.broker.timelock);
+            await this.broker.enableFlashBuyout();
+            this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+          });
+
+          it("it enables flash buyout", async () => {
+            expect(this.data.sale.flash).to.equal(true);
+          });
+
+          it("it emits a EnableFlashBuyout event", async () => {
+            await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout").withArgs(this.sERC20.contract.address);
+          });
+        });
+
+        describe("» but sale is neither pending nor opened", () => {
+          before(async () => {
+            await setup(this, { broker: true });
+            await this.broker.register({ flash: false });
+            await advanceTime(this.params.broker.timelock);
+            await this.broker.createProposal();
+            await this.broker.acceptProposal();
+          });
+
+          it("it reverts", async () => {
+            await expect(this.broker.enableFlashBuyout()).to.be.revertedWith("Broker: invalid sale state");
+          });
+        });
+      });
+
+      describe("» but flash buyout is already enabled", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.enableFlashBuyout()).to.be.revertedWith("Broker: flash buyout already enabled");
+        });
+      });
+    });
+
+    describe("» but caller is not guardian", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register({ flash: false });
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.enableFlashBuyout({ from: this.signers.others[0] })).to.be.revertedWith(
+          "Broker: must be sale's guardian to enable flash buyout"
+        );
+      });
+    });
+  });
+
+  describe.only("# escape", () => {
+    describe("» caller has ESCAPE_ROLE", () => {
+      describe("» and parameters lengths match", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register();
+          this.data.tokenId0 = this.data.tokenId;
+          this.data.sERC20 = this.sERC20;
+          await this.sERC721.mint();
+          await this.sERC1155.spectralize({ guardian: this.broker.contract });
+          await this.broker.register();
+          this.data.tokenId1 = this.data.tokenId;
+          await this.broker.escape();
+        });
+
+        it("it transfers NFTs", async () => {
+          expect(await this.sERC721.ownerOf(this.data.tokenId0)).to.equal(this.signers.broker.beneficiaries[0].address);
+          expect(await this.sERC721.ownerOf(this.data.tokenId1)).to.equal(this.signers.broker.beneficiaries[1].address);
+        });
+
+        it("it emits a Escape events", async () => {
+          await expect(this.data.tx)
+            .to.emit(this.broker.contract, "Escape")
+            .withArgs(this.data.sERC20.contract.address, this.signers.broker.beneficiaries[0].address, ethers.constants.HashZero);
+
+          await expect(this.data.tx)
+            .to.emit(this.broker.contract, "Escape")
+            .withArgs(this.sERC20.contract.address, this.signers.broker.beneficiaries[1].address, ethers.constants.HashZero);
+        });
+      });
+
+      describe("» but parameters lengths mismatch", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register();
+          this.data.sERC20 = this.sERC20;
+          await this.sERC721.mint();
+          await this.sERC1155.spectralize({ guardian: this.broker.contract });
+          await this.broker.register();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.escape({ sERC20s: [this.sERC20.contract.address] })).to.be.revertedWith("Broker: parameters lengths mismatch");
+          await expect(this.broker.escape({ beneficiaries: [this.signers.broker.beneficiaries[0].address] })).to.be.revertedWith(
+            "Broker: parameters lengths mismatch"
+          );
+          await expect(this.broker.escape({ datas: [ethers.constants.HashZero] })).to.be.revertedWith("Broker: parameters lengths mismatch");
+        });
+      });
+    });
+
+    describe("» caller does not have ESCAPE_ROLE", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register();
+        this.data.sERC20 = this.sERC20;
+        await this.sERC721.mint();
+        await this.sERC1155.spectralize({ guardian: this.broker.contract });
+        await this.broker.register();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.escape({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must have ESCAPE_ROLE to escape");
       });
     });
   });

@@ -17,7 +17,7 @@ import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
 /**
  * @title Vault
- * @notice sERC1155 token wrapping ERC721s into sERC20s.
+ * @notice ERC1155 token wrapping ERC721s into sERC20s.
  * @dev sERC1155 does not implement mint nor burn in an effort to maintain some separation of concerns between
  *      financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
  *      sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
@@ -32,10 +32,11 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
     using ERC165Checker for address;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    // keccak256("Le spectral, ce sont ces autres, jamais présents comme tels, ni vivants ni morts, avec lesquels je m'entretiens");
-    bytes32 public constant DERRIDA = 0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce;
+    bytes32 public constant DERRIDA = 0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce; // keccak256("Le spectral, ce sont ces autres, jamais présents comme tels, ni vivants ni morts, avec lesquels je m'entretiens");
     bytes4 private constant ERC721_ID = 0x80ac58cd;
     bytes4 private constant ERC1155RECEIVER_ID = 0x4e2312e0;
+
+    // Faire une lib ERC165Ids avec ERC721 et ERC1155Receiver comme ID ?
 
     address private _sERC20Base;
     string private _unavailableURI;
@@ -145,7 +146,7 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
      *      - If the caller is not `from`, it must be an approved operator of `from`.
      *      - `from` must have a balance of tokens of type `id` of at least `amount`.
      *      - If `to` refers to a smart contract, it must implement onERC1155Received and return the acceptance magic
-     *      value.
+     *        value.
      * @param from   The address to transfer the tokens from.
      * @param to     The address to transfer the tokens to.
      * @param id     The id of the token type to transfer.

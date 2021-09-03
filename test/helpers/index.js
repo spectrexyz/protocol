@@ -11,8 +11,8 @@ const RECEIVER_BATCH_MAGIC_VALUE = "0xbc197c81";
 
 const sERC721 = require("./models/sERC721");
 const sERC1155 = require("./models/sERC1155");
-const sBootstrappingPool = require("./models/sBootstrappingPool");
-const sMinter = require("./models/sMinter");
+// const sBootstrappingPool = require("./models/sBootstrappingPool");
+// const sMinter = require("./models/sMinter");
 const { Broker, Template, Splitter } = require("./models");
 
 const initialize = async (ctx) => {
@@ -157,7 +157,9 @@ const initialize = async (ctx) => {
     owners: [],
     beneficiaries: [],
     others: [],
-    broker: {},
+    broker: {
+      beneficiaries: [],
+    },
   };
 
   [
@@ -198,6 +200,8 @@ const initialize = async (ctx) => {
     ctx.signers.broker.buyer,
     ctx.signers.broker.registrar,
     ctx.signers.broker.escaper,
+    ctx.signers.broker.beneficiaries[0],
+    ctx.signers.broker.beneficiaries[1],
     ...ctx.signers.others
   ] = await ethers.getSigners();
 };
@@ -257,17 +261,17 @@ const setup = async (ctx, opts = {}) => {
   }
 
   if (opts.balancer || opts.template) {
-    await sBootstrappingPool.deploy(ctx, opts);
-    ctx.data.poolId = await ctx.sBootstrappingPool.getPoolId();
+    // await sBootstrappingPool.deploy(ctx, opts);
+    // ctx.data.poolId = await ctx.sBootstrappingPool.getPoolId();
   }
 
   if (opts.minter || opts.template) {
-    await sMinter.deploy(ctx, opts);
-    await ctx.sERC20.grantRole({
-      role: ctx.constants.sERC20.MINT_ROLE,
-      account: ctx.sMinter.contract,
-    });
-    if (opts.register) await ctx.sMinter.register();
+    // await sMinter.deploy(ctx, opts);
+    // await ctx.sERC20.grantRole({
+    //   role: ctx.constants.sERC20.MINT_ROLE,
+    //   account: ctx.sMinter.contract,
+    // });
+    // if (opts.register) await ctx.sMinter.register();
   }
 
   if (opts.broker || opts.template) {
