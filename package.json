@@ -3,22 +3,60 @@
   "version": "1.0.0",
   "license": "GPL-3.0-or-later",
   "homepage": "https://github.com/spectrexyz/protocol",
-  "private": true,
-  "engines": {
-    "node": ">=16.2.0"
-  },
+  "files": [
+    "contracts/**/*",
+    "!contracts/test/*"
+  ],
   "scripts": {
-    "compile:core": "cd core && yarn compile",
-    "compile:distribution": "cd distribution/bootstrapping-pool && yarn compile",
-    "compile:infrastructure": "cd infrastructure && yarn compile",
-    "compile": "yarn compile:core && yarn compile:distribution && yarn compile:infrastructure"
+    "compile": "npx hardhat compile",
+    "lint": "npx prettier --write contracts/",
+    "test:broker": "npx hardhat test test/broker/*",
+    "test:broker:coverage": "npx hardhat coverage --testfiles test/broker/*",
+    "test:token": "npx hardhat test test/token/*",
+    "test:token:coverage": "npx hardhat coverage --testfiles test/token/*",
+    "test:utils": "npx hardhat test test/utils/*",
+    "test:utils:coverage": "npx hardhat coverage --testfiles test/utils/*",
+    "test:template": "npx hardhat test test/template/*",
+    "test:gas": "REPORT_GAS=true npx hardhat test",
+    "test:coverage": "npx hardhat coverage"
   },
-  "workspaces": [
-    "core",
-    "infrastructure",
-    "templates",
-    "buyout/*",
-    "distribution/*",
-    "pvt/*"
-  ]
+  "dependencies": {
+    "@balancer-labs/v2-pool-weighted": "^1.0.0",
+    "@balancer-labs/v2-solidity-utils": "^1.0.0",
+    "@balancer-labs/v2-vault": "^1.0.0",
+    "@openzeppelin/contracts": "^4.0.0",
+    "@openzeppelin/contracts-0.7": "npm:@openzeppelin/contracts@^3.4.0",
+    "@openzeppelin/contracts-upgradeable": "^4.0.0",
+    "@openzeppelin/contracts-upgradeable-0.7": "npm:@openzeppelin/contracts-upgradeable@^3.4.0"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.1",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "chai": "^4.3.0",
+    "decimal.js": "^10.3.1",
+    "ethereum-waffle": "^3.2.2",
+    "ethers": "^5.0.30",
+    "hardhat": "^2.5.0",
+    "hardhat-gas-reporter": "^1.0.4",
+    "prettier": "^2.3.2",
+    "prettier-plugin-solidity": "^1.0.0-beta.17",
+    "solidity-coverage": "^0.7.17"
+  },
+  "prettier": {
+    "overrides": [
+      {
+        "files": "*.sol",
+        "options": {
+          "printWidth": 160,
+          "explicitTypes": "always"
+        }
+      },
+      {
+        "files": "*.js",
+        "options": {
+          "printWidth": 160
+        }
+      }
+    ]
+  }
 }
