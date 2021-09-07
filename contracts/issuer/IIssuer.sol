@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/IBalancer.sol";
-import "./libraries/Markets.sol";
+import "./libraries/Issuances.sol";
 import "../token/sIERC20.sol";
 
 interface IIssuer {
@@ -14,16 +14,7 @@ interface IIssuer {
     event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 amount, uint256 expiration);
 
     /* #region core */
-    /**
-     * @notice Registers a pit for `sERC20`.
-     * @dev    This function is protected by the REGISTER_ROLE.
-     * @param  sERC20       The sERC20 to register the pit for.
-     * @param  pool         The address of the sERC20's bootstrapping pool [to which LP rewards are transferred].
-     * @param  beneficiary  The address of the pit's beneficiary [to which ETH proceeds are transferred]
-     * @param  reserve The price of the sERC20 before the pool's oracle is functional [expressed in sERC20s / ETH and 18 decimals].
-     * @param  allocation   The allocated percentage of sERC20s [expressed with 18 decimals so that 100% = 1e20 and 1% = 1e18].
-     * @param  fee          The minting fee [deducted from the ETH proceeds and sent as a reward to LPs].
-     */
+
     function register(
         sIERC20 sERC20,
         address pool,
@@ -105,7 +96,7 @@ interface IIssuer {
      * @notice Returns pit associated to an `sERC20`.
      * @param  sERC20 The address of the sERC20 whose pit is queried.
      */
-    // function marketOf(address sERC20) external view returns (Markets.Market memory);
+    // function marketOf(address sERC20) external view returns (Issuances.Market memory);
     /* #endregion*/
 
     function twapOf(sIERC20 sERC20) external view returns (uint256);

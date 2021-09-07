@@ -4,23 +4,24 @@ pragma solidity ^0.8.0;
 import "./IIssuer.sol";
 import "./interfaces/IBalancer.sol";
 import "./interfaces/ISpectralizationBootstrappingPool.sol";
-import "./libraries/Markets.sol";
+import "./libraries/Issuances.sol";
 import "../token/sIERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
 import "hardhat/console.sol";
 
-contract Issuer is Context, AccessControl, IIssuer {
+contract Issuer is Context, AccessControlEnumerable, IIssuer {
     using Address for address payable;
 
+    bytes32 public constant CLOSE_ROLE = keccak256("REGISTER_ROLE");
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     uint256 public constant DECIMALS = 1e18;
     uint256 public constant HUNDRED = 1e20;
 
     modifier protected() {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "MarketHall: protected operation");
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Issuer: protected operation");
         _;
     }
 
@@ -28,7 +29,7 @@ contract Issuer is Context, AccessControl, IIssuer {
     address payable private _bank;
     address private _splitter;
     uint256 private _protocolFee;
-    mapping(sIERC20 => Markets.Market) private _markets;
+    mapping(sIERC20 => Issuances.Issuance) private _markets;
 
     constructor(
         IBVault vault_,
@@ -36,10 +37,10 @@ contract Issuer is Context, AccessControl, IIssuer {
         address splitter_,
         uint256 protocolFee_
     ) {
-        require(address(vault_) != address(0), "MarketHall: vault cannot be the zero address");
-        require(bank_ != address(0), "MarketHall: bank cannot be the zero address");
-        require(splitter_ != address(0), "MarketHall: splitter cannot be the zero address");
-        require(protocolFee_ < HUNDRED, "MarketHall: protocol fee must be inferior to 100%");
+        require(address(vault_) != address(0), "Issuer: vault cannot be the zero address");
+        require(bank_ != address(0), "Issuer: bank cannot be the zero address");
+        require(splitter_ != address(0), "Issuer: splitter cannot be the zero address");
+        require(protocolFee_ < HUNDRED, "Issuer: protocol fee must be inferior to 100%");
 
         _vault = vault_;
         _bank = bank_;
@@ -50,47 +51,25 @@ contract Issuer is Context, AccessControl, IIssuer {
     }
 
     /**
-     *
+     * @notice Open the issuance of `sERC20`.
+     * @dev - We do not check neither that:
+     *        - `sERC20` is unregistered
+     *        - nor that it actually is an sERC20
+     *        - nor that this contract is granted MINT_ROLE over `sERC20`
+     *        - nor that `pool` actually is a Balancer's pool
+     *        - nor that `allocation` is inferior to 100%
+              to save gas.
+     *      - Indeed, only trusted templates, registering sERC20s out of actual NFT fractionalizations and already checking / updating `allocation`, are supposed
+     *        to be granted REGISTER_ROLE.
+     *      - Other parameters are checked because they are passed by users and forwarded unchecked by templates.
+     * @param sERC20 The sERC20 to open the issuance of.
+     * @param pool The address of the sERC20's balancer pool.
+     * @param guardian The address of the issuance guardian [to which ETH proceeds are transferred]
+     * @param reserve The price of the sERC20 before the pool's oracle is functional [expressed in sERC20s / ETH and 18 decimals].
+     * @param allocation The pre-allocated percentage of sERC20s [expressed with 1e18 decimals].
+     * @param fee The minting fee [deducted from the ETH proceeds and sent as a reward to LPs].
+     * @param flash True if flash issuance is enabled, false otherwise.
      */
-    function mint(sIERC20 sERC20, uint256 expected) external payable override {
-        Markets.Market storage market = _markets[sERC20];
-
-        require(market.state == Markets.State.Opened, "MarketHall: invalid market state");
-        require(msg.value != 0, "MarketHall: minted value cannot be null");
-
-        uint256 price = _twapOf(market);
-        uint256 amount = (price * msg.value) / DECIMALS;
-
-        require(amount >= expected, "MarketHall: insufficient minting return");
-
-        _mint(sERC20, market, _msgSender(), msg.value, amount);
-    }
-
-    function _mint(
-        sIERC20 sERC20,
-        Markets.Market storage market,
-        address buyer,
-        uint256 value,
-        uint256 amount
-    ) private {
-        uint256 fee = (value * market.fee) / HUNDRED;
-        uint256 protocolFee_ = ((value - fee) * _protocolFee) / HUNDRED;
-        uint256 remaining = value - fee - protocolFee_; //msg.value.sub(protocolFee).sub(fee);
-        // // pool LP reward
-        uint256 reward = _rewardAndLock(sERC20, market, fee);
-        // mint recipient tokens
-        sERC20.mint(buyer, amount);
-        // mint allocation tokens
-        sERC20.mint(_splitter, _allocation(market.allocation, amount + reward));
-        // // poke weights
-        // pool.pokeWeights();
-        // collect protocol fee
-        _bank.sendValue(protocolFee_);
-        // // pay beneficiary
-        market.guardian.sendValue(remaining);
-        emit Mint(sERC20, buyer, msg.value, amount);
-    }
-
     function register(
         sIERC20 sERC20,
         address pool,
@@ -100,14 +79,13 @@ contract Issuer is Context, AccessControl, IIssuer {
         uint256 fee,
         bool flash
     ) external override {
-        require(hasRole(REGISTER_ROLE, _msgSender()), "MarketHall: must have REGISTER_ROLE to register");
-        require(guardian != payable(address(0)), "MarketHall: beneficiary cannot be the zero address");
-        require(reserve != 0, "MarketHall: reserve price cannot be null");
-        require(allocation < HUNDRED, "MarketHall: allocation must be inferior to 100%");
-        require(fee < HUNDRED, "MarketHall: minting fee must be inferior to 100%");
+        require(hasRole(REGISTER_ROLE, _msgSender()), "Issuer: must have REGISTER_ROLE to register");
+        require(guardian != payable(address(0)), "Issuer: beneficiary cannot be the zero address");
+        require(reserve != 0, "Issuer: reserve price cannot be null");
+        require(allocation < HUNDRED, "Issuer: allocation must be inferior to 100%");
+        require(fee < HUNDRED, "Issuer: minting fee must be inferior to 100%");
 
-        // we should deploy the pool here in the future ?
-        _markets[sERC20].state = Markets.State.Opened;
+        _markets[sERC20].state = Issuances.State.Opened;
         _markets[sERC20].pool = ISpectralizationBootstrappingPool(pool);
         _markets[sERC20].poolId = ISpectralizationBootstrappingPool(pool).getPoolId();
         _markets[sERC20].sERC20Index = ISpectralizationBootstrappingPool(pool).sERC20IsToken0() ? 0 : 1;
@@ -121,6 +99,23 @@ contract Issuer is Context, AccessControl, IIssuer {
     }
 
     /**
+     *
+     */
+    function mint(sIERC20 sERC20, uint256 expected) external payable override {
+        Issuances.Issuance storage market = _markets[sERC20];
+
+        require(market.state == Issuances.State.Opened, "Issuer: invalid market state");
+        require(msg.value != 0, "Issuer: minted value cannot be null");
+
+        uint256 price = _twapOf(market);
+        uint256 amount = (price * msg.value) / DECIMALS;
+
+        require(amount >= expected, "Issuer: insufficient minting return");
+
+        _mint(sERC20, market, _msgSender(), msg.value, amount);
+    }
+
+    /**
      * @notice Create a proposal to mint `amount` token of `sERC20`.
      * @param sERC20 The sERC20 to mint.
      * @param amount The amount of tokens to mint.
@@ -131,11 +126,11 @@ contract Issuer is Context, AccessControl, IIssuer {
         uint256 amount,
         uint256 lifespan
     ) external payable override returns (uint256) {
-        Markets.Market storage market = _markets[sERC20];
+        Issuances.Issuance storage market = _markets[sERC20];
         address buyer = _msgSender();
 
-        require(market.state == Markets.State.Opened, "MarketHall: invalid market state");
-        require(!market.flash, "MarketHall: flash minting is enabled");
+        require(market.state == Issuances.State.Opened, "Issuer: invalid market state");
+        require(!market.flash, "Issuer: flash minting is enabled");
 
         uint256 price = _twapOf(market);
         require(amount <= price * msg.value, "Broker: insufficient value");
@@ -168,19 +163,19 @@ contract Issuer is Context, AccessControl, IIssuer {
 
     /* #region setters */
     function setBank(address payable bank_) external override protected {
-        require(bank_ != address(0), "MarketHall: bank cannot be the zero address");
+        require(bank_ != address(0), "Issuer: bank cannot be the zero address");
 
         _bank = bank_;
     }
 
     function setSplitter(address splitter_) external override protected {
-        require(splitter_ != address(0), "MarketHall: splitter cannot be the zero address");
+        require(splitter_ != address(0), "Issuer: splitter cannot be the zero address");
 
         _splitter = splitter_;
     }
 
     function setProtocolFee(uint256 protocolFee_) external override protected {
-        require(protocolFee_ < HUNDRED, "MarketHall: protocol fee must be inferior to 100%");
+        require(protocolFee_ < HUNDRED, "Issuer: protocol fee must be inferior to 100%");
 
         _protocolFee = protocolFee_;
     }
@@ -208,13 +203,39 @@ contract Issuer is Context, AccessControl, IIssuer {
         return _twapOf(_markets[sERC20]);
     }
 
-    // function marketOf(address sERC20) public view override returns (Markets.Market memory) {
+    // function marketOf(address sERC20) public view override returns (Issuances.Issuance memory) {
     //     return _markets[sERC20];
     // }
 
     /* #endregion*/
 
     /* #region private */
+
+    function _mint(
+        sIERC20 sERC20,
+        Issuances.Issuance storage market,
+        address buyer,
+        uint256 value,
+        uint256 amount
+    ) private {
+        uint256 fee = (value * market.fee) / HUNDRED;
+        uint256 protocolFee_ = ((value - fee) * _protocolFee) / HUNDRED;
+        uint256 remaining = value - fee - protocolFee_; //msg.value.sub(protocolFee).sub(fee);
+        // // pool LP reward
+        uint256 reward = _rewardAndLock(sERC20, market, fee);
+        // mint recipient tokens
+        sERC20.mint(buyer, amount);
+        // mint allocation tokens
+        sERC20.mint(_splitter, _allocation(market.allocation, amount + reward));
+        // // poke weights
+        // pool.pokeWeights();
+        // collect protocol fee
+        _bank.sendValue(protocolFee_);
+        // // pay beneficiary
+        market.guardian.sendValue(remaining);
+        emit Mint(sERC20, buyer, msg.value, amount);
+    }
+
     function _request(
         sIERC20 sERC20,
         ISpectralizationBootstrappingPool pool,
@@ -257,7 +278,7 @@ contract Issuer is Context, AccessControl, IIssuer {
      * @dev - This function always returns the price in sERC20 per ETH [see PriceOracle.sol for details].
      *      - This function do not care about decimals as both ETH and sERC20s have 18 decimals.
      */
-    function _twapOf(Markets.Market storage market) private view returns (uint256) {
+    function _twapOf(Issuances.Issuance storage market) private view returns (uint256) {
         IPriceOracle.OracleAverageQuery[] memory query = new IPriceOracle.OracleAverageQuery[](1);
         query[0] = IPriceOracle.OracleAverageQuery({variable: IPriceOracle.Variable.PAIR_PRICE, secs: 1 days, ago: 0});
 
@@ -271,7 +292,7 @@ contract Issuer is Context, AccessControl, IIssuer {
                 revert(reason);
             }
         } catch {
-            revert("MarketHall: pool's oracle reverted");
+            revert("Issuer: pool's oracle reverted");
         }
     }
 
@@ -317,7 +338,7 @@ contract Issuer is Context, AccessControl, IIssuer {
 
     function _rewardAndLock(
         sIERC20 sERC20,
-        Markets.Market storage market,
+        Issuances.Issuance storage market,
         uint256 value
     ) private returns (uint256) {
         uint256 reward;

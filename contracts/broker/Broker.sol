@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 
 /**
  * @title Broker
- * @notice Handles the buyout of spectralized NFTs.
+ * @notice Handles the buyout of fractionalized NFTs.
  */
 contract Broker is Context, AccessControlEnumerable, IBroker {
     using Address for address payable;
@@ -42,7 +42,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     /**
      * @notice Put the NFT pegged to `sERC20` on sale.
      * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an sERC20 to save gas.
-     *      - Indeed, only trusted templates, registering sERC20s out of actual NFT spectralizations, are supposed to be granted REGISTER_ROLE.
+     *      - Indeed, only trusted templates, registering sERC20s out of actual NFT fractionalizations, are supposed to be granted REGISTER_ROLE.
      *      - Other parameters are checked because they are passed by users and forwarded unchecked by templates.
      * @param sERC20 The sERC20 whose pegged NFT is put on sale.
      * @param guardian The account authorized to enable flash buyout and accept / reject proposals otherwise.

@@ -14,7 +14,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 /**
  * @title  sERC20
- * @notice ERC20 token of spectralized ERC721.
+ * @notice ERC20 token of fractionalized ERC721.
  * @dev    - This contract is meant to be used as the implementation contract of EIP-1167 minimal proxies.
  *         - See https://eips.ethereum.org/EIPS/eip-1167.
  */
