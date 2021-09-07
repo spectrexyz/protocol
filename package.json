@@ -11,12 +11,8 @@
     "compile": "npx hardhat compile",
     "lint": "npx prettier --write contracts/",
     "test:broker": "npx hardhat test test/broker/*",
-    "test:broker:coverage": "npx hardhat coverage --testfiles test/broker/*",
     "test:token": "npx hardhat test test/token/*",
-    "test:token:coverage": "npx hardhat coverage --testfiles test/token/*",
     "test:utils": "npx hardhat test test/utils/*",
-    "test:utils:coverage": "npx hardhat coverage --testfiles test/utils/*",
-    "test:template": "npx hardhat test test/template/*",
     "test:gas": "REPORT_GAS=true npx hardhat test",
     "test:coverage": "npx hardhat coverage"
   },

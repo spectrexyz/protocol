@@ -1,5 +1,4 @@
 const { expect } = require("chai");
-const { ethers } = require("ethers");
 const { initialize, setup } = require("../helpers");
 const { advanceTime } = require("../helpers/time");
 
