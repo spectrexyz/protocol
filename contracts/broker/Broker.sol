@@ -23,7 +23,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     bytes32 public constant ESCAPE_ROLE = keccak256("ESCAPE_ROLE");
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     uint256 public constant MINIMUM_TIMELOCK = 1 weeks;
-    uint256 private constant DECIMALS = 1e18;
+    uint256 public constant DECIMALS = 1e18;
     bytes32 private constant _MINT_ROLE = keccak256("MINT_ROLE");
 
     IVault private immutable _vault;
@@ -47,7 +47,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
      * @param sERC20 The sERC20 whose pegged NFT is put on sale.
      * @param guardian The account authorized to enable flash buyout and accept / reject proposals otherwise.
      * @param reserve The reserve price above which the NFT can be bought out.
-     * @param multiplier The sale's buyout multiplier.
+     * @param multiplier The sale's buyout multiplier [expressed with 1e18 decimals].
      * @param timelock The period of time after which the sale opens [in seconds].
      * @param flash True if flash buyout is enabled, false otherwise.
      */
