@@ -23,7 +23,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     bytes32 public constant ESCAPE_ROLE = keccak256("ESCAPE_ROLE");
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     uint256 public constant MINIMUM_TIMELOCK = 1 weeks;
-    uint256 public constant DECIMALS = 1e18;
+    uint256 public constant DECIMALS = 1e18; // !IMPORTANT: is the same as Issuer.DECIMALS
     bytes32 private constant _MINT_ROLE = keccak256("MINT_ROLE");
 
     IVault private immutable _vault;
