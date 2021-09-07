@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-// const { ethers } = require("ethers");
+const { ethers } = require("ethers");
 const { initialize, setup } = require("../helpers");
 const { advanceTime } = require("../helpers/time");
 
@@ -15,7 +15,7 @@ describe("Broker", () => {
 
     it("it initializes broker", async () => {
       expect(await this.broker.vault()).to.equal(this.sERC1155.contract.address);
-      expect(await this.broker.forge()).to.equal(this.contracts.marketMock.address);
+      expect(await this.broker.issuer()).to.equal(this.contracts.issuerMock.address);
     });
 
     it("it sets up permissions", async () => {
@@ -110,7 +110,7 @@ describe("Broker", () => {
 
             it("it reverts", async () => {
               await expect(this.broker.register({ flash: false, guardian: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
-                "Broker: guardian cannot be the zero address if flash buyout is not enabled"
+                "Broker: guardian cannot be the zero address if flash buyout is disabled"
               );
             });
           });
@@ -171,8 +171,8 @@ describe("Broker", () => {
             expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
           });
 
-          it("it revokes market's MINT_ROLE over sERC20", async () => {
-            expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
+          it("it closes sERC20 issuance", async () => {
+            await expect(this.data.tx).to.emit(this.contracts.issuerMock, "Close").withArgs(this.sERC20.contract.address);
           });
 
           it("it emits a Buyout event", async () => {
@@ -210,8 +210,8 @@ describe("Broker", () => {
             expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
           });
 
-          it("it revokes market's MINT_ROLE over sERC20", async () => {
-            expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
+          it("it closes sERC20 issuance", async () => {
+            await expect(this.data.tx).to.emit(this.contracts.issuerMock, "Close").withArgs(this.sERC20.contract.address);
           });
 
           it("it emits a Buyout event", async () => {
@@ -245,8 +245,8 @@ describe("Broker", () => {
             expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
           });
 
-          it("it revokes market's MINT_ROLE over sERC20", async () => {
-            expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
+          it("it closes sERC20 issuance", async () => {
+            await expect(this.data.tx).to.emit(this.contracts.issuerMock, "Close").withArgs(this.sERC20.contract.address);
           });
 
           it("it emits a Buyout event", async () => {
@@ -469,8 +469,8 @@ describe("Broker", () => {
               expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.broker.buyer.address);
             });
 
-            it("it revokes market's MINT_ROLE over sERC20", async () => {
-              expect(await this.sERC20.hasRole(this.constants.sERC20.MINT_ROLE, this.contracts.marketMock.address)).to.equal(false);
+            it("it closes sERC20 issuance", async () => {
+              await expect(this.data.tx).to.emit(this.contracts.issuerMock, "Close").withArgs(this.sERC20.contract.address);
             });
 
             it("it emits a AcceptProposal event", async () => {
@@ -639,7 +639,7 @@ describe("Broker", () => {
     });
   });
 
-  describe.only("# withdrawProposal", () => {
+  describe("# withdrawProposal", () => {
     describe("» caller is proposal's buyer", () => {
       describe("» proposal is pending", () => {
         before(async () => {
@@ -737,9 +737,83 @@ describe("Broker", () => {
     });
   });
 
+  describe("# claim", () => {
+    describe("» sale is opened", () => {
+      describe("» and there is something to claim", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register();
+          await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+          await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+          await this.sERC20.mint({ to: this.signers.others[1], amount: this.params.broker.balance });
+
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.buyout();
+          this.data.previousClaimerETHBalance = await this.signers.others[0].getBalance();
+          await this.broker.claim();
+          this.data.sale = await this.broker.saleOf(this.sERC20.contract.address);
+          this.data.expectedValue = this.params.broker.value.div(ethers.BigNumber.from("2"));
+          this.data.lastClaimerETHBalance = await this.signers.others[0].getBalance();
+        });
+
+        it("it burns claimer tokens", async () => {
+          expect(await this.sERC20.balanceOf(this.signers.others[0])).to.equal(0);
+        });
+
+        it("it pays claimer", async () => {
+          expect(this.data.lastClaimerETHBalance.sub(this.data.previousClaimerETHBalance).add(this.data.gasSpent)).to.equal(this.data.expectedValue);
+        });
+
+        it("it updates sale's stock", async () => {
+          expect(this.data.sale.stock).to.equal(this.params.broker.value.sub(this.data.expectedValue));
+        });
+
+        it("it emits a claim event", async () => {
+          await expect(this.data.tx)
+            .to.emit(this.broker.contract, "Claim")
+            .withArgs(this.sERC20.contract.address, this.signers.others[0].address, this.data.expectedValue, this.params.broker.balance);
+        });
+      });
+
+      describe("» but there is nothing to claim", () => {
+        before(async () => {
+          await setup(this, { broker: true });
+          await this.broker.register();
+          await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+          await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+          await this.sERC20.mint({ to: this.signers.others[1], amount: this.params.broker.balance });
+
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.buyout();
+          await this.broker.claim();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.claim()).to.be.revertedWith("Broker: nothing to claim");
+        });
+      });
+    });
+
+    describe("» sale is not closed", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register();
+        await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+        await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+        await this.sERC20.mint({ to: this.signers.others[1], amount: this.params.broker.balance });
+
+        await advanceTime(this.params.broker.timelock);
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.claim()).to.be.revertedWith("Broker: invalid sale state");
+      });
+    });
+  });
+
   describe("# enableFlashBuyout", () => {
     describe("» caller is sale's guardian", () => {
-      describe("» and flash buyout is not enabled", () => {
+      describe("» and flash buyout is disabled", () => {
         describe("» and sale is pending", () => {
           before(async () => {
             await setup(this, { broker: true });
@@ -879,6 +953,45 @@ describe("Broker", () => {
 
       it("it reverts", async () => {
         await expect(this.broker.escape({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must have ESCAPE_ROLE to escape");
+      });
+    });
+  });
+
+  describe("# priceOfFor", () => {
+    describe("» market value is inferior to reserve price", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register();
+        await this.sERC20.mint({ to: this.signers.broker.buyer, amount: ethers.BigNumber.from(1) });
+        await this.sERC20.mint({ to: this.signers.others[0], amount: ethers.BigNumber.from(1) });
+        this.data.price = await this.broker.priceOfFor(this.sERC20.contract.address, this.signers.broker.buyer.address);
+      });
+
+      it("it returns valid data based on reserve price", async () => {
+        expect(this.data.price.value).to.equal(this.params.broker.reserve.div(ethers.BigNumber.from("2")));
+        expect(this.data.price.collateral).to.equal(ethers.BigNumber.from(1));
+      });
+    });
+
+    describe("» market value is superior to reserve price", () => {
+      before(async () => {
+        await setup(this, { broker: true });
+        await this.broker.register();
+        await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+        await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+        this.data.price = await this.broker.priceOfFor(this.sERC20.contract.address, this.signers.broker.buyer.address);
+      });
+
+      it("it returns valid data based on market value", async () => {
+        expect(this.data.price.value).to.equal(
+          (await this.sERC20.totalSupply()) // supply
+            .mul(await this.broker.twapOf(this.sERC20.contract.address)) // price
+            .mul(this.params.broker.multiplier)
+            .div(ethers.utils.parseEther("1")) // DECIMALS for TWAP
+            .div(ethers.utils.parseEther("1")) // DECIMALS for multiplier
+            .div(ethers.BigNumber.from("2")) // buyer holds half the supply
+        );
+        expect(this.data.price.collateral).to.equal(this.params.broker.balance);
       });
     });
   });

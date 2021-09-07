@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import { IVault as IBVault } from "./IVault.sol"; // this is the Balancer's vaut interface, not the spectre's vault one.
-import {sIERC20} from "../../token/interfaces/sIERC20.sol";
-import "../libraries/Markets.sol";
+import {IVault as IBVault} from "./interfaces/IVault.sol"; // this is the Balancer's vaut interface, not the spectre's vault one.
+import {sIERC20} from "../token/sIERC20.sol";
+import {Markets} from "./libraries/Markets.sol";
 
-interface IForge {
+interface IIssuer {
     /**
      * @notice Emitted when an `sERC20`pit is registered.
      */
     event Register(address indexed sERC20, address pool, address beneficiary, uint256 initialPrice, uint256 allocation, uint256 fee, uint256 protocolFee);
     event Mint(sIERC20 indexed sERC20, address indexed recipient, uint256 value, uint256 amount);
+    event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 amount, uint256 expiration);
 
     /* #region core */
     /**
@@ -46,6 +47,8 @@ interface IForge {
         uint256 amount,
         uint256 lifespan
     ) external payable returns (uint256);
+
+    function close(sIERC20 sERC20) external;
 
     /**
      * @notice Transfers any ERC20 or ETH owned by this contract to the bank.
@@ -104,4 +107,6 @@ interface IForge {
      */
     // function marketOf(address sERC20) external view returns (Markets.Market memory);
     /* #endregion*/
+
+    function twapOf(sIERC20 sERC20) external view returns (uint256);
 }

@@ -10,10 +10,12 @@
   "scripts": {
     "compile": "npx hardhat compile",
     "lint": "npx prettier --write contracts/",
-    "test:token": "npx hardhat test test/token/*",
-    "test:core": "npx hardhat test test/core/*",
     "test:broker": "npx hardhat test test/broker/*",
+    "test:broker:coverage": "npx hardhat coverage --testfiles test/broker/*",
+    "test:token": "npx hardhat test test/token/*",
+    "test:token:coverage": "npx hardhat coverage --testfiles test/token/*",
     "test:utils": "npx hardhat test test/utils/*",
+    "test:utils:coverage": "npx hardhat coverage --testfiles test/utils/*",
     "test:template": "npx hardhat test test/template/*",
     "test:gas": "REPORT_GAS=true npx hardhat test",
     "test:coverage": "npx hardhat coverage"
@@ -38,7 +40,7 @@
     "hardhat-gas-reporter": "^1.0.4",
     "prettier": "^2.3.2",
     "prettier-plugin-solidity": "^1.0.0-beta.17",
-    "solidity-coverage": "^0.7.16"
+    "solidity-coverage": "^0.7.17"
   },
   "prettier": {
     "overrides": [

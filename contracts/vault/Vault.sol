@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "./interfaces/IVault.sol";
+import "./IVault.sol";
 import "./libraries/Cast.sol";
-import "../token/interfaces/sIERC20.sol";
+import "../token/sIERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";

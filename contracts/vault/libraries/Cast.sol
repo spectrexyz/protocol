@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "../../token/interfaces/sIERC20.sol";
+import "../../token/sIERC20.sol";
 
 /**
  * @title Cast

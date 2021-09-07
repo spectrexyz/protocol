@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "./interfaces/ISplitter.sol";
-import "../token/interfaces/sIERC20.sol";
+import "./ISplitter.sol";
+import "../token/sIERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 

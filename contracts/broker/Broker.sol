@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "./interfaces/IBroker.sol";
+import "./IBroker.sol";
 import "./libraries/Proposals.sol";
 import "./libraries/Sales.sol";
-import { IForge } from "../market/interfaces/IForge.sol";
-import "../token/interfaces/sIERC20.sol";
-import "../vault/interfaces/IVault.sol";
+import "../issuer/IIssuer.sol";
+import "../token/sIERC20.sol";
+import "../vault/IVault.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
 /**
  * @title Broker
- * @dev This contract presumes that it has ADMIN_ROLE over all sERC20s - to neutralize minting when a buyout happens.
  * @notice Handles the buyout of spectralized NFTs.
  */
 contract Broker is Context, AccessControlEnumerable, IBroker {
@@ -23,26 +22,26 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
 
     bytes32 public constant ESCAPE_ROLE = keccak256("ESCAPE_ROLE");
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
-    uint256 public constant DECIMALS = 1e18;
-    uint256 public constant MINIMUM_TIMELOCK = 1 weeks; // On le passe en variable plutôt qu'en constante ?
+    uint256 public constant MINIMUM_TIMELOCK = 1 weeks;
+    uint256 private constant DECIMALS = 1e18;
     bytes32 private constant _MINT_ROLE = keccak256("MINT_ROLE");
 
     IVault private immutable _vault;
-    IForge private immutable _forge;
+    IIssuer private immutable _issuer;
     mapping(sIERC20 => Sales.Sale) private _sales;
 
-    constructor(IVault vault_, IForge forge_) {
+    constructor(IVault vault_, IIssuer issuer_) {
         require(address(vault_) != address(0), "Broker: vault cannot be the zero address");
-        require(address(forge_) != address(0), "Broker: forge cannot be the zero address");
+        require(address(issuer_) != address(0), "Broker: issuer cannot be the zero address");
 
         _vault = vault_;
-        _forge = forge_;
+        _issuer = issuer_;
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
     /**
      * @notice Put the NFT pegged to `sERC20` on sale.
-     * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an sERC20 nor that this contract is granted ADMIN_ROLE to save gas.
+     * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an sERC20 to save gas.
      *      - Indeed, only trusted templates, registering sERC20s out of actual NFT spectralizations, are supposed to be granted REGISTER_ROLE.
      *      - Other parameters are checked because they are passed by users and forwarded unchecked by templates.
      * @param sERC20 The sERC20 whose pegged NFT is put on sale.
@@ -64,7 +63,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
 
         require(hasRole(REGISTER_ROLE, _msgSender()), "Broker: must have REGISTER_ROLE to register");
         require(timelock >= MINIMUM_TIMELOCK, "Broker: invalid timelock");
-        require(flash || guardian != address(0), "Broker: guardian cannot be the zero address if flash buyout is not enabled");
+        require(flash || guardian != address(0), "Broker: guardian cannot be the zero address if flash buyout is disabled");
 
         sale._state = Sales.State.Pending;
         sale.guardian = guardian;
@@ -195,7 +194,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
-     * @notice Claim shares of `sERC20`'s buyout.
+     * @notice Claim shares of the buyout of the NFT pegged to `sERC20`
      * @dev This function is open to re-entrancy for it would be harmless.
      * @param sERC20 The sERC20 whose buyout shares are claimed.
      */
@@ -211,6 +210,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         sale.stock -= value;
         sERC20.burnFrom(holder, balance);
         payable(holder).sendValue(value);
+
+        emit Claim(sERC20, holder, value, balance);
     }
 
     /**
@@ -222,8 +223,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         Sales.State state = sale.state();
 
         require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to enable flash buyout");
-        require(!sale.flash, "Broker: flash buyout already enabled");
         require(state == Sales.State.Pending || state == Sales.State.Opened, "Broker: invalid sale state");
+        require(!sale.flash, "Broker: flash buyout already enabled");
 
         _enableFlashBuyout(sERC20, sale);
     }
@@ -258,10 +259,17 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
-     * @notice Return the broker's forge.
+     * @notice Return the broker's issuer.
      */
-    function forge() public view override returns (IForge) {
-        return _forge;
+    function issuer() public view override returns (IIssuer) {
+        return _issuer;
+    }
+
+    /**
+     * @notice Return what it costs for `buyer` to buyout the NFT pegged to `sERC20`.
+     */
+    function priceOfFor(sIERC20 sERC20, address buyer) public view override returns (uint256 value, uint256 collateral) {
+        return _priceOfFor(sERC20, _sales[sERC20], buyer);
     }
 
     /**
@@ -289,7 +297,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
-     * @notice Return the data related to the sale of the NFT pegged to `sERC20`.
+     * @notice Return the sale of the NFT pegged to `sERC20`.
      */
     function saleOf(sIERC20 sERC20)
         public
@@ -328,12 +336,13 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     ) private {
         sale._state = Sales.State.Closed;
         sale.stock = value;
+        _issuer.close(sERC20);
 
-        sERC20.revokeRole(_MINT_ROLE, address(_forge)); // sinon on crée une fonction spécifique sur le forge pour interrompre le minting
         if (collateral > 0) {
             if (locked) sERC20.burn(collateral);
             else sERC20.burnFrom(buyer, collateral);
         }
+
         _vault.unlock(sERC20, buyer, "");
 
         emit Buyout(sERC20, buyer, value, collateral);
@@ -352,13 +361,9 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     ) private view returns (uint256 value, uint256 collateral) {
         collateral = sERC20.balanceOf(buyer);
         uint256 supply = sERC20.totalSupply();
-        uint256 tokenPrice = 1e16;
-        uint256 marketValue = (((tokenPrice * supply) / DECIMALS) * sale.multiplier) / DECIMALS;
+        uint256 marketValue = (((_issuer.twapOf(sERC20) * supply) / DECIMALS) * sale.multiplier) / DECIMALS;
         uint256 reserve = sale.reserve;
         uint256 rawValue = reserve >= marketValue ? reserve : marketValue;
-
-        // PEUT ETRE ON MET MOINS DE DECIMALS POUR ÊTRE SUR QUE CA OVERFLOW PAS
-        // AUSSI DECIMALS ON PEUT LE PASSER EN PRIVATE CAR C UN TRUC INTERNE
 
         value = supply > 0 ? (rawValue * (DECIMALS - (collateral * DECIMALS) / supply)) / DECIMALS : rawValue;
     }

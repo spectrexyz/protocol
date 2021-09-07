@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.7.0;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.0;
 
-import "../../../core/interfaces/0.7/sIERC20.sol";
-import "../../libraries/0.7/Sales.sol";
+import "./libraries/Sales.sol";
+import "../issuer/IIssuer.sol";
+import "../token/sIERC20.sol";
+import "../vault/IVault.sol";
 
 interface IBroker {
-    event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 collateral);
+    event Register(sIERC20 indexed sERC20, address indexed guardian, uint256 reserve, uint256 multiplier, uint256 opening);
+    event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 collateral, uint256 expiration);
     event AcceptProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event RejectProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
-    event CancelProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
+    event WithdrawProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
+    event Claim(sIERC20 indexed sERC20, address indexed holder, uint256 value, uint256 collateral);
     event Buyout(sIERC20 indexed sERC20, address indexed buyer, uint256 value, uint256 collateral);
     event EnableFlashBuyout(sIERC20 indexed sERC20);
     event Escape(sIERC20 indexed sERC20, address indexed beneficiary, bytes data);
@@ -25,11 +28,13 @@ interface IBroker {
 
     function buyout(sIERC20 sERC20) external payable;
 
+    function createProposal(sIERC20 sERC20, uint256 lifespan) external payable returns (uint256);
+
     function acceptProposal(sIERC20 sERC20, uint256 proposalId) external;
 
     function rejectProposal(sIERC20 sERC20, uint256 proposalId) external;
 
-    function cancelProposal(sIERC20 sERC20, uint256 proposalId) external;
+    function withdrawProposal(sIERC20 sERC20, uint256 proposalId) external;
 
     function claim(sIERC20 sERC20) external;
 
@@ -41,7 +46,11 @@ interface IBroker {
         bytes[] calldata datas
     ) external;
 
-    function vault() external view returns (address);
+    function vault() external view returns (IVault);
+
+    function issuer() external view returns (IIssuer);
+
+    function priceOfFor(sIERC20 sERC20, address buyer) external view returns (uint256 value, uint256 collateral);
 
     function proposalFor(sIERC20 sERC20, uint256 proposalId)
         external

@@ -1,6 +1,6 @@
 const { ethers } = require("ethers");
 const _Broker_ = require("../../../artifacts/contracts/broker/Broker.sol/Broker.json");
-const _MarketMock_ = require("../../../artifacts/contracts/mock/MarketMock.sol/MarketMock.json");
+const _IssuerMock_ = require("../../../artifacts/contracts/mock/IssuerMock.sol/IssuerMock.json");
 
 class Broker {
   constructor(ctx) {
@@ -9,16 +9,18 @@ class Broker {
     this.vault = this.contract.vault;
     this.saleOf = this.contract.saleOf;
     this.proposalFor = this.contract.proposalFor;
-    this.forge = this.contract.forge;
+    this.issuer = this.contract.issuer;
     this.ADMIN_ROLE = this.contract.ADMIN_ROLE;
     this.REGISTER_ROLE = this.contract.REGISTER_ROLE;
     this.hasRole = this.contract.hasRole;
     this.getRoleAdmin = this.contract.getRoleAdmin;
+    this.priceOfFor = this.contract.priceOfFor;
+    this.twapOf = ctx.contracts.issuerMock.twapOf;
   }
 
   static async deploy(ctx, opts) {
-    ctx.contracts.marketMock = await waffle.deployContract(ctx.signers.root, _MarketMock_);
-    ctx.contracts.broker = await waffle.deployContract(ctx.signers.broker.admin, _Broker_, [ctx.contracts.sERC1155.address, ctx.contracts.marketMock.address]);
+    ctx.contracts.issuerMock = await waffle.deployContract(ctx.signers.root, _IssuerMock_);
+    ctx.contracts.broker = await waffle.deployContract(ctx.signers.broker.admin, _Broker_, [ctx.contracts.sERC1155.address, ctx.contracts.issuerMock.address]);
 
     ctx.broker = new Broker(ctx);
 
@@ -49,7 +51,7 @@ class Broker {
     await (
       await this.ctx.contracts.sERC20
         .connect(this.ctx.signers.sERC20.admin)
-        .grantRole(await this.ctx.contracts.sERC20.MINT_ROLE(), this.ctx.contracts.marketMock.address)
+        .grantRole(await this.ctx.contracts.sERC20.MINT_ROLE(), this.ctx.contracts.issuerMock.address)
     ).wait();
 
     this.ctx.data.tx = await this.contract
@@ -72,7 +74,6 @@ class Broker {
 
     this.ctx.data.tx = await this.contract.connect(opts.from).buyout(opts.sERC20.address, { value: opts.value });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
-    // this.ctx.data.proposalId = this.ctx.data.receipt.events.filter((event) => event.event === "CreateProposal")[0].args.proposalId;
   }
 
   async createProposal(opts = {}) {
@@ -135,6 +136,24 @@ class Broker {
 
     this.ctx.data.tx = await this.contract.connect(opts.from).escape(opts.sERC20s, opts.beneficiaries, opts.datas);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async claim(opts = {}) {
+    opts.from ??= this.ctx.signers.others[0];
+    opts.sERC20 ??= this.ctx.sERC20.contract.address;
+
+    await this.ctx.sERC20.approve({
+      from: opts.from,
+      spender: this.ctx.broker.contract,
+      amount: await this.ctx.sERC20.balanceOf(opts.from),
+    });
+
+    this.ctx.data.gasSpent = this.ctx.data.receipt.gasUsed.mul(this.ctx.data.tx.gasPrice);
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).claim(opts.sERC20);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+
+    this.ctx.data.gasSpent = this.ctx.data.gasSpent.add(this.ctx.data.receipt.gasUsed.mul(this.ctx.data.tx.gasPrice));
   }
 }
 

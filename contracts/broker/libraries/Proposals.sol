@@ -23,9 +23,8 @@ library Proposals {
         State _state = proposal._state;
         uint256 expiration = proposal.expiration;
 
-        if (_state == State.Pending && expiration != 0) {
-            if (block.timestamp < proposal.expiration) return State.Pending;
-            else return State.Lapsed;
+        if (_state == State.Pending && expiration != 0 && block.timestamp >= expiration) {
+            return State.Lapsed;
         } else {
             return _state;
         }

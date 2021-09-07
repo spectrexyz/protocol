@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "./interfaces/IForge.sol";
+import "./IIssuer.sol";
 import "./interfaces/IPriceOracle.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/ISpectralizationBootstrappingPool.sol";
-import {sIERC20} from "../token/interfaces/sIERC20.sol";
+import {sIERC20} from "../token/sIERC20.sol";
 
 import "./libraries/Markets.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -14,16 +14,16 @@ import "@openzeppelin/contracts/utils/Context.sol";
 
 import "hardhat/console.sol";
 
-contract Forge is Context, AccessControl, IForge {
+// Issuer / Issuance
+contract Issuer is Context, AccessControl, IIssuer {
     using Address for address payable;
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE"); // ON PEUT UTILISER DEFAULT_ADMIN_ROLE A LA PLACE
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     uint256 public constant DECIMALS = 1e18;
     uint256 public constant HUNDRED = 1e20;
 
     modifier protected() {
-        require(hasRole(ADMIN_ROLE, _msgSender()), "MarketHall: protected operation");
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "MarketHall: protected operation");
         _;
     }
 
@@ -34,28 +34,26 @@ contract Forge is Context, AccessControl, IForge {
     mapping(sIERC20 => Markets.Market) private _markets;
 
     constructor(
-        IVault vault,
-        address payable bank,
-        address splitter,
-        uint256 protocolFee
+        IVault vault_,
+        address payable bank_,
+        address splitter_,
+        uint256 protocolFee_
     ) {
-        require(address(vault) != address(0), "MarketHall: vault cannot be the zero address");
-        require(bank != address(0), "MarketHall: bank cannot be the zero address");
-        require(splitter != address(0), "MarketHall: splitter cannot be the zero address");
-        require(protocolFee < HUNDRED, "MarketHall: protocol fee must be inferior to 100%");
+        require(address(vault_) != address(0), "MarketHall: vault cannot be the zero address");
+        require(bank_ != address(0), "MarketHall: bank cannot be the zero address");
+        require(splitter_ != address(0), "MarketHall: splitter cannot be the zero address");
+        require(protocolFee_ < HUNDRED, "MarketHall: protocol fee must be inferior to 100%");
 
-        _vault = vault;
-        _bank = bank;
-        _splitter = splitter;
-        _protocolFee = protocolFee;
+        _vault = vault_;
+        _bank = bank_;
+        _splitter = splitter_;
+        _protocolFee = protocolFee_;
 
-        _setupRole(ADMIN_ROLE, _msgSender());
-        _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
-        _setRoleAdmin(REGISTER_ROLE, ADMIN_ROLE);
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
     /**
-     * 
+     *
      */
     function mint(sIERC20 sERC20, uint256 expected) external payable override {
         Markets.Market storage market = _markets[sERC20];
@@ -128,7 +126,7 @@ contract Forge is Context, AccessControl, IForge {
     /**
      * @notice Create a proposal to mint `amount` token of `sERC20`.
      * @param sERC20 The sERC20 to mint.
-     * @param amount The amount of tokens to mint
+     * @param amount The amount of tokens to mint.
      * @param lifespan The lifespan of the proposal [in seconds].
      */
     function createProposal(
@@ -137,6 +135,7 @@ contract Forge is Context, AccessControl, IForge {
         uint256 lifespan
     ) external payable override returns (uint256) {
         Markets.Market storage market = _markets[sERC20];
+        address buyer = _msgSender();
 
         require(market.state == Markets.State.Opened, "MarketHall: invalid market state");
         require(!market.flash, "MarketHall: flash minting is enabled");
@@ -148,16 +147,18 @@ contract Forge is Context, AccessControl, IForge {
         uint256 expiration = lifespan == 0 ? 0 : block.timestamp + lifespan;
         market.proposals[proposalId] = Proposals.Proposal({
             _state: Proposals.State.Pending,
-            buyer: _msgSender(),
+            buyer: buyer,
             value: msg.value,
             amount: amount,
             expiration: expiration
         });
 
-        // emit CreateProposal(sERC20, proposalId, buyer, msg.value, collateral, expiration);
+        emit CreateProposal(sERC20, proposalId, buyer, msg.value, amount, expiration);
 
         return proposalId;
     }
+
+    function close(sIERC20 sERC20) external override {}
 
     // Peut être pas necessaire : SI, pour withdraw les sous des LPs quand c'est le market est Closed
     function withdraw(address token) external override {
@@ -169,22 +170,22 @@ contract Forge is Context, AccessControl, IForge {
     }
 
     /* #region setters */
-    function setBank(address payable bank) external override protected {
-        require(bank != address(0), "MarketHall: bank cannot be the zero address");
+    function setBank(address payable bank_) external override protected {
+        require(bank_ != address(0), "MarketHall: bank cannot be the zero address");
 
-        _bank = bank;
+        _bank = bank_;
     }
 
-    function setSplitter(address splitter) external override protected {
-        require(splitter != address(0), "MarketHall: splitter cannot be the zero address");
+    function setSplitter(address splitter_) external override protected {
+        require(splitter_ != address(0), "MarketHall: splitter cannot be the zero address");
 
-        _splitter = splitter;
+        _splitter = splitter_;
     }
 
-    function setProtocolFee(uint256 protocolFee) external override protected {
-        require(protocolFee < HUNDRED, "MarketHall: protocol fee must be inferior to 100%");
+    function setProtocolFee(uint256 protocolFee_) external override protected {
+        require(protocolFee_ < HUNDRED, "MarketHall: protocol fee must be inferior to 100%");
 
-        _protocolFee = protocolFee;
+        _protocolFee = protocolFee_;
     }
 
     /* #endregion*/
@@ -204,6 +205,10 @@ contract Forge is Context, AccessControl, IForge {
 
     function protocolFee() public view override returns (uint256) {
         return _protocolFee;
+    }
+
+    function twapOf(sIERC20 sERC20) public view override returns (uint256) {
+        return _twapOf(_markets[sERC20]);
     }
 
     // function marketOf(address sERC20) public view override returns (Markets.Market memory) {
@@ -331,12 +336,11 @@ contract Forge is Context, AccessControl, IForge {
             reward = (value * balances[0]) / balances[1];
         }
 
-        
         sIERC20(sERC20).mint(address(this), reward);
         sIERC20(sERC20).approve(address(_vault), reward);
         _vault.joinPool{value: value}(poolId, address(this), _bank, _request(sERC20, market.pool, reward, value, isRegular));
         // pool some of it with this contract
-      
+
         return reward;
     }
 }
