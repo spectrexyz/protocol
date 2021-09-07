@@ -16,8 +16,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
     mapping(sIERC20 => Split) _splits;
 
-    constructor(address registrar) {
-        _setupRole(REGISTER_ROLE, registrar);
+    constructor() {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 

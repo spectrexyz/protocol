@@ -14,9 +14,12 @@ class Splitter {
   }
 
   static async deploy(ctx) {
-    ctx.contracts.splitter = await waffle.deployContract(ctx.signers.splitter.admin, _Splitter_, [ctx.signers.splitter.registrar.address]);
+    ctx.contracts.splitter = await waffle.deployContract(ctx.signers.splitter.admin, _Splitter_);
 
     ctx.splitter = new Splitter(ctx);
+
+    const tx = await ctx.contracts.splitter.grantRole(await ctx.splitter.REGISTER_ROLE(), ctx.signers.splitter.registrar.address);
+    await tx.wait();
   }
 
   async register(opts = {}) {
