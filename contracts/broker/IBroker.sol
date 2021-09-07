@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./libraries/Sales.sol";
-import "../issuer/IIssuer.sol";
+import {IIssuer} from "../issuer/IIssuer.sol";
 import "../token/sIERC20.sol";
 import "../vault/IVault.sol";
 
