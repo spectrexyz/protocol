@@ -194,7 +194,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
-     * @notice Claim shares of the buyout of the NFT pegged to `sERC20`
+     * @notice Claim shares of the buyout of the NFT pegged to `sERC20`.
      * @dev This function is open to re-entrancy for it would be harmless.
      * @param sERC20 The sERC20 whose buyout shares are claimed.
      */

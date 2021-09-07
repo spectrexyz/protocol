@@ -24,7 +24,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
      * @notice Register an `sERC20` whose received tokens are to split between `beneficiaries` with respect to `shares`.
      * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an sERC20 to save gas.
      *      - Indeed, only trusted templates, registering sERC20s out of actual NFT fractionalizations, are supposed to be granted REGISTER_ROLE.
-     *      - Other parameters are checked because they are passed by users and forwarded unchecked by the template.
+     *      - Other parameters are checked because they are passed by users and forwarded unchecked by templates.
      * @param sERC20 The sERC20 whose received tokens are to split between beneficiaries.
      * @param beneficiaries The addresses between which to split the received sERC20s.
      * @param shares The respective shares of the beneficiaries over the received sERC20s [expressed with 1e18 decimals].
