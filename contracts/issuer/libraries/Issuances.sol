@@ -15,7 +15,7 @@ library Issuances {
         State state;
         ISpectralizationBootstrappingPool pool;
         bytes32 poolId;
-        address guardian; // guardian ?
+        address guardian;
         uint256 reserve;
         uint256 allocation;
         uint256 fee;

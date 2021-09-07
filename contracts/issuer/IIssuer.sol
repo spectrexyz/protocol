@@ -98,8 +98,19 @@ interface IIssuer {
      * @notice Returns pit associated to an `sERC20`.
      * @param  sERC20 The address of the sERC20 whose pit is queried.
      */
-    // function marketOf(address sERC20) external view returns (Issuances.Market memory);
-    /* #endregion*/
+    function issuanceOf(sIERC20 sERC20)
+        external
+        view
+        returns (
+            Issuances.State state,
+            ISpectralizationBootstrappingPool pool,
+            address guardian,
+            uint256 reserve,
+            uint256 allocation,
+            uint256 fee,
+            uint256 nbOfProposals,
+            bool flash
+        );
 
     function twapOf(sIERC20 sERC20) external view returns (uint256);
 }

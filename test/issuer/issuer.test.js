@@ -67,6 +67,118 @@ describe.only("Issuer", () => {
     });
   });
 
+  describe.only("# register", () => {
+    describe("» caller has REGISTER_ROLE", () => {
+      describe("» and guardian is not the zero address", () => {
+        describe("» and reserve price is not null", () => {
+          describe.only("» and minting fee is inferior to 100%", () => {
+            before(async () => {
+              await setup(this, {
+                issuer: true,
+                mint: false,
+              });
+              await this.issuer.register();
+              this.data.issuance = await this.issuer.issuanceOf(this.sERC20.contract.address);
+            });
+
+            it.only("it registers issuance", async () => {
+              expect(this.data.issuance.state).to.equal(this.constants.issuer.issuances.state.OPEN);
+              // expect(this.data.issuance.pool).to.equal(this.sBootstrappingPool.contract.address);
+              expect(this.data.issuance.guardian).to.equal(this.signers.issuer.guardian.address);
+              expect(this.data.issuance.reserve).to.equal(this.params.issuance.reserve);
+              expect(this.data.issuance.allocation).to.equal(this.params.issuance.allocation);
+              expect(this.data.issuance.fee).to.equal(this.params.issuance.fee);
+              expect(this.data.issuance.nbOfProposals).to.equal(0);
+              expect(this.data.issuance.flash).to.equal(true);
+            });
+
+            it("it emits a Register event", async () => {
+              await expect(this.data.tx)
+                .to.emit(this.sMinter.contract, "Register")
+                .withArgs(
+                  this.sERC20.contract.address,
+                  this.sBootstrappingPool.contract.address,
+                  this.signers.sMinter.beneficiary.address,
+                  this.params.sMinter.initialPrice,
+                  this.params.sMinter.allocation,
+                  this.params.sMinter.fee,
+                  this.params.sMinter.protocolFee
+                );
+            });
+          });
+
+          describe("» but minting fee is superior or equal to 100%", () => {
+            before(async () => {
+              await setup(this, {
+                balancer: true,
+                minter: true,
+                mint: false,
+                register: false,
+              });
+            });
+
+            it("it reverts", async () => {
+              await expect(
+                this.sMinter.register({
+                  fee: this.constants.sMinter.HUNDRED.sub(this.params.sMinter.protocolFee),
+                })
+              ).to.be.revertedWith("sMinter: cumulated fees must be inferior to 100%");
+            });
+          });
+        });
+
+        describe("» but reserve price is null", () => {
+          before(async () => {
+            await setup(this, {
+              balancer: true,
+              minter: true,
+              mint: false,
+              register: false,
+            });
+          });
+
+          it("it reverts", async () => {
+            await expect(this.sMinter.register({ initialPrice: "0" })).to.be.revertedWith("sMinter: initial price cannot be null");
+          });
+        });
+      });
+
+      describe("» but guardian is the zero address", () => {
+        before(async () => {
+          await setup(this, {
+            balancer: true,
+            minter: true,
+            mint: false,
+            register: false,
+          });
+        });
+
+        it("it reverts", async () => {
+          await expect(
+            this.sMinter.register({
+              beneficiary: { address: ethers.constants.AddressZero },
+            })
+          ).to.be.revertedWith("sMinter: beneficiary cannot be the zero address");
+        });
+      });
+    });
+
+    describe("» caller does not have REGISTER_ROLE", () => {
+      before(async () => {
+        await setup(this, {
+          balancer: true,
+          minter: true,
+          mint: false,
+          register: false,
+        });
+      });
+
+      it("it reverts", async () => {
+        await expect(this.sMinter.register({ from: this.signers.others[0] })).to.be.revertedWith("sMinter: must have REGISTER_ROLE to register");
+      });
+    });
+  });
+
   // describe('⇛ setters', () => {
   //   describe('# setBank', () => {
   //     describe('» caller is admin', () => {

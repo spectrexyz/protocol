@@ -66,7 +66,7 @@ const initialize = async (ctx) => {
     issuer: {
       protocolFee: ethers.BigNumber.from("2000000000000000000"), // 2e18 = 2%
       fee: ethers.BigNumber.from("5000000000000000000"), // 5%
-      initialPrice: ethers.utils.parseEther("2"), // 2 sERC20 / ETH
+      reserve: ethers.utils.parseEther("2"), // 2 sERC20 / ETH
       allocation: ethers.utils.parseEther("1").mul(ethers.BigNumber.from("10")), // 10%
       value: ethers.utils.parseEther("3"), // 3 ETH
     },
@@ -94,6 +94,7 @@ const initialize = async (ctx) => {
         INVARIANT: 2,
       },
     },
+
     broker: {
       DECIMALS: ethers.BigNumber.from("1000000000000000000"),
       sales: {
@@ -124,6 +125,13 @@ const initialize = async (ctx) => {
       DECIMALS: ethers.BigNumber.from("1000000000000000000"),
       HUNDRED: ethers.BigNumber.from("100000000000000000000"),
       ONE: ethers.BigNumber.from("1000000000000000000"),
+      issuances: {
+        state: {
+          PENDING: 1,
+          OPEN: 2,
+          CLOSED: 3,
+        },
+      },
     },
     unlockedURI: "ipfs://Qm.../unwrapped",
     unavailableURI: "ipfs://Qm.../unavailable",
@@ -191,7 +199,7 @@ const initialize = async (ctx) => {
     ctx.signers.issuer.admin,
     ctx.signers.issuer.bank,
     ctx.signers.issuer.splitter,
-    ctx.signers.issuer.beneficiary,
+    ctx.signers.issuer.guardian,
     ctx.signers.issuer.recipient,
     ctx.signers.issuer.registerer,
     ctx.signers.broker.admin,
@@ -267,6 +275,9 @@ const setup = async (ctx, opts = {}) => {
   if (opts.issuer || opts.template) {
     await Balancer.deploy(ctx, opts);
     await Issuer.deploy(ctx, opts);
+
+    await ctx.issuer.grantRole({ role: await ctx.issuer.REGISTER_ROLE(), account: ctx.signers.issuer.registerer });
+
     await ctx.sERC20.grantRole({
       role: ctx.constants.sERC20.MINT_ROLE,
       account: ctx.issuer.contract,

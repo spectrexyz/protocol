@@ -10,7 +10,7 @@ class Issuer {
     this.bank = this.contract.bank;
     this.splitter = this.contract.splitter;
     this.protocolFee = this.contract.protocolFee;
-    this.pitOf = this.contract.pitOf;
+    this.issuanceOf = this.contract.issuanceOf;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.hasRole = this.contract.hasRole;
     this.DEFAULT_ADMIN_ROLE = this.contract.DEFAULT_ADMIN_ROLE;
@@ -30,24 +30,28 @@ class Issuer {
       opts.protocolFee,
     ]);
 
-    await (
-      await ctx.contracts.issuer.connect(ctx.signers.issuer.admin).grantRole(await ctx.contracts.issuer.REGISTER_ROLE(), ctx.signers.issuer.registerer.address)
-    ).wait();
-
     ctx.issuer = new Issuer(ctx);
+  }
+
+  async grantRole(opts = {}) {
+    opts.from ??= this.ctx.signers.issuer.admin;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).grantRole(opts.role, opts.account.address);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async register(opts = {}) {
     opts.from ??= this.ctx.signers.issuer.registerer;
     opts.pool ??= { address: ethers.constants.AddressZero }; //this.ctx.sBootstrappingPool.contract;
-    opts.beneficiary ??= this.ctx.signers.issuer.beneficiary;
-    opts.initialPrice ??= this.ctx.params.issuer.initialPrice;
+    opts.guardian ??= this.ctx.signers.issuer.guardian;
+    opts.reserve ??= this.ctx.params.issuer.reserve;
     opts.allocation ??= this.ctx.params.issuer.allocation;
     opts.fee ??= this.ctx.params.issuer.fee;
+    opts.flash ??= true;
 
     this.ctx.data.tx = await this.contract
       .connect(opts.from)
-      .register(this.ctx.sERC20.contract.address, opts.pool.address, opts.beneficiary.address, opts.initialPrice, opts.allocation, opts.fee);
+      .register(this.ctx.sERC20.contract.address, opts.guardian.address, opts.pool.address, opts.reserve, opts.allocation, opts.fee, opts.flash);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 

@@ -222,9 +222,32 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         return _twapOf(_issuances[sERC20]);
     }
 
-    // function issuanceOf(address sERC20) public view override returns (Issuances.Issuance memory) {
-    //     return _issuances[sERC20];
-    // }
+    function issuanceOf(sIERC20 sERC20)
+        public
+        view
+        override
+        returns (
+            Issuances.State state,
+            ISpectralizationBootstrappingPool pool,
+            address guardian,
+            uint256 reserve,
+            uint256 allocation,
+            uint256 fee,
+            uint256 nbOfProposals,
+            bool flash
+        )
+    {
+        Issuances.Issuance storage issuance = _issuances[sERC20];
+        
+        state = issuance.state;
+        pool = issuance.pool;
+        guardian = issuance.guardian;
+        reserve = issuance.reserve;
+        allocation = issuance.allocation;
+        fee = issuance.fee;
+        nbOfProposals = issuance.nbOfProposals;
+        flash = issuance.flash;
+    }
 
     /* #endregion*/
 
