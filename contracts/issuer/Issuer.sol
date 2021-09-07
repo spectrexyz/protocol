@@ -2,19 +2,16 @@
 pragma solidity ^0.8.0;
 
 import "./IIssuer.sol";
-import "./interfaces/IPriceOracle.sol";
-import "./interfaces/IVault.sol";
+import "./interfaces/IBalancer.sol";
 import "./interfaces/ISpectralizationBootstrappingPool.sol";
-import {sIERC20} from "../token/sIERC20.sol";
-
 import "./libraries/Markets.sol";
+import "../token/sIERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
 import "hardhat/console.sol";
 
-// Issuer / Issuance
 contract Issuer is Context, AccessControl, IIssuer {
     using Address for address payable;
 
@@ -27,14 +24,14 @@ contract Issuer is Context, AccessControl, IIssuer {
         _;
     }
 
-    IVault private immutable _vault;
+    IBVault private immutable _vault;
     address payable private _bank;
     address private _splitter;
     uint256 private _protocolFee;
     mapping(sIERC20 => Markets.Market) private _markets;
 
     constructor(
-        IVault vault_,
+        IBVault vault_,
         address payable bank_,
         address splitter_,
         uint256 protocolFee_
@@ -191,7 +188,7 @@ contract Issuer is Context, AccessControl, IIssuer {
     /* #endregion*/
 
     /* #region getters */
-    function vault() public view override returns (IVault) {
+    function vault() public view override returns (IBVault) {
         return _vault;
     }
 
@@ -224,7 +221,7 @@ contract Issuer is Context, AccessControl, IIssuer {
         uint256 amount,
         uint256 value,
         bool sERC20IsToken0
-    ) private view returns (IVault.JoinPoolRequest memory) {
+    ) private view returns (IBVault.JoinPoolRequest memory) {
         IAsset[] memory assets = new IAsset[](2);
         uint256[] memory amounts = new uint256[](2);
 
@@ -242,13 +239,13 @@ contract Issuer is Context, AccessControl, IIssuer {
 
         return
             pool.totalSupply() > 0
-                ? IVault.JoinPoolRequest({
+                ? IBVault.JoinPoolRequest({
                     assets: assets,
                     maxAmountsIn: amounts,
                     userData: abi.encode(ISpectralizationBootstrappingPool.JoinKind.REWARD, amounts),
                     fromInternalBalance: false
                 })
-                : IVault.JoinPoolRequest({
+                : IBVault.JoinPoolRequest({
                     assets: assets,
                     maxAmountsIn: amounts,
                     userData: abi.encode(ISpectralizationBootstrappingPool.JoinKind.INIT, amounts),
