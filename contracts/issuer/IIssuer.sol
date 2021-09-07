@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/IBalancer.sol";
+import "./interfaces/ISpectralizationBootstrappingPool.sol";
 import "./libraries/Issuances.sol";
 import "../token/sIERC20.sol";
 
@@ -9,16 +10,15 @@ interface IIssuer {
     /**
      * @notice Emitted when an `sERC20`pit is registered.
      */
-    event Register(address indexed sERC20, address pool, address beneficiary, uint256 initialPrice, uint256 allocation, uint256 fee, uint256 protocolFee);
+    event Register(sIERC20 indexed sERC20, address indexed guardian, ISpectralizationBootstrappingPool pool, uint256 reserve, uint256 allocation, uint256 fee);
     event Mint(sIERC20 indexed sERC20, address indexed recipient, uint256 value, uint256 amount);
     event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 amount, uint256 expiration);
-
-    /* #region core */
+    event EnableFlashIssuance(sIERC20 indexed sERC20);
 
     function register(
         sIERC20 sERC20,
-        address pool,
-        address payable beneficiary,
+        address guardian,
+        ISpectralizationBootstrappingPool pool,
         uint256 reserve,
         uint256 allocation,
         uint256 fee,
@@ -40,6 +40,8 @@ interface IIssuer {
     ) external payable returns (uint256);
 
     function close(sIERC20 sERC20) external;
+
+    function enableFlashIssuance(sIERC20 sERC20) external;
 
     /**
      * @notice Transfers any ERC20 or ETH owned by this contract to the bank.

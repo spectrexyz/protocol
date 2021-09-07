@@ -12,8 +12,8 @@ const RECEIVER_BATCH_MAGIC_VALUE = "0xbc197c81";
 const sERC721 = require("./models/sERC721");
 const sERC1155 = require("./models/sERC1155");
 // const sBootstrappingPool = require("./models/sBootstrappingPool");
-// const sMinter = require("./models/sMinter");
-const { Broker, Template, Splitter } = require("./models");
+// const issuer = require("./models/issuer");
+const { Broker, Balancer, Issuer, Template, Splitter } = require("./models");
 
 const initialize = async (ctx) => {
   ctx.params = {
@@ -63,7 +63,7 @@ const initialize = async (ctx) => {
     splitter: {
       shares: [ethers.utils.parseEther("30"), ethers.utils.parseEther("10"), ethers.utils.parseEther("60")],
     },
-    sMinter: {
+    issuer: {
       protocolFee: ethers.BigNumber.from("2000000000000000000"), // 2e18 = 2%
       fee: ethers.BigNumber.from("5000000000000000000"), // 5%
       initialPrice: ethers.utils.parseEther("2"), // 2 sERC20 / ETH
@@ -120,7 +120,7 @@ const initialize = async (ctx) => {
       Locked: 1,
       Unlocked: 2,
     },
-    sMinter: {
+    issuer: {
       DECIMALS: ethers.BigNumber.from("1000000000000000000"),
       HUNDRED: ethers.BigNumber.from("100000000000000000000"),
       ONE: ethers.BigNumber.from("1000000000000000000"),
@@ -151,7 +151,7 @@ const initialize = async (ctx) => {
     sERC721: { owners: [] },
     sERC1155: {},
     splitter: { beneficiaries: [] },
-    sMinter: {},
+    issuer: {},
     holders: [],
     owners: [],
     beneficiaries: [],
@@ -188,12 +188,12 @@ const initialize = async (ctx) => {
     ctx.signers.splitter.beneficiaries[0],
     ctx.signers.splitter.beneficiaries[1],
     ctx.signers.splitter.beneficiaries[2],
-    ctx.signers.sMinter.admin,
-    ctx.signers.sMinter.bank,
-    ctx.signers.sMinter.splitter,
-    ctx.signers.sMinter.beneficiary,
-    ctx.signers.sMinter.recipient,
-    ctx.signers.sMinter.registerer,
+    ctx.signers.issuer.admin,
+    ctx.signers.issuer.bank,
+    ctx.signers.issuer.splitter,
+    ctx.signers.issuer.beneficiary,
+    ctx.signers.issuer.recipient,
+    ctx.signers.issuer.registerer,
     ctx.signers.broker.admin,
     ctx.signers.broker.guardian,
     ctx.signers.broker.buyer,
@@ -264,13 +264,13 @@ const setup = async (ctx, opts = {}) => {
     // ctx.data.poolId = await ctx.sBootstrappingPool.getPoolId();
   }
 
-  if (opts.minter || opts.template) {
-    // await sMinter.deploy(ctx, opts);
-    // await ctx.sERC20.grantRole({
-    //   role: ctx.constants.sERC20.MINT_ROLE,
-    //   account: ctx.sMinter.contract,
-    // });
-    // if (opts.register) await ctx.sMinter.register();
+  if (opts.issuer || opts.template) {
+    await Balancer.deploy(ctx, opts);
+    await Issuer.deploy(ctx, opts);
+    await ctx.sERC20.grantRole({
+      role: ctx.constants.sERC20.MINT_ROLE,
+      account: ctx.issuer.contract,
+    });
   }
 
   if (opts.broker || opts.template) {
