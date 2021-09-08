@@ -48,7 +48,7 @@ describe("Vault", () => {
     });
   });
 
-  describe("⇛ ERC165", () => {
+  describe("⇛ IERC165", () => {
     before(async () => {
       await setup.vault(this, { fractionalize: false });
     });
@@ -78,7 +78,7 @@ describe("Vault", () => {
     });
   });
 
-  describe("⇛ ERC1155", () => {
+  describe("⇛ IERC1155", () => {
     describe("# balanceOf", () => {
       describe("» the queried address is not the zero address", () => {
         describe("» and the queried token type exists", () => {
@@ -731,7 +731,7 @@ describe("Vault", () => {
     });
   });
 
-  describe("⇛ ERC1155MetadataURI", () => {
+  describe("⇛ IERC1155MetadataURI", () => {
     describe("# uri", () => {
       describe("» token type exists", () => {
         describe("» and its associated ERC721 is still locked", () => {
@@ -782,7 +782,7 @@ describe("Vault", () => {
     });
   });
 
-  describe("⇛ ERC721Receiver", () => {
+  describe("⇛ IERC721Receiver", () => {
     describe("# onERC721Received", () => {
       describe("» is called by a standard-compliant ERC721", () => {
         describe("» and fractionalization data have a valid length", () => {
@@ -847,12 +847,12 @@ describe("Vault", () => {
     });
   });
 
-  describe.skip("⇛ sERC1155", () => {
+  describe("⇛ IVault", () => {
     describe("# fractionalize", () => {
-      describe("» NFT has never been spectralized", () => {
+      describe("» NFT has never been fractionalized", () => {
         describe("» and NFT is ERC721-compliant", () => {
-          describe("» and sERC1155 has been approved to transfer NFT", () => {
-            describe("» and NFT is not owned by sERC1155", () => {
+          describe("» and the vault has been approved to transfer NFT", () => {
+            describe("» and NFT is not owned by the vault", () => {
               before(async () => {
                 await setup.vault(this);
               });
@@ -860,19 +860,19 @@ describe("Vault", () => {
               itFractionalizesLikeExpected(this);
             });
 
-            describe("» but NFT is owned by sERC1155", () => {
+            describe("» but NFT is owned by the vault", () => {
               before(async () => {
                 await setup.vault(this, { fractionalize: false });
                 await this.sERC721.transfer();
               });
 
               it("it reverts", async () => {
-                await expect(this.vault.fractionalize()).to.be.revertedWith("Vault: NFT is already owned by sERC1155");
+                await expect(this.vault.fractionalize()).to.be.revertedWith("Vault: NFT is already owned by this vault");
               });
             });
           });
 
-          describe("» but sERC1155 has not been approved to transfer NFT", () => {
+          describe("» but the vault has not been approved to transfer NFT", () => {
             before(async () => {
               await setup.vault(this, { approve: false, fractionalize: false });
             });
@@ -889,12 +889,12 @@ describe("Vault", () => {
           });
 
           it("it reverts", async () => {
-            await expect(this.vault.fractionalize({ collection: this.signers.others[0] })).to.be.revertedWith("Vault: NFT is not ERC721-compliant");
+            await expect(this.vault.fractionalize({ collection: this.sERC20.contract })).to.be.revertedWith("Vault: NFT is not ERC721-compliant");
           });
         });
       });
 
-      describe("» NFT has already been spectralized", () => {
+      describe("» NFT has already been fractionalized", () => {
         describe("» and NFT has been unlocked since", () => {
           before(async () => {
             await setup.vault(this);
@@ -923,7 +923,7 @@ describe("Vault", () => {
     describe("# unlock [by id]", () => {
       describe("» spectre exists", () => {
         describe("» and spectre is locked", () => {
-          describe("» and caller is spectre's guardian", () => {
+          describe("» and caller is spectre's broker", () => {
             before(async () => {
               await setup.vault(this);
               await this.vault.unlock();
@@ -932,13 +932,13 @@ describe("Vault", () => {
             itUnlocksLikeExpected(this);
           });
 
-          describe("» but caller is not spectre's guardian", () => {
+          describe("» but caller is not spectre's broker", () => {
             before(async () => {
               await setup.vault(this);
             });
 
             it("it reverts", async () => {
-              await expect(this.vault.unlock({ from: this.signers.others[0] })).to.be.revertedWith("Vault: must be guardian to unlock");
+              await expect(this.vault.unlock({ from: this.signers.others[0] })).to.be.revertedWith("Vault: must be spectre's broker to unlock");
             });
           });
         });
@@ -969,7 +969,7 @@ describe("Vault", () => {
     describe("# unlock [by address]", () => {
       describe("» spectre exists", () => {
         describe("» and spectre is locked", () => {
-          describe("» and caller is spectre's guardian", () => {
+          describe("» and caller is spectre's broker", () => {
             before(async () => {
               await setup.vault(this);
               await this.vault.unlock({ byAddress: true });
@@ -978,7 +978,7 @@ describe("Vault", () => {
             itUnlocksLikeExpected(this);
           });
 
-          describe("» but caller is not spectre's guardian", () => {
+          describe("» but caller is not spectre's broker", () => {
             before(async () => {
               await setup.vault(this);
             });
@@ -989,7 +989,7 @@ describe("Vault", () => {
                   byAddress: true,
                   from: this.signers.others[0],
                 })
-              ).to.be.revertedWith("Vault: must be guardian to unlock");
+              ).to.be.revertedWith("Vault: must be spectre's broker to unlock");
             });
           });
         });
@@ -1017,11 +1017,11 @@ describe("Vault", () => {
       });
     });
 
-    describe("# updateUnavailableURI", () => {
-      describe("» caller has ADMIN_ROLE", () => {
+    describe("# setUnavailableURI", () => {
+      describe("» caller has DEFAULT_ADMIN_ROLE", () => {
         before(async () => {
           await setup.vault(this);
-          await this.vault.updateUnavailableURI("ipfs://testunavailableURI");
+          await this.vault.setUnavailableURI("ipfs://testunavailableURI");
         });
 
         it("it updates unavailableURI", async () => {
@@ -1029,26 +1029,26 @@ describe("Vault", () => {
         });
       });
 
-      describe("» caller does not have ADMIN_ROLE", () => {
+      describe("» caller does not have DEFAULT_ADMIN_ROLE", () => {
         before(async () => {
           await setup.vault(this);
         });
 
         it("it reverts", async () => {
           await expect(
-            this.vault.updateUnavailableURI("ipfs://testunavailableURI", {
+            this.vault.setUnavailableURI("ipfs://testunavailableURI", {
               from: this.signers.others[0],
             })
-          ).to.be.revertedWith("Vault: must have admin role to update unavailableURI");
+          ).to.be.revertedWith("Vault: must have DEFAULT_ADMIN_ROLE to set unavailableURI");
         });
       });
     });
 
-    describe("# updateUnlockedURI", () => {
-      describe("» caller has ADMIN_ROLE", () => {
+    describe("# setUnlockedURI", () => {
+      describe("» caller has DEFAULT_ADMIN_ROLE", () => {
         before(async () => {
           await setup.vault(this);
-          await this.vault.updateUnlockedURI("ipfs://testunlockedURI");
+          await this.vault.setUnlockedURI("ipfs://testunlockedURI");
         });
 
         it("it updates unlockedURI", async () => {
@@ -1056,22 +1056,22 @@ describe("Vault", () => {
         });
       });
 
-      describe("» caller does not have ADMIN_ROLE", () => {
+      describe("» caller does not have DEFAULT_ADMIN_ROLE", () => {
         before(async () => {
           await setup.vault(this);
         });
 
         it("it reverts", async () => {
           await expect(
-            this.vault.updateUnlockedURI("ipfs://testunlockedURI", {
+            this.vault.setUnlockedURI("ipfs://testunlockedURI", {
               from: this.signers.others[0],
             })
-          ).to.be.revertedWith("Vault: must have admin role to update unlockedURI");
+          ).to.be.revertedWith("Vault: must have DEFAULT_ADMIN_ROLE to set unlockedURI");
         });
       });
     });
 
-    describe("# onSERC20Transferred", () => {
+    describe("# onERC20Transferred", () => {
       describe("» caller is a registered sERC20", () => {
         describe("» and sERC20s are transferred", () => {
           describe("» and the receiver is an EOA", () => {
@@ -1084,13 +1084,7 @@ describe("Vault", () => {
             it("it emits a TransferSingle event", async () => {
               await expect(this.data.tx)
                 .to.emit(this.vault.contract, "TransferSingle")
-                .withArgs(
-                  this.sERC20.contract.address,
-                  this.signers.holders[0].address,
-                  this.signers.holders[1].address,
-                  this.data.id,
-                  this.params.sERC20.amount
-                );
+                .withArgs(this.sERC20.address, this.signers.holders[0].address, this.signers.holders[1].address, this.data.id, this.params.sERC20.amount);
             });
           });
 
@@ -1192,7 +1186,7 @@ describe("Vault", () => {
 
         it("it reverts", async () => {
           await expect(
-            this.vault.contract.connect(this.signers.others[0]).onSERC20Transferred(ethers.constants.AddressZero, ethers.constants.AddressZero, 0)
+            this.vault.contract.connect(this.signers.others[0]).onERC20Transferred(ethers.constants.AddressZero, ethers.constants.AddressZero, 0)
           ).to.be.revertedWith("Vault: must be sERC20 to use transfer hook");
         });
       });

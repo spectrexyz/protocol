@@ -98,17 +98,17 @@ const itFractionalizesLikeExpected = (ctx, opts = {}) => {
 
 const itUnlocksLikeExpected = (ctx, opts = {}) => {
   it("it updates spectre state", async () => {
-    const spectre = await ctx.contracts.sERC1155["spectreOf(uint256)"](ctx.data.id);
+    const spectre = await ctx.contracts.vault["spectreOf(uint256)"](ctx.data.id);
 
-    expect(spectre.state).to.equal(ctx.constants.SpectreState.Unlocked);
+    expect(spectre.state).to.equal(ctx.constants.vault.spectres.state.Unlocked);
   });
 
-  it("it updates NFT lock", async () => {
-    expect(await ctx.contracts.vault.lockOf(ctx.contracts.sERC721.address, ctx.data.id)).to.equal(0);
+  it("it re-initializes NFT's token type", async () => {
+    expect(await ctx.contracts.vault.tokenTypeOf(ctx.sERC721.address, ctx.data.id)).to.equal(0);
   });
 
   it("it emits an Unlock event", async () => {
-    await expect(ctx.data.tx).to.emit(ctx.contracts.sERC1155, "Unlock").withArgs(ctx.data.id, ctx.signers.sERC721.owners[1].address);
+    await expect(ctx.data.tx).to.emit(ctx.vault.contract, "Unlock").withArgs(ctx.data.id, ctx.signers.sERC721.owners[1].address);
   });
 
   it("it transfers NFT", async () => {

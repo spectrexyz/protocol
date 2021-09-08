@@ -125,17 +125,17 @@ class Vault {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
-  async updateUnavailableURI(uri, opts = {}) {
+  async setUnavailableURI(uri, opts = {}) {
     opts.from ??= this.ctx.signers.vault.admin;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).updateUnavailableURI(uri);
+    this.ctx.data.tx = await this.contract.connect(opts.from).setUnavailableURI(uri);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
-  async updateUnlockedURI(uri, opts = {}) {
+  async setUnlockedURI(uri, opts = {}) {
     opts.from ??= this.ctx.signers.vault.admin;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).updateUnlockedURI(uri);
+    this.ctx.data.tx = await this.contract.connect(opts.from).setUnlockedURI(uri);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
