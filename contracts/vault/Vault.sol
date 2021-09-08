@@ -112,16 +112,6 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
     }
 
     /**
-     * @notice Check whether `operator` is approved to transfer `account`'s tokens.
-     * @param account The account whose approval of `operator` is being queried.
-     * @param operator The operator whose approval from `account` is being queried.
-     * @return True if `operator` is approved to transfer `account`'s tokens, false otherwise.
-     */
-    function isApprovedForAll(address account, address operator) public view override returns (bool) {
-        return _operatorApprovals[account][operator];
-    }
-
-    /**
      * @notice Grant or revoke permission to `operator` to transfer the caller's tokens, according to `approved`.
      * @dev Caller cannot set approval for self.
      * @param operator The operator being approved.
@@ -196,6 +186,18 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
 
         _doSafeBatchTransferAcceptanceCheck(operator, from, to, ids, amounts, data);
     }
+
+    /**
+     * @notice Check whether `operator` is approved to transfer `account`'s tokens.
+     * @param account The account whose approval of `operator` is being queried.
+     * @param operator The operator whose approval from `account` is being queried.
+     * @return True if `operator` is approved to transfer `account`'s tokens, false otherwise.
+     */
+    function isApprovedForAll(address account, address operator) public view override returns (bool) {
+        return _operatorApprovals[account][operator];
+    }
+
+    /** IERC1155MetadataURI */
 
     /**
      * @notice Return the URI for token type `id`.
