@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.0;
 
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+
 contract ERC721Mock {
     function supportsInterface(bytes4 interfaceId) public pure returns (bool) {
         return interfaceId != 0xffffffff;

@@ -1,6 +1,7 @@
 const _sERC20_ = require("../../artifacts/contracts/token/sERC20.sol/sERC20.json");
 const _ERC1155ReceiverMock_ = require("../../artifacts/contracts/mock/ERC1155ReceiverMock.sol/ERC1155ReceiverMock.json");
 const _ERC721Mock_ = require("../../artifacts/contracts/mock/ERC721Mock.sol/ERC721Mock.json");
+const _ERC721SenderMock_ = require("../../artifacts/contracts/mock/ERC721SenderMock.sol/ERC721SenderMock.json");
 const config = require("./config");
 const { Broker, Balancer, Issuer, Template, Vault, sERC721, Splitter } = require("./models");
 
@@ -109,11 +110,6 @@ const initialize = async (ctx) => {
         INVARIANT: 2,
       },
     },
-    SpectreState: {
-      Null: 0,
-      Locked: 1,
-      Unlocked: 2,
-    },
     issuer: {
       DECIMALS: ethers.BigNumber.from("1000000000000000000"),
       HUNDRED: ethers.BigNumber.from("100000000000000000000"),
@@ -151,6 +147,9 @@ const mock = {
     },
     ERC721: async (ctx) => {
       ctx.contracts.ERC721Mock = await waffle.deployContract(ctx.signers.root, _ERC721Mock_);
+    },
+    ERC721Sender: async (ctx) => {
+      ctx.contracts.ERC721SenderMock = await waffle.deployContract(ctx.signers.root, _ERC721SenderMock_);
     },
   },
 };
@@ -227,7 +226,7 @@ const setup = {
     await ctx.sERC721.mint(opts);
 
     if (opts.fractionalize) {
-      await ctx.vault.fractionalize();
+      await ctx.vault.fractionalize(opts);
     }
   },
 };

@@ -11,9 +11,9 @@ module.exports = {
     DECIMALS: ethers.BigNumber.from("1000000000000000000"),
     sales: {
       state: {
-        PENDING: 1,
-        OPEN: 2,
-        CLOSED: 3,
+        Pending: 1,
+        Open: 2,
+        Closed: 3,
       },
     },
     proposals: {

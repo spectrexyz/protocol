@@ -58,45 +58,41 @@ const itSafeBatchTransfersFromLikeExpected = (ctx, opts = { operator: undefined 
   });
 };
 
-const itSpectralizesLikeExpected = (ctx, opts = {}) => {
+const itFractionalizesLikeExpected = (ctx, opts = {}) => {
   it("it locks ERC721", async () => {
-    expect(await ctx.contracts.vault.isLocked(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(true);
-    expect(await ctx.contracts.vault.lockOf(ctx.contracts.sERC721.address, ctx.data.tokenId)).to.equal(ctx.data.id);
-    expect(await ctx.contracts.sERC721.ownerOf(ctx.data.tokenId)).to.equal(ctx.contracts.vault.address);
-  });
-
-  it("it emits a Lock event", async () => {
-    await expect(ctx.data.tx2).to.emit(ctx.contracts.sERC1155, "Lock").withArgs(ctx.data.id);
+    expect(await ctx.vault.isLocked(ctx.sERC721.address, ctx.data.tokenId)).to.equal(true);
+    expect(await ctx.vault.tokenTypeOf(ctx.sERC721.address, ctx.data.tokenId)).to.equal(ctx.data.id);
+    expect(await ctx.sERC721.ownerOf(ctx.data.tokenId)).to.equal(ctx.vault.address);
   });
 
   it("it clones and initializes sERC20", async () => {
-    expect(await ctx.contracts.sERC20.name()).to.equal(ctx.constants.name);
-    expect(await ctx.contracts.sERC20.symbol()).to.equal(ctx.constants.symbol);
-    expect(await ctx.contracts.sERC20.cap()).to.equal(ctx.constants.cap);
-    expect(await ctx.contracts.sERC20.hasRole(await ctx.contracts.sERC20.DEFAULT_ADMIN_ROLE(), ctx.signers.sERC20.admin.address)).to.equal(true);
+    expect(await ctx.sERC20.name()).to.equal(ctx.params.sERC20.name);
+    expect(await ctx.sERC20.symbol()).to.equal(ctx.params.sERC20.symbol);
+    expect(await ctx.sERC20.cap()).to.equal(ctx.params.sERC20.cap);
+    expect(await ctx.sERC20.hasRole(ctx.constants.sERC20.DEFAULT_ADMIN_ROLE, ctx.signers.sERC20.admin.address)).to.equal(true);
   });
 
   it("it emits a TransferSingle event as per the ERC1155 standard", async () => {
     opts.operator = opts.transfer ? ctx.contracts.sERC721 : ctx.signers.root;
 
     await expect(ctx.data.tx2)
-      .to.emit(ctx.contracts.sERC1155, "TransferSingle")
+      .to.emit(ctx.contracts.vault, "TransferSingle")
       .withArgs(opts.operator.address, ethers.constants.AddressZero, ethers.constants.AddressZero, ctx.data.id, 0);
   });
 
   it("it registers spectre", async () => {
-    const spectre = await ctx.contracts.sERC1155["spectreOf(uint256)"](ctx.data.id);
+    const spectre = await ctx.contracts.vault["spectreOf(uint256)"](ctx.data.id);
 
-    expect(spectre.state).to.equal(ctx.constants.SpectreState.Locked);
-    expect(spectre.collection).to.equal(ctx.contracts.sERC721.address);
+    expect(spectre.state).to.equal(ctx.constants.vault.spectres.state.Locked);
+    expect(spectre.collection).to.equal(ctx.sERC721.address);
     expect(spectre.tokenId).to.equal(ctx.data.tokenId);
-    expect(spectre.guardian).to.equal(ctx.signers.vault.guardian.address);
+    expect(spectre.broker).to.equal(ctx.signers.vault.broker.address);
   });
 
-  it("it emits a Spectralize event", async () => {
+  it("it emits a Fractionalize event", async () => {
     await expect(ctx.data.tx2)
-      .to.emit(ctx.contracts.sERC1155, "Spectralize")
-      .withArgs(ctx.contracts.sERC721.address, ctx.data.tokenId, ctx.data.id, ctx.contracts.sERC20.address, ctx.signers.vault.guardian.address);
+      .to.emit(ctx.vault.contract, "Fractionalize")
+      .withArgs(ctx.sERC721.address, ctx.data.tokenId, ctx.data.id, ctx.sERC20.address, ctx.signers.vault.broker.address);
   });
 };
 
@@ -123,6 +119,6 @@ const itUnlocksLikeExpected = (ctx, opts = {}) => {
 module.exports = {
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
-  itSpectralizesLikeExpected,
+  itFractionalizesLikeExpected,
   itUnlocksLikeExpected,
 };

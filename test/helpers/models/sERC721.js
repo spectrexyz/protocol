@@ -4,6 +4,7 @@ class sERC721 {
   constructor(ctx) {
     this.ctx = ctx;
     this.contract = ctx.contracts.sERC721;
+    this.address = this.contract.address;
     this.ownerOf = this.contract.ownerOf;
   }
 

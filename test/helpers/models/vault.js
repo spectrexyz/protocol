@@ -17,6 +17,8 @@ class Vault {
     this.balanceOf = this.contract.balanceOf;
     this.balanceOfBatch = this.contract.balanceOfBatch;
     this.isApprovedForAll = this.contract.isApprovedForAll;
+    this.isLocked = this.contract.isLocked;
+    this.tokenTypeOf = this.contract.tokenTypeOf;
     this.onERC721Received = this.contract.onERC721Received;
   }
 
@@ -150,9 +152,9 @@ class Vault {
           ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.vault.broker.address]),
         ])
       : ethers.utils.concat([
-          ethers.utils.formatBytes32String(this.ctx.constants.name),
-          ethers.utils.formatBytes32String(this.ctx.constants.symbol),
-          ethers.utils.defaultAbiCoder.encode(["uint256"], [this.ctx.constants.cap]),
+          ethers.utils.formatBytes32String(this.ctx.params.sERC20.name),
+          ethers.utils.formatBytes32String(this.ctx.params.sERC20.symbol),
+          ethers.utils.defaultAbiCoder.encode(["uint256"], [this.ctx.params.sERC20.cap]),
           ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC20.admin.address]),
           ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.vault.broker.address]),
           ethers.utils.defaultAbiCoder.encode(["bytes32"], [opts.derrida]),

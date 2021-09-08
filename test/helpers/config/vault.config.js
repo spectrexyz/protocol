@@ -11,5 +11,12 @@ module.exports = {
   constants: {
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
     DERRIDA: "0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce",
+    spectres: {
+      state: {
+        Null: 0,
+        Locked: 1,
+        Unlocked: 2,
+      },
+    },
   },
 };

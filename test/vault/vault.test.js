@@ -3,7 +3,7 @@ const { initialize, mock, setup } = require("../helpers");
 const {
   itSafeBatchTransfersFromLikeExpected,
   itSafeTransfersFromLikeExpected,
-  itSpectralizesLikeExpected,
+  itFractionalizesLikeExpected,
   itUnlocksLikeExpected,
 } = require("./vault.behavior");
 
@@ -78,7 +78,7 @@ describe("Vault", () => {
     });
   });
 
-  describe.only("⇛ ERC1155", () => {
+  describe("⇛ ERC1155", () => {
     describe("# balanceOf", () => {
       describe("» the queried address is not the zero address", () => {
         describe("» and the queried token type exists", () => {
@@ -785,17 +785,17 @@ describe("Vault", () => {
   describe("⇛ ERC721Receiver", () => {
     describe("# onERC721Received", () => {
       describe("» is called by a standard-compliant ERC721", () => {
-        describe("» and spectralization data have a valid length", () => {
-          describe("» and spectralization data ends up with Derrida magic value", () => {
+        describe("» and fractionalization data have a valid length", () => {
+          describe("» and fractionalization data ends up with Derrida magic value", () => {
             before(async () => {
               await setup.vault(this, { fractionalize: false });
               await this.vault.fractionalize({ transfer: true });
             });
 
-            itSpectralizesLikeExpected(this, { transfer: true });
+            itFractionalizesLikeExpected(this, { transfer: true });
           });
 
-          describe("» but spectralization data does not end up with Derrida magic value", () => {
+          describe("» but fractionalization data does not end up with Derrida magic value", () => {
             before(async () => {
               await setup.vault(this, { approve: false, fractionalize: false });
             });
@@ -806,18 +806,18 @@ describe("Vault", () => {
                   transfer: true,
                   derrida: ethers.constants.HashZero,
                 })
-              ).to.be.revertedWith("Vault: invalid spectralization data");
+              ).to.be.revertedWith("Vault: invalid fractionalization data");
             });
           });
         });
 
-        describe("» but spectralization data does not have a valid length", () => {
+        describe("» but fractionalization data does not have a valid length", () => {
           before(async () => {
             await setup.vault(this, { approve: false, fractionalize: false });
           });
 
           it("it reverts", async () => {
-            await expect(this.vault.fractionalize({ transfer: true, short: true })).to.be.revertedWith("Vault: invalid spectralization data length");
+            await expect(this.vault.fractionalize({ transfer: true, short: true })).to.be.revertedWith("Vault: invalid fractionalization data length");
           });
         });
       });
@@ -825,19 +825,30 @@ describe("Vault", () => {
       describe("» is called by a non-compliant ERC721", () => {
         before(async () => {
           await setup.vault(this, { approve: false, fractionalize: false });
+          await mock.deploy.ERC721Sender(this);
         });
 
         it("it reverts", async () => {
           await expect(
-            this.vault.onERC721Received(this.signers.others[0].address, ethers.constants.AddressZero, 0, ethers.constants.HashZero)
+            this.contracts.ERC721SenderMock.onERC721Received(
+              this.vault.address,
+              ethers.utils.concat([
+                ethers.utils.formatBytes32String(this.params.sERC20.name),
+                ethers.utils.formatBytes32String(this.params.sERC20.symbol),
+                ethers.utils.defaultAbiCoder.encode(["uint256"], [this.params.sERC20.cap]),
+                ethers.utils.defaultAbiCoder.encode(["address"], [this.signers.sERC20.admin.address]),
+                ethers.utils.defaultAbiCoder.encode(["address"], [this.signers.vault.broker.address]),
+                ethers.utils.defaultAbiCoder.encode(["bytes32"], [this.constants.vault.DERRIDA]),
+              ])
+            )
           ).to.be.revertedWith("Vault: NFT is not ERC721-compliant");
         });
       });
     });
   });
 
-  describe("⇛ sERC1155", () => {
-    describe("# spectralize", () => {
+  describe.skip("⇛ sERC1155", () => {
+    describe("# fractionalize", () => {
       describe("» NFT has never been spectralized", () => {
         describe("» and NFT is ERC721-compliant", () => {
           describe("» and sERC1155 has been approved to transfer NFT", () => {
@@ -846,7 +857,7 @@ describe("Vault", () => {
                 await setup.vault(this);
               });
 
-              itSpectralizesLikeExpected(this);
+              itFractionalizesLikeExpected(this);
             });
 
             describe("» but NFT is owned by sERC1155", () => {
@@ -894,7 +905,7 @@ describe("Vault", () => {
             await this.vault.fractionalize();
           });
 
-          itSpectralizesLikeExpected(this);
+          itFractionalizesLikeExpected(this);
         });
 
         describe("» but NFT still is locked", () => {
