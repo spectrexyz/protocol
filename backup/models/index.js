@@ -4,7 +4,7 @@ const Balancer = require("./balancer");
 const Broker = require("./broker");
 const Issuer = require("./issuer");
 const Splitter = require("./Splitter");
-// const Template = require("./template");
+const Template = require("./template");
 const Vault = require("./vault");
 
 module.exports = {
@@ -14,6 +14,6 @@ module.exports = {
   Broker,
   Issuer,
   Splitter,
-  // Template,
+  Template,
   Vault,
 };

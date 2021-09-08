@@ -98,7 +98,7 @@ class sERC20 {
 
   async approve(opts = {}) {
     opts.from ??= this.ctx.signers.holders[0];
-    opts.spender ??= this.ctx.vault;
+    opts.spender ??= this.ctx.contracts.Vault;
     opts.amount ??= this.ctx.params.sERC20.cap;
 
     this.ctx.data.tx = await this.ctx.contracts.sERC20.connect(opts.from).approve(opts.spender.address, opts.amount);

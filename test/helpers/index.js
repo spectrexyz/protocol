@@ -3,7 +3,7 @@ const _ERC1155ReceiverMock_ = require("../../artifacts/contracts/mock/ERC1155Rec
 const _ERC721Mock_ = require("../../artifacts/contracts/mock/ERC721Mock.sol/ERC721Mock.json");
 const _ERC721SenderMock_ = require("../../artifacts/contracts/mock/ERC721SenderMock.sol/ERC721SenderMock.json");
 const config = require("./config");
-const { Broker, Balancer, Issuer, Template, Vault, sERC721, Splitter } = require("./models");
+const { Broker, Balancer, Issuer, Vault, sERC721, Splitter } = require("./models");
 
 const _signers = async (ctx) => {
   const signers = {
@@ -71,28 +71,6 @@ const initialize = async (ctx) => {
     broker: config.broker.params,
     splitter: config.splitter.params,
     vault: config.vault.params,
-    sBootstrappingPool: {
-      pooled: {
-        ETH: ethers.BigNumber.from("2000000000000000000"),
-        sERC20: ethers.BigNumber.from("1000000000000000000"),
-      },
-      name: "My SBP Token",
-      symbol: "$SBP",
-      // normalizedStartWeight: ethers.BigNumber.from('300000000000000000'),
-      // normalizedEndWeight: ethers.BigNumber.from('600000000000000000'),
-      sERC20MaxWeight: ethers.BigNumber.from("600000000000000000"),
-      sERC20MinWeight: ethers.BigNumber.from("300000000000000000"),
-      swapFeePercentage: ethers.BigNumber.from("10000000000000000"),
-      pauseWindowDuration: ethers.BigNumber.from("3000"),
-      bufferPeriodDuration: ethers.BigNumber.from("1000"),
-    },
-    issuer: {
-      protocolFee: ethers.BigNumber.from("2000000000000000000"), // 2e18 = 2%
-      fee: ethers.BigNumber.from("5000000000000000000"), // 5%
-      reserve: ethers.utils.parseEther("2"), // 2 sERC20 / ETH
-      allocation: ethers.utils.parseEther("1").mul(ethers.BigNumber.from("10")), // 10%
-      value: ethers.utils.parseEther("3"), // 3 ETH
-    },
   };
 
   ctx.constants = {
@@ -100,28 +78,6 @@ const initialize = async (ctx) => {
     vault: config.vault.constants,
     broker: config.broker.constants,
     splitter: config.splitter.constants,
-    sBootstrappingPool: {
-      ONE: ethers.BigNumber.from("1000000000000000000"),
-      MINIMUM_BPT: ethers.BigNumber.from("1000000"),
-      TWO_TOKEN_POOL: 2,
-      ORACLE_VARIABLE: {
-        PAIR_PRICE: 0,
-        BPT_PRICE: 1,
-        INVARIANT: 2,
-      },
-    },
-    issuer: {
-      DECIMALS: ethers.BigNumber.from("1000000000000000000"),
-      HUNDRED: ethers.BigNumber.from("100000000000000000000"),
-      ONE: ethers.BigNumber.from("1000000000000000000"),
-      issuances: {
-        state: {
-          PENDING: 1,
-          OPEN: 2,
-          CLOSED: 3,
-        },
-      },
-    },
   };
 
   ctx.signers = await _signers();
@@ -210,6 +166,18 @@ const setupback = async (ctx, opts = {}) => {
 const setup = {
   sERC20: async (ctx, opts = {}) => {
     await setup.vault(ctx, opts);
+  },
+  broker: async (ctx, opts = {}) => {
+    opts.fractionalize ??= true;
+
+    ctx.contracts.sERC20Base = await waffle.deployContract(ctx.signers.root, _sERC20_);
+
+    await sERC721.deploy(ctx);
+    await Vault.deploy(ctx);
+    await Broker.deploy(ctx);
+
+    await ctx.sERC721.mint(opts);
+    await ctx.vault.fractionalize({ broker: ctx.broker });
   },
   splitter: async (ctx, opts = {}) => {
     await setup.vault(ctx, opts);

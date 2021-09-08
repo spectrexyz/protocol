@@ -6,11 +6,12 @@ class Broker {
   constructor(ctx) {
     this.ctx = ctx;
     this.contract = ctx.contracts.broker;
-    this.address = this.contract.address;
     this.vault = this.contract.vault;
     this.saleOf = this.contract.saleOf;
     this.proposalFor = this.contract.proposalFor;
     this.issuer = this.contract.issuer;
+    this.ADMIN_ROLE = this.contract.ADMIN_ROLE;
+    this.REGISTER_ROLE = this.contract.REGISTER_ROLE;
     this.hasRole = this.contract.hasRole;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.priceOfFor = this.contract.priceOfFor;
@@ -19,16 +20,16 @@ class Broker {
 
   static async deploy(ctx, opts) {
     ctx.contracts.issuerMock = await waffle.deployContract(ctx.signers.root, _IssuerMock_);
-    ctx.contracts.broker = await waffle.deployContract(ctx.signers.broker.admin, _Broker_, [ctx.vault.address, ctx.contracts.issuerMock.address]);
+    ctx.contracts.broker = await waffle.deployContract(ctx.signers.broker.admin, _Broker_, [ctx.contracts.sERC1155.address, ctx.contracts.issuerMock.address]);
 
     ctx.broker = new Broker(ctx);
 
     await (
-      await ctx.contracts.broker.connect(ctx.signers.broker.admin).grantRole(await ctx.constants.broker.REGISTER_ROLE, ctx.signers.broker.registrar.address)
+      await ctx.contracts.broker.connect(ctx.signers.broker.admin).grantRole(await ctx.contracts.broker.REGISTER_ROLE(), ctx.signers.broker.registrar.address)
     ).wait();
 
     await (
-      await ctx.contracts.broker.connect(ctx.signers.broker.admin).grantRole(await ctx.constants.broker.ESCAPE_ROLE, ctx.signers.broker.escaper.address)
+      await ctx.contracts.broker.connect(ctx.signers.broker.admin).grantRole(await ctx.contracts.broker.ESCAPE_ROLE(), ctx.signers.broker.escaper.address)
     ).wait();
   }
 
@@ -68,7 +69,7 @@ class Broker {
     await this.ctx.sERC20.approve({
       from: opts.from,
       spender: this.ctx.broker.contract,
-      amount: await this.ctx.sERC20.balanceOf(opts.from.address),
+      amount: await this.ctx.sERC20.balanceOf(opts.from),
     });
 
     this.ctx.data.tx = await this.contract.connect(opts.from).buyout(opts.sERC20.address, { value: opts.value });
@@ -84,7 +85,7 @@ class Broker {
     await this.ctx.sERC20.approve({
       from: opts.from,
       spender: this.ctx.broker.contract,
-      amount: await this.ctx.sERC20.balanceOf(opts.from.address),
+      amount: await this.ctx.sERC20.balanceOf(opts.from),
     });
 
     this.ctx.data.tx = await this.contract.connect(opts.from).createProposal(opts.sERC20.address, opts.lifespan, { value: opts.value });
