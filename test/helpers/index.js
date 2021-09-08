@@ -9,11 +9,10 @@ const Decimal = require("decimal.js");
 const RECEIVER_SINGLE_MAGIC_VALUE = "0xf23a6e61";
 const RECEIVER_BATCH_MAGIC_VALUE = "0xbc197c81";
 
-const sERC721 = require("./models/sERC721");
 const sERC1155 = require("./models/sERC1155");
 // const sBootstrappingPool = require("./models/sBootstrappingPool");
 // const issuer = require("./models/issuer");
-const { Broker, Balancer, Issuer, Template, Splitter } = require("./models");
+const { Broker, Balancer, Issuer, Template, sERC721, Splitter } = require("./models");
 
 const initialize = async (ctx) => {
   ctx.params = {

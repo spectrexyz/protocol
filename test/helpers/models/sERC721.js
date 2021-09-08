@@ -1,4 +1,4 @@
-const _sERC721_ = require("../../../artifacts/contracts/core/sERC721.sol/sERC721.json");
+const _sERC721_ = require("../../../artifacts/contracts/token/sERC721.sol/sERC721.json");
 
 class sERC721 {
   constructor(ctx) {

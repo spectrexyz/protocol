@@ -1,4 +1,5 @@
 const sERC20 = require("./sERC20");
+const sERC721 = require("./sERC721");
 const Balancer = require("./balancer");
 const Broker = require("./broker");
 const Issuer = require("./issuer");
@@ -7,6 +8,7 @@ const Template = require("./template");
 
 module.exports = {
   sERC20,
+  sERC721,
   Balancer,
   Broker,
   Issuer,

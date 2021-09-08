@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import "./IVault.sol";
 import "./libraries/Cast.sol";
+import "./libraries/ERC165Ids.sol";
+import "./libraries/Spectres.sol";
 import "../token/sIERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -17,12 +19,14 @@ import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
 /**
  * @title Vault
- * @notice ERC1155 token wrapping ERC721s into sERC20s.
- * @dev sERC1155 does not implement mint nor burn in an effort to maintain some separation of concerns between
- *      financial / monetary primitives - handled by sERC20s - and display / collectible primitives - handled by the
- *      sERC1155. Let's note that the ERC1155 standard does not require neither mint nor burn functions.
+ * @notice ERC1155 token wrapping locked ERC721 tokens into sERC20 tokens.
+ * @dev - This contract does not implement mint nor burn functions.
+ *      - This is made on purpose to maintain some separation of concerns between:
+ *        - financial / monetary primitives - handled by sERC20s, and
+ *        - display / collectible primitives - handled by this Vault.
+ *      - Let's note that the ERC1155 standard does not require neither mint nor burn functions.
  */
-contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
+contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155MetadataURI, IERC721Receiver, IVault {
     using Address for address;
     using Cast for address;
     using Cast for bytes32;
@@ -31,45 +35,36 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
     using Clones for address;
     using ERC165Checker for address;
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant DERRIDA = 0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce; // keccak256("Le spectral, ce sont ces autres, jamais présents comme tels, ni vivants ni morts, avec lesquels je m'entretiens");
-    bytes4 private constant ERC721_ID = 0x80ac58cd;
-    bytes4 private constant ERC1155RECEIVER_ID = 0x4e2312e0;
-
-    // Faire une lib ERC165Ids avec ERC721 et ERC1155Receiver comme ID ?
 
     address private _sERC20Base;
     string private _unavailableURI;
     string private _unlockedURI;
 
     mapping(address => mapping(address => bool)) private _operatorApprovals;
-    mapping(uint256 => Spectre) private _spectres; // token type => Spectre [immutable]
-    mapping(address => mapping(uint256 => uint256)) private _locks; // ERC721 => token type [re-initialized when unlocked]
-
-    event Spectralize(address indexed collection, uint256 indexed tokenId, uint256 indexed id, address sERC20, address guardian);
-    event Lock(uint256 indexed id);
-    event Unlock(uint256 indexed id, address recipient);
+    mapping(uint256 => Spectres.Spectre) private _spectres; // token type => Spectres.Spectre [immutable]
+    mapping(IERC721 => mapping(uint256 => uint256)) private _tokenTypes; // ERC721 => token type [re-initialized when unlocked]
 
     /**
-     * @notice sERC1155 constructor.
-     * @dev Context, ERC165 and AccessControlEnumerable have no constructor.
+     * @notice Vault constructor.
+     * @dev Neither Context, nor ERC165, nor AccessControlEnumerable have a constructor.
      */
     constructor(
         address sERC20Base_,
         string memory unavailableURI_,
         string memory unlockedURI_
     ) {
-        require(sERC20Base_ != address(0), "sERC1155: sERC20 base cannot be the zero address");
+        require(sERC20Base_ != address(0), "Vault: sERC20 base cannot be the zero address");
 
         _sERC20Base = sERC20Base_;
         _unavailableURI = unavailableURI_;
         _unlockedURI = unlockedURI_;
 
-        _setupRole(ADMIN_ROLE, _msgSender());
-        _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
-    /* #region ERC165 */
+    /** IERC165 */
+
     /**
      * @dev ERC165 and AccessControlEnumerable interfaces are supported through super.supportsInterface().
      */
@@ -81,32 +76,31 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
             super.supportsInterface(interfaceId);
     }
 
-    /* #endregion */
+    /** IERC1155 */
 
-    /* #region ERC1155 */
     /**
-     * @notice Returns the amount of tokens of type `id` owned by `account`.
+     * @notice Return the amount of tokens of type `id` owned by `account`.
      * @dev `account` cannot be the zero address.
      * @param account The account whose balance is queried.
      * @param id The token type whose balance is queried.
      * @return The amount of tokens of type `id` owned by `account`.
      */
     function balanceOf(address account, uint256 id) public view override returns (uint256) {
-        require(account != address(0), "sERC1155: balance query for the zero address");
+        require(account != address(0), "Vault: balance query for the zero address");
 
-        return _spectres[id].state != SpectreState.Null ? id.sERC20().balanceOf(account) : 0;
+        return _spectres[id].state != Spectres.State.Null ? id.sERC20().balanceOf(account) : 0;
     }
 
     /**
      * @notice Batched version of `balanceOf`.
      * @dev - `accounts` and `ids` must have the same length.
      *      - `accounts` entries cannot be the zero address.
-     * @param accounts The accounts whose balance are queried.
-     * @param ids The token types whose balance are queried.
+     * @param accounts The accounts whose balances are queried.
+     * @param ids The token types whose balances are queried.
      * @return The amount of tokens of types `ids` owned by `accounts`.
      */
-    function balanceOfBatch(address[] calldata accounts, uint256[] calldata ids) external view override returns (uint256[] memory) {
-        require(accounts.length == ids.length, "sERC1155: accounts and ids length mismatch");
+    function balanceOfBatch(address[] calldata accounts, uint256[] calldata ids) public view override returns (uint256[] memory) {
+        require(accounts.length == ids.length, "Vault: accounts and ids length mismatch");
 
         uint256[] memory batchBalances = new uint256[](accounts.length);
 
@@ -120,38 +114,37 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
     /**
      * @notice Check whether `operator` is approved to transfer `account`'s tokens.
      * @param account The account whose approval of `operator` is being queried.
-     * @param operator The operator whose approval from `account` is being quieried.
+     * @param operator The operator whose approval from `account` is being queried.
      * @return True if `operator` is approved to transfer `account`'s tokens, false otherwise.
      */
-    function isApprovedForAll(address account, address operator) external view override returns (bool) {
+    function isApprovedForAll(address account, address operator) public view override returns (bool) {
         return _operatorApprovals[account][operator];
     }
 
     /**
-     * @notice Grants or revokes permission to `operator` to transfer the caller's tokens, according to `approved`.
+     * @notice Grant or revoke permission to `operator` to transfer the caller's tokens, according to `approved`.
      * @dev Caller cannot set approval for self.
      * @param operator The operator being approved.
-     * @param approved The approval status: true if the operator is approved, false to revoke its approval.
+     * @param approved True if the operator is approved, false to revoke its approval.
      */
     function setApprovalForAll(address operator, bool approved) external override {
-        require(_msgSender() != operator, "sERC1155: setting approval status for self");
+        require(_msgSender() != operator, "Vault: setting approval status for self");
 
         _operatorApprovals[_msgSender()][operator] = approved;
         emit ApprovalForAll(_msgSender(), operator, approved);
     }
 
     /**
-     * @notice Transfers `amount` tokens of type `id` from `from` to `to`.
+     * @notice Transfer `amount` tokens of type `id` from `from` to `to`.
      * @dev - `to` cannot be the zero address.
      *      - If the caller is not `from`, it must be an approved operator of `from`.
      *      - `from` must have a balance of tokens of type `id` of at least `amount`.
-     *      - If `to` refers to a smart contract, it must implement onERC1155Received and return the acceptance magic
-     *        value.
-     * @param from   The address to transfer the tokens from.
-     * @param to     The address to transfer the tokens to.
-     * @param id     The id of the token type to transfer.
+     *      - If `to` refers to a smart contract, it must implement onERC1155Received and return the acceptance magic value.
+     * @param from The address to transfer the tokens from.
+     * @param to The address to transfer the tokens to.
+     * @param id The id of the token type to transfer.
      * @param amount The amount of tokens to transfer.
-     * @param data   The data to be passed to `onERC1155Received` on `_to` if it is a contract.
+     * @param data The data to be passed to `onERC1155Received` on `_to` if it is a contract.
      */
     function safeTransferFrom(
         address from,
@@ -162,8 +155,8 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
     ) external override {
         address operator = _msgSender();
 
-        require(to != address(0), "sERC1155: transfer to the zero address");
-        require(from == operator || _operatorApprovals[from][operator], "sERC1155: must be owner or approved to transfer");
+        require(to != address(0), "Vault: transfer to the zero address");
+        require(from == operator || _operatorApprovals[from][operator], "Vault: must be owner or approved to transfer");
 
         id.sERC20().onERC1155Transferred(from, to, amount);
 
@@ -172,6 +165,16 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
         _doSafeTransferAcceptanceCheck(operator, from, to, id, amount, data);
     }
 
+    /**
+     * @notice Batched version of `safeTransferFrom`.
+     * @dev - The same remarks as above apply, plus:
+     *      - `ids` and `amounts` must have the same length.
+     * @param from The address to transfer the tokens from.
+     * @param to The address to transfer the tokens to.
+     * @param ids The ids of the token types to transfer.
+     * @param amounts The amounts of tokens to transfer.
+     * @param data The data to be passed to `onERC1155Received` on `_to` if it is a contract.
+     */
     function safeBatchTransferFrom(
         address from,
         address to,
@@ -181,9 +184,9 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
     ) external override {
         address operator = _msgSender();
 
-        require(ids.length == amounts.length, "sERC1155: ids and amounts length mismatch");
-        require(to != address(0), "sERC1155: transfer to the zero address");
-        require(from == operator || _operatorApprovals[from][operator], "sERC1155: must be owner or approved to transfer");
+        require(ids.length == amounts.length, "Vault: ids and amounts length mismatch");
+        require(to != address(0), "Vault: transfer to the zero address");
+        require(from == operator || _operatorApprovals[from][operator], "Vault: must be owner or approved to transfer");
 
         for (uint256 i = 0; i < ids.length; i++) {
             ids[i].sERC20().onERC1155Transferred(from, to, amounts[i]);
@@ -194,55 +197,52 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
         _doSafeBatchTransferAcceptanceCheck(operator, from, to, ids, amounts, data);
     }
 
-    /* #endregion */
-
-    /* #region ERC1155MetadataURI */
     /**
-     * @notice Returns the URI for token type `id`.
-     * @dev The ERC1155 standard requires this function to return the same value as the latest `URI` event for an `_id`
-     *      if such events are emitted. Because we cannot control the original NFT's uri updates, we do NOT emit such `URI`
-     *      event at token type creation. See https://eips.ethereum.org/EIPS/eip-1155#metadata.
-     * @param id The ERC1155 id of the token type.
-     * @return "" if the token type does not exist, `_unlockedURI` if the token type exists but its underlying ERC721 has
-     * been unwrapped, the original ERC721's URI otherwise.
+     * @notice Return the URI for token type `id`.
+     * @dev - The ERC1155 standard requires this function to return the same value as the latest `URI` event for an `_id` if such events are emitted.
+     *      - Because we cannot control the wrapped NFT's URI updates, we do NOT emit such `URI` event at token type creation.
+     *      - See https://eips.ethereum.org/EIPS/eip-1155#metadata.
+     * @param id The id of the token type.
+     * @return - "" if the token type does not exist,
+     *         - `_unavailableURI` if the token type exists, its underlying ERC721 is still locked, but does not implement ERC721Metadata,
+     *         - `_unlockedURI` if the token type exists but its underlying ERC721 has been unlocked,
+     *         - the token type's underlying ERC721's URI otherwise.
+     *
      */
-    function uri(uint256 id) external view override returns (string memory) {
-        Spectre storage spectre = _spectres[id];
+    function uri(uint256 id) public view override returns (string memory) {
+        Spectres.Spectre storage spectre = _spectres[id];
 
-        if (spectre.state == SpectreState.Locked) {
-            try IERC721Metadata(spectre.collection).tokenURI(spectre.tokenId) returns (string memory uri_) {
+        if (spectre.state == Spectres.State.Locked) {
+            try IERC721Metadata(address(spectre.collection)).tokenURI(spectre.tokenId) returns (string memory uri_) {
                 return uri_;
             } catch {
                 return _unavailableURI;
             }
         }
 
-        if (spectre.state == SpectreState.Unlocked) return _unlockedURI;
+        if (spectre.state == Spectres.State.Unlocked) return _unlockedURI;
 
         return "";
     }
 
-    /* #endregion */
+    /** IERC721Receiver */
 
-    /* #region IERC721Receiver */
     /**
-     * @notice Called whenever an NFT is transferred to this contract through IERC721.safeTransferFrom().
-     * @dev - We do not check that the NFT is not already locked as such a transfer could only be triggered by this
-     *      very contract if the ERC721 contract itself is not malicious. If the ERC721 is malicious, there is nothing
-     *      we can do anyhow.
-     *      - We do not check that the NFT has actually been transferred as this function call should happen only after
-     *      the transfer if the ERC721 contract itself is not malicious. If the ERC721 is malicious, there is nothing
-     *      we can do anyhow.
-     *      - This function extract the spectralization parameters out of the data bytes.
-     *      - See `spectralize` natspec for more details on those parameters.
+     * @notice Called whenever an NFT is transferred to this contract through ERC721#safeTransferFrom.
+     * @dev - We do not check that the NFT is not already locked as such a transfer could only be triggered by this very contract if the ERC721 contract itself
+     *        is not malicious. If the ERC721 is malicious, there is nothing we can do anyhow.
+     *      - We do not check that the NFT has actually been transferred as this function call should happen only after the transfer if the ERC721 contract
+     *        itself is not malicious. If the ERC721 is malicious, there is nothing we can do anyhow.
+     *      - This function extract the fractionalization parameters out of the data bytes.
+     *      - See `fractionalize` natspec for more details on those parameters.
      *      - The data bytes are expected to look like this:
      *        [
-     *          bytes32(name)     | 32 bytes
-     *          bytes32(symbol)   | 32 bytes
-     *          uint256(cap)      | 32 bytes
-     *          address(admin)    | 32 bytes
-     *          address(guardian) | 32 bytes
-     *          bytes32(DERRIDA)  | 32 bytes
+     *          bytes32(name)    | 32 bytes
+     *          bytes32(symbol)  | 32 bytes
+     *          uint256(cap)     | 32 bytes
+     *          address(admin)   | 32 bytes
+     *          address(broker)  | 32 bytes
+     *          bytes32(DERRIDA) | 32 bytes
      *        ]
      */
     function onERC721Received(
@@ -251,16 +251,16 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
         uint256 tokenId,
         bytes calldata data
     ) external override returns (bytes4) {
-        address collection = _msgSender();
-        require(collection.supportsInterface(ERC721_ID), "sERC1155: NFT is not ERC721-compliant");
-        require(data.length == 192, "sERC1155: invalid spectralization data length");
+        IERC721 collection = IERC721(_msgSender());
+        require(collection.supportsInterface(ERC165Ids.ERC721), "Vault: NFT is not ERC721-compliant");
+        require(data.length == 192, "Vault: invalid fractionalization data length");
 
         bytes memory _data = data; // one cannot mload data located in calldata
         bytes32 name;
         bytes32 symbol;
         uint256 cap;
         address admin;
-        address guardian;
+        address broker;
         bytes32 derrida;
 
         assembly {
@@ -268,100 +268,142 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
             symbol := mload(add(_data, 64))
             cap := mload(add(_data, 96))
             admin := mload(add(_data, 128))
-            guardian := mload(add(_data, 160))
+            broker := mload(add(_data, 160))
             derrida := mload(add(_data, 192))
         }
 
-        require(derrida == DERRIDA, "sERC1155: invalid spectralization data");
+        require(derrida == DERRIDA, "Vault: invalid fractionalization data");
 
-        emit Lock(_spectralize(collection, tokenId, name.toString(), symbol.toString(), cap, admin, guardian));
+        _fractionalize(collection, tokenId, address(collection), name.toString(), symbol.toString(), cap, admin, broker);
 
-        return IERC721Receiver.onERC721Received.selector; // 0x150b7a02
+        return IERC721Receiver.onERC721Received.selector;
     }
 
-    /* #endregion */
+    /** IVault */
 
-    /* #region sERC1155 */
     /**
-     * @notice Spectralize the ERC721-compliant NFT belonging to `collection` and identified by `tokenId` into an sERC20.
+     * @notice Fractionalize the ERC721-compliant NFT belonging to `collection` and identified by `tokenId` into an sERC20.
      * @dev - This contract must be approved to transfer the NFT before this function is called.
-     *      - sERC20-related parameters are checked in sERC20.initialize().
+     *      - sERC20-related parameters are checked in sERC20#initialize.
      *      - This function is open to re-entrancy for it would be harmless.
-     * @param collection The address of the ERC721 contract the NFT to spectralize belongs to.
-     * @param tokenId    The tokenId of the NFT to spectralize.
-     * @param name       The name of the sERC20 to spectralize the NFT into.
-     * @param symbol     The symbol of the sERC20 to spectralize the NFT into.
-     * @param cap        The supply cap of the sERC20 to spectralize the NFT into.
-     * @param admin      The admin of the sERC20 to spectralize the NFT into [can manage its roles and permissions].
-     * @param guardian   The guardian of the spectre to create [can unlock it and release its NFT].
+     * @param collection The address of the ERC721 contract the NFT to fractionalize belongs to.
+     * @param tokenId The tokenId of the NFT to fractionalize.
+     * @param name The name of the sERC20 to fractionalize the NFT into.
+     * @param symbol The symbol of the sERC20 to fractionalize the NFT into.
+     * @param cap The supply cap of the sERC20 to fractionalize the NFT into.
+     * @param admin The admin of the sERC20 to fractionalize the NFT into [allowed to manage its roles and permissions].
+     * @param broker The broker of the fractionalized NFT [allowed to unlock its spectre and release its NFT].
      */
-    function spectralize(
-        address collection,
+    function fractionalize(
+        IERC721 collection,
         uint256 tokenId,
         string memory name,
         string memory symbol,
         uint256 cap,
         address admin,
-        address guardian
-    ) external override returns (uint256 id) {
-        require(collection.supportsInterface(ERC721_ID), "sERC1155: NFT is not ERC721-compliant");
-        require(_locks[collection][tokenId] == 0, "sERC1155: NFT is already locked");
+        address broker
+    ) external override returns (uint256) {
+        require(collection.supportsInterface(ERC165Ids.ERC721), "Vault: NFT is not ERC721-compliant");
+        require(_tokenTypes[collection][tokenId] == 0, "Vault: NFT is already locked");
 
-        address owner = IERC721(collection).ownerOf(tokenId);
-        // check that this contract does not already own the NFT beforehand to guarantee that such an NFT cannot be
-        // stolen if it accidentally ends up owned by this contract while un-spectralized.
-        require(owner != address(this), "sERC1155: NFT is already owned by sERC1155");
+        address owner = collection.ownerOf(tokenId);
+        // in case the NFT accidentally ended up owned by this contract while un-fractionalized
+        require(owner != address(this), "Vault: NFT is already owned by this vault");
 
-        id = _spectralize(collection, tokenId, name, symbol, cap, admin, guardian);
-        IERC721(collection).transferFrom(owner, address(this), tokenId);
+        uint256 id = _fractionalize(collection, tokenId, _msgSender(), name, symbol, cap, admin, broker);
+        collection.transferFrom(owner, address(this), tokenId);
 
-        emit Lock(id);
+        return id;
     }
 
+    /**
+     * @notice Unlock the spectre tied to token type `id` and transfer its underlying NFT to `recipient` with `data` as ERC721#safeTransferFrom callback data.
+     * @param id The token type of the spectre to unlock.
+     * @param recipient The recipient of the spectre's underlying NFT.
+     * @param data The ERC721#safeTransferFrom callback data.
+     */
     function unlock(
         uint256 id,
         address recipient,
         bytes calldata data
     ) external override {
-        Spectre storage spectre = _spectres[id];
+        Spectres.Spectre storage spectre = _spectres[id];
 
-        require(spectre.state == SpectreState.Locked, "sERC1155: spectre is not locked");
-        require(spectre.guardian == _msgSender(), "sERC1155: must be guardian to unlock");
+        require(_msgSender() == spectre.broker, "Vault: must be spectre's broker to unlock");
+        require(spectre.state == Spectres.State.Locked, "Vault: spectre is not locked");
 
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
 
+    /**
+     * @notice Unlock the spectre tied to `sERC20` and transfer its underlying NFT to `recipient` with `data` as ERC721#safeTransferFrom callback data.
+     * @param sERC20 The sERC20 of the spectre to unlock.
+     * @param recipient The recipient of the spectre's underlying NFT.
+     * @param data The ERC721#safeTransferFrom callback data.
+     */
     function unlock(
         sIERC20 sERC20,
         address recipient,
         bytes calldata data
     ) external override {
         uint256 id = sERC20.id();
-        Spectre storage spectre = _spectres[id];
+        Spectres.Spectre storage spectre = _spectres[id];
 
-        require(spectre.state == SpectreState.Locked, "sERC1155: spectre is not locked");
-        require(spectre.guardian == _msgSender(), "sERC1155: must be guardian to unlock");
+        require(_msgSender() == spectre.broker, "Vault: must be spectre's broker to unlock");
+        require(spectre.state == Spectres.State.Locked, "Vault: spectre is not locked");
 
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
 
-    function updateUnavailableURI(string memory unavailableURI_) external override {
-        require(hasRole(ADMIN_ROLE, _msgSender()), "sERC1155: must have admin role to update unavailableURI");
+    /**
+     * @notice Transfer the NFT belonging to `collection` and identified by `tokenId` to `recipient` with `data` as ERC721#safeTransferFrom callback data.
+     * @dev This function is only meant to be used in case an NFT accidentally ends up owned by this contract while un-fractionalized.
+     * @param collection The address of the ERC721 contract the NFT to escape belongs to.
+     * @param tokenId The tokenId of the NFT to escape.
+     * @param recipient The recipient of the NFT to escape.
+     * @param data The ERC721#safeTransferFrom callback data.
+     */
+    function escape(
+        IERC721 collection,
+        uint256 tokenId,
+        address recipient,
+        bytes calldata data
+    ) external override {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to escape NFTs");
+        require(_tokenTypes[collection][tokenId] != 0, "Vault: NFT is locked");
+        require(collection.ownerOf(tokenId) == address(this), "Vault: NFT is not owned by this vault");
+
+        collection.safeTransferFrom(address(this), recipient, tokenId, data);
+
+        emit Escape(collection, tokenId, recipient);
+    }
+
+    /**
+     * @notice Set the URI associated to spectres whose underlying NFTs do not implement IERC721Metadata to `unavailableURI_`.
+     * @param unavailableURI_ The URI to associate to spectres whose underlying NFTs do not implement IERC721Metadata.
+     */
+    function setUnavailableURI(string memory unavailableURI_) external override {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to update unavailableURI");
 
         _unavailableURI = unavailableURI_;
     }
 
-    function updateUnlockedURI(string memory unlockedURI_) external override {
-        require(hasRole(ADMIN_ROLE, _msgSender()), "sERC1155: must have admin role to update unlockedURI");
+    /**
+     * @notice Set the URI associated to unlocked spectres.
+     * @param unlockedURI_ The URI to associate to unlocked spectres.
+     */
+    function setUnlockedURI(string memory unlockedURI_) external override {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to update unlockedURI");
 
         _unlockedURI = unlockedURI_;
     }
 
     /**
-     * @notice Mirrors sERC20s transfers.
-     * @dev This function is called by sERC20s whenever a transfer occurs at the sERC20 layer. This enable the sERC1155
-     * contract to emit a `TransferSingle` event, as required per the ERC1155 standard, each time a transfer occurs -
-     * even when this transfer occurs at the sERC20 layer.
+     * @notice Mirror sERC20s transfers.
+     * @dev - This function is called by sERC20s whenever a transfer occurs at the sERC20 layer.
+     *      - This enable this vault to emit a `TransferSingle` event, as required per the ERC1155 standard, each time a transfer occurs [no matter which layer
+     *        this transfer is triggered from].
+     *      - If the recipient of the tokens implements ERC1155Receiver, its callback function is called.
      * @param from The address the tokens have been transferred from.
      * @param to The address the tokens have been transferred to.
      * @param amount The amount of tokens which have been transferred.
@@ -374,106 +416,117 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
         address operator = _msgSender();
         uint256 id = operator.id();
 
-        require(_spectres[id].state != SpectreState.Null, "sERC1155: must be sERC20 to use transfer hook");
+        require(_spectres[id].state != Spectres.State.Null, "Vault: must be sERC20 to use transfer hook");
 
         emit TransferSingle(operator, from, to, id, amount);
 
-        if (to.supportsInterface(ERC1155RECEIVER_ID)) {
-            /* solhint-disable indent */
+        if (to.supportsInterface(ERC165Ids.ERC1155Receiver)) {
             try IERC1155Receiver(to).onERC1155Received(operator, from, id, amount, "") returns (bytes4 response) {
                 if (response != IERC1155Receiver(to).onERC1155Received.selector) {
-                    revert("sERC1155: ERC1155Receiver rejected tokens");
+                    revert("Vault: ERC1155Receiver rejected tokens");
                 }
             } catch Error(string memory reason) {
                 revert(reason);
             }
-            /* solhint-enable indent */
         }
     }
 
-    function sERC20Base() external view override returns (address) {
+    /**
+     * @notice Return the address of sERC20's implementation contract.
+     */
+    function sERC20Base() public view override returns (address) {
         return _sERC20Base;
     }
 
-    function unavailableURI() external view override returns (string memory) {
+    /**
+     * @notice Return the URI associated to spectres whose underlying NFTs do not implement IERC721Metadata.
+     */
+    function unavailableURI() public view override returns (string memory) {
         return _unavailableURI;
     }
 
-    function unlockedURI() external view override returns (string memory) {
+    /**
+     * @notice Return the URI associated to unlocked spectres.
+     */
+    function unlockedURI() public view override returns (string memory) {
         return _unlockedURI;
     }
 
-    function isLocked(address collection, uint256 tokenId) external view override returns (bool) {
-        return _locks[collection][tokenId] != 0;
-    }
-
-    function lockOf(address collection, uint256 tokenId) external view override returns (uint256) {
-        return _locks[collection][tokenId];
+    /**
+     * @notice Check whether the NFT belonging to `collection` and identified by `tokenId` is locked into this vault or not.
+     */
+    function isLocked(IERC721 collection, uint256 tokenId) public view override returns (bool) {
+        return _tokenTypes[collection][tokenId] != 0;
     }
 
     /**
-     * @notice Returns the NFT associated to the `id` token type.
-     * @param id The id of the token type whose NFT is queried.
-     * @return The NFT associated to the `id` token type.
+     * @notice Return the token type associated to the NFT belonging to `collection` and identified by `tokenId` [return 0 if the NFT is not currently locked].
      */
-    function spectreOf(uint256 id) external view override returns (Spectre memory) {
+    function tokenTypeOf(IERC721 collection, uint256 tokenId) public view override returns (uint256) {
+        return _tokenTypes[collection][tokenId];
+    }
+
+    /**
+     * @notice Return the spectre associated to the token type `id` .
+     * @param id The id of the token type whose spectre is queried.
+     */
+    function spectreOf(uint256 id) public view override returns (Spectres.Spectre memory) {
         return _spectres[id];
     }
 
     /**
-     * @notice Returns the NFT associated to the `sERC20` token.
-     * @param sERC20 The address of the sERC20 whose NFT is queried.
-     * @return The NFT associated to the `sERC20` token.
+     * @notice Return the spectre associated to the sERC20 `sERC20`.
+     * @param sERC20 The sERC20 whose spectre is queried.
      */
-    function spectreOf(address sERC20) external view override returns (Spectre memory) {
+    function spectreOf(sIERC20 sERC20) public view override returns (Spectres.Spectre memory) {
         return _spectres[sERC20.id()];
     }
 
     /**
-     * @notice Returns the address of the sERC20 associated to the `id` token type.
-     * @param id The id of the token type whose sERC20 address is queried.
-     * @return The address of the sERC20 associated to the `id` token type.
+     * @notice Return the sERC20 associated to the token type `id`.
+     * @param id The id of the token type whose sERC20 is queried.
      */
-    function sERC20Of(uint256 id) external pure override returns (sIERC20) {
+    function sERC20Of(uint256 id) public pure override returns (sIERC20) {
         return id.sERC20();
     }
 
-    /* #endregion*/
+    /** private */
 
-    /* #region private */
-    function _spectralize(
-        address collection,
+    function _fractionalize(
+        IERC721 collection,
         uint256 tokenId,
+        address operator,
         string memory name,
         string memory symbol,
         uint256 cap,
         address admin,
-        address guardian
+        address broker
     ) private returns (uint256) {
         address sERC20 = _sERC20Base.clone();
         uint256 id = sERC20.id();
 
-        _locks[collection][tokenId] = id;
-        _spectres[id] = Spectre({state: SpectreState.Locked, collection: collection, tokenId: tokenId, guardian: guardian});
+        _spectres[id] = Spectres.Spectre({state: Spectres.State.Locked, collection: collection, tokenId: tokenId, broker: broker});
+        _tokenTypes[collection][tokenId] = id;
+
         sIERC20(sERC20).initialize(name, symbol, cap, admin);
 
-        emit TransferSingle(_msgSender(), address(0), address(0), id, uint256(0));
-        emit Spectralize(collection, tokenId, id, sERC20, guardian);
+        emit TransferSingle(operator, address(0), address(0), id, uint256(0));
+        emit Fractionalize(collection, tokenId, id, sIERC20(sERC20), broker);
 
         return id;
     }
 
     function _unlock(
-        address collection,
+        IERC721 collection,
         uint256 tokenId,
         uint256 id,
         address recipient,
         bytes memory data
     ) private {
-        _spectres[id].state = SpectreState.Unlocked;
-        delete _locks[collection][tokenId];
+        _spectres[id].state = Spectres.State.Unlocked;
+        delete _tokenTypes[collection][tokenId];
 
-        IERC721(collection).safeTransferFrom(address(this), recipient, tokenId, data);
+        collection.safeTransferFrom(address(this), recipient, tokenId, data);
 
         emit Unlock(id, recipient);
     }
@@ -487,17 +540,15 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
         bytes memory data
     ) private {
         if (to.isContract()) {
-            /* solhint-disable indent */
             try IERC1155Receiver(to).onERC1155Received(operator, from, id, amount, data) returns (bytes4 response) {
                 if (response != IERC1155Receiver(to).onERC1155Received.selector) {
-                    revert("sERC1155: ERC1155Receiver rejected tokens");
+                    revert("Vault: ERC1155Receiver rejected tokens");
                 }
             } catch Error(string memory reason) {
                 revert(reason);
             } catch {
-                revert("sERC1155: transfer to non ERC1155Receiver implementer");
+                revert("Vault: transfer to non ERC1155Receiver implementer");
             }
-            /* solhint-enable indent */
         }
     }
 
@@ -510,20 +561,15 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IVault {
         bytes memory data
     ) private {
         if (to.isContract()) {
-            /* solhint-disable indent */
-            /* solhint-disable max-line-length */
             try IERC1155Receiver(to).onERC1155BatchReceived(operator, from, ids, amounts, data) returns (bytes4 response) {
                 if (response != IERC1155Receiver(to).onERC1155BatchReceived.selector) {
-                    revert("sERC1155: ERC1155Receiver rejected tokens");
+                    revert("Vault: ERC1155Receiver rejected tokens");
                 }
             } catch Error(string memory reason) {
                 revert(reason);
             } catch {
-                revert("sERC1155: transfer to non ERC1155Receiver implementer");
+                revert("Vault: transfer to non ERC1155Receiver implementer");
             }
-            /* solhint-enable max-line-length */
-            /* solhint-enable indent  */
         }
     }
-    /* #endregion */
 }

@@ -1,34 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
+import "./libraries/Spectres.sol";
 import "../token/sIERC20.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-interface IVault is IERC1155, IERC1155MetadataURI, IERC721Receiver {
-    enum SpectreState {
-        Null,
-        Locked,
-        Unlocked
-    }
+interface IVault {
+    event Fractionalize(IERC721 indexed collection, uint256 indexed tokenId, uint256 indexed id, sIERC20 sERC20, address broker);
+    event Unlock(uint256 indexed id, address recipient);
+    event Escape(IERC721 collection, uint256 tokenId, address recipient);
 
-    struct Spectre {
-        SpectreState state;
-        address collection;
-        uint256 tokenId;
-        address guardian; // on peut remplacer par broker
-    }
-
-    function spectralize(
-        address collection,
+    function fractionalize(
+        IERC721 collection,
         uint256 tokenId,
         string memory name,
         string memory symbol,
         uint256 cap,
         address admin,
-        address guardian
-    ) external returns (uint256 id);
+        address broker
+    ) external returns (uint256);
 
     function unlock(
         uint256 id,
@@ -42,9 +32,16 @@ interface IVault is IERC1155, IERC1155MetadataURI, IERC721Receiver {
         bytes calldata data
     ) external;
 
-    function updateUnavailableURI(string memory unavailableURI_) external;
+    function escape(
+        IERC721 collection,
+        uint256 tokenId,
+        address recipient,
+        bytes memory data
+    ) external;
 
-    function updateUnlockedURI(string memory unlockedURI_) external;
+    function setUnavailableURI(string memory unavailableURI_) external;
+
+    function setUnlockedURI(string memory unlockedURI_) external;
 
     function onERC20Transferred(
         address from,
@@ -58,13 +55,13 @@ interface IVault is IERC1155, IERC1155MetadataURI, IERC721Receiver {
 
     function unlockedURI() external view returns (string memory);
 
-    function isLocked(address collection, uint256 tokenId) external view returns (bool);
+    function isLocked(IERC721 collection, uint256 tokenId) external view returns (bool);
 
-    function lockOf(address collection, uint256 tokenId) external view returns (uint256);
+    function tokenTypeOf(IERC721 collection, uint256 tokenId) external view returns (uint256);
 
-    function spectreOf(uint256 id) external view returns (Spectre memory);
+    function spectreOf(uint256 id) external view returns (Spectres.Spectre memory);
 
-    function spectreOf(address sERC20) external view returns (Spectre memory);
+    function spectreOf(sIERC20 sERC20) external view returns (Spectres.Spectre memory);
 
     function sERC20Of(uint256 id) external pure returns (sIERC20);
 }

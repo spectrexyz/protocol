@@ -12,6 +12,10 @@ import "@openzeppelin/contracts/utils/Context.sol";
 
 import "hardhat/console.sol";
 
+/**
+ * @title Issuer
+ * @notice Handles the issuance of sERC20 tokens.
+ */
 contract Issuer is Context, AccessControlEnumerable, IIssuer {
     using Address for address payable;
 
@@ -238,7 +242,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         )
     {
         Issuances.Issuance storage issuance = _issuances[sERC20];
-        
+
         state = issuance.state;
         pool = issuance.pool;
         guardian = issuance.guardian;
