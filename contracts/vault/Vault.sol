@@ -331,8 +331,8 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
     ) external override {
         Spectres.Spectre storage spectre = _spectres[id];
 
-        require(_msgSender() == spectre.broker, "Vault: must be spectre's broker to unlock");
         require(spectre.state == Spectres.State.Locked, "Vault: spectre is not locked");
+        require(_msgSender() == spectre.broker, "Vault: must be spectre's broker to unlock");
 
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
@@ -351,8 +351,8 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
         uint256 id = sERC20.id();
         Spectres.Spectre storage spectre = _spectres[id];
 
-        require(_msgSender() == spectre.broker, "Vault: must be spectre's broker to unlock");
         require(spectre.state == Spectres.State.Locked, "Vault: spectre is not locked");
+        require(_msgSender() == spectre.broker, "Vault: must be spectre's broker to unlock");
 
         _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
     }
@@ -385,7 +385,7 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
      * @param unavailableURI_ The URI to associate to spectres whose underlying NFTs do not implement IERC721Metadata.
      */
     function setUnavailableURI(string memory unavailableURI_) external override {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to update unavailableURI");
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to set unavailableURI");
 
         _unavailableURI = unavailableURI_;
     }
@@ -395,7 +395,7 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
      * @param unlockedURI_ The URI to associate to unlocked spectres.
      */
     function setUnlockedURI(string memory unlockedURI_) external override {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to update unlockedURI");
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to set unlockedURI");
 
         _unlockedURI = unlockedURI_;
     }
