@@ -5,7 +5,6 @@ const _WETH_ = require("../../../artifacts/contracts/test/WETH.sol/WETH.json");
 
 class Balancer {
   static async deploy(ctx, opts) {
-    let token0, token1, sERC20IsToken0;
     opts.mint ??= opts.minter ? false : true;
 
     ctx.contracts.authorizer = await waffle.deployContract(ctx.signers.root, _Authorizer_, [ctx.signers.root.address]);

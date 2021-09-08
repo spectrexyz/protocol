@@ -1,5 +1,4 @@
 const _Issuer_ = require("../../../artifacts/contracts/issuer/Issuer.sol/Issuer.json");
-const { ethers } = require("ethers");
 
 class Issuer {
   constructor(ctx) {

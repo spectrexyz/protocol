@@ -7,36 +7,36 @@ describe("sERC20", () => {
     await initialize(this);
   });
 
-  describe("⇛ initialize", () => {
+  describe("# initialize", () => {
     describe("» is called on the proxy contract", () => {
       describe("» and cap is not zero", () => {
         describe("» and admin is not the zero address", () => {
           before(async () => {
-            await setup(this);
+            await setup.sERC20(this);
           });
 
-          it("# it sets sERC20's name", async () => {
+          it("it sets sERC20's name", async () => {
             expect(await this.sERC20.name()).to.equal(this.params.sERC20.name);
           });
 
-          it("# it sets sERC20's symbol", async () => {
+          it("it sets sERC20's symbol", async () => {
             expect(await this.sERC20.symbol()).to.equal(this.params.sERC20.symbol);
           });
 
-          it("# it sets sERC20's decimals", async () => {
+          it("it sets sERC20's decimals", async () => {
             expect(await this.sERC20.decimals()).to.equal(18);
           });
 
-          it("# it sets sERC20's cap", async () => {
+          it("it sets sERC20's cap", async () => {
             expect(await this.sERC20.cap()).to.equal(this.params.sERC20.cap);
           });
 
-          it("# it sets sERC20's admin", async () => {
-            expect(await this.sERC20.hasRole(await this.contracts.sERC20.DEFAULT_ADMIN_ROLE(), this.signers.sERC20.admin.address)).to.equal(true);
+          it("it sets sERC20's admin", async () => {
+            expect(await this.sERC20.hasRole(this.constants.sERC20.DEFAULT_ADMIN_ROLE, this.signers.sERC20.admin.address)).to.equal(true);
           });
 
-          it("# it sets sERC20's vault's address", async () => {
-            expect(await this.sERC20.vault()).to.equal(this.sERC1155.contract.address);
+          it("it sets sERC20's vault's address", async () => {
+            expect(await this.sERC20.vault()).to.equal(this.vault.address);
           });
         });
 
@@ -101,14 +101,14 @@ describe("sERC20", () => {
     describe("» recipient is not the zero address", () => {
       describe("» and sender has enough balance", () => {
         before(async () => {
-          await setup(this);
+          await setup.sERC20(this);
           await this.sERC20.mint();
           await this.sERC20.transfer({ to: this.signers.holders[1] });
         });
 
         it("it transfers tokens", async () => {
-          expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
-          expect(await this.sERC20.balanceOf(this.signers.holders[1])).to.equal(this.params.sERC20.amount);
+          expect(await this.sERC20.balanceOf(this.signers.holders[0].address)).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
+          expect(await this.sERC20.balanceOf(this.signers.holders[1].address)).to.equal(this.params.sERC20.amount);
         });
 
         it("it emits a Transfer event", async () => {
@@ -117,16 +117,16 @@ describe("sERC20", () => {
             .withArgs(this.signers.holders[0].address, this.signers.holders[1].address, this.params.sERC20.amount);
         });
 
-        it("it emits a TransferSingle event at the sERC1155 layer", async () => {
+        it("it emits a TransferSingle event at the vault layer", async () => {
           await expect(this.data.tx)
-            .to.emit(this.contracts.sERC1155, "TransferSingle")
-            .withArgs(this.sERC20.contract.address, this.signers.holders[0].address, this.signers.holders[1].address, this.data.id, this.params.sERC20.amount);
+            .to.emit(this.contracts.vault, "TransferSingle")
+            .withArgs(this.sERC20.address, this.signers.holders[0].address, this.signers.holders[1].address, this.data.id, this.params.sERC20.amount);
         });
       });
 
       describe("» but sender does not have enough balance", () => {
         before(async () => {
-          await setup(this);
+          await setup.sERC20(this);
           await this.sERC20.mint();
         });
 
@@ -143,7 +143,7 @@ describe("sERC20", () => {
 
     describe("» recipient is the zero address", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.mint();
       });
 
@@ -163,7 +163,7 @@ describe("sERC20", () => {
         describe("» and spender has enough approved balance", () => {
           describe("» and token owner has enough balance", () => {
             before(async () => {
-              await setup(this);
+              await setup.sERC20(this);
               await this.sERC20.mint();
               await this.sERC20.approve({
                 spender: this.signers.others[0],
@@ -173,8 +173,8 @@ describe("sERC20", () => {
             });
 
             it("it transfers tokens", async () => {
-              expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
-              expect(await this.sERC20.balanceOf(this.signers.holders[1])).to.equal(this.params.sERC20.amount);
+              expect(await this.sERC20.balanceOf(this.signers.holders[0].address)).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
+              expect(await this.sERC20.balanceOf(this.signers.holders[1].address)).to.equal(this.params.sERC20.amount);
             });
 
             it("it updates spender's allowance", async () => {
@@ -187,16 +187,10 @@ describe("sERC20", () => {
                 .withArgs(this.signers.holders[0].address, this.signers.holders[1].address, this.params.sERC20.amount);
             });
 
-            it("it emits a TransferSingle event at the sERC1155 layer", async () => {
+            it("it emits a TransferSingle event at the vault layer", async () => {
               await expect(this.data.tx)
-                .to.emit(this.contracts.sERC1155, "TransferSingle")
-                .withArgs(
-                  this.sERC20.contract.address,
-                  this.signers.holders[0].address,
-                  this.signers.holders[1].address,
-                  this.data.id,
-                  this.params.sERC20.amount
-                );
+                .to.emit(this.contracts.vault, "TransferSingle")
+                .withArgs(this.sERC20.address, this.signers.holders[0].address, this.signers.holders[1].address, this.data.id, this.params.sERC20.amount);
             });
 
             it("it emits an Approval event", async () => {
@@ -208,7 +202,7 @@ describe("sERC20", () => {
 
           describe("» but token owner does not have enough balance", () => {
             before(async () => {
-              await setup(this);
+              await setup.sERC20(this);
               await this.sERC20.mint();
               await this.sERC20.approve({
                 spender: this.signers.others[0],
@@ -228,7 +222,7 @@ describe("sERC20", () => {
 
         describe("» but spender does not have enough approved balance", () => {
           before(async () => {
-            await setup(this);
+            await setup.sERC20(this);
             await this.sERC20.mint();
           });
 
@@ -240,7 +234,7 @@ describe("sERC20", () => {
 
       describe("» but recipient is the zero address", () => {
         before(async () => {
-          await setup(this);
+          await setup.sERC20(this);
           await this.sERC20.mint();
         });
 
@@ -256,7 +250,7 @@ describe("sERC20", () => {
 
     describe("» but token owner is the zero address", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.mint();
       });
 
@@ -273,7 +267,7 @@ describe("sERC20", () => {
   describe("# setRoleAdmin", () => {
     describe("» caller has admin role", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.setRoleAdmin({
           adminRole: ethers.BigNumber.from("0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c2177"),
         });
@@ -298,7 +292,7 @@ describe("sERC20", () => {
 
     describe("» caller does not have admin role", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
       });
 
       it("it reverts", async () => {
@@ -311,14 +305,14 @@ describe("sERC20", () => {
     describe("» burnt amount is inferior to balance", () => {
       describe("» and sERC20 is not paused", () => {
         before(async () => {
-          await setup(this);
+          await setup.sERC20(this);
           await this.sERC20.mint();
           await this.sERC20.burn();
         });
 
         it("it burns tokens", async () => {
           expect(await this.sERC20.totalSupply()).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
-          expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
+          expect(await this.sERC20.balanceOf(this.signers.holders[0].address)).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
         });
 
         it("it emits a Transfer event", async () => {
@@ -327,16 +321,16 @@ describe("sERC20", () => {
             .withArgs(this.signers.holders[0].address, ethers.constants.AddressZero, this.params.sERC20.amount);
         });
 
-        it("it emits a TransferSingle event at the sERC1155 layer", async () => {
+        it("it emits a TransferSingle event at the vault layer", async () => {
           await expect(this.data.tx)
-            .to.emit(this.contracts.sERC1155, "TransferSingle")
-            .withArgs(this.sERC20.contract.address, this.signers.holders[0].address, ethers.constants.AddressZero, this.data.id, this.params.sERC20.amount);
+            .to.emit(this.contracts.vault, "TransferSingle")
+            .withArgs(this.sERC20.address, this.signers.holders[0].address, ethers.constants.AddressZero, this.data.id, this.params.sERC20.amount);
         });
       });
 
       describe("» but sERC20 is paused", () => {
         before(async () => {
-          await setup(this);
+          await setup.sERC20(this);
           await this.sERC20.pause();
         });
 
@@ -348,7 +342,7 @@ describe("sERC20", () => {
 
     describe("» burnt amount is superior to balance", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.mint();
       });
 
@@ -366,7 +360,7 @@ describe("sERC20", () => {
     describe("» and spender has enough approved balance", () => {
       describe("» and token owner has enough balance", () => {
         before(async () => {
-          await setup(this);
+          await setup.sERC20(this);
           await this.sERC20.mint();
           await this.sERC20.approve({
             spender: this.signers.others[0],
@@ -377,7 +371,7 @@ describe("sERC20", () => {
 
         it("it transfers tokens", async () => {
           expect(await this.sERC20.totalSupply()).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
-          expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
+          expect(await this.sERC20.balanceOf(this.signers.holders[0].address)).to.equal(this.params.sERC20.balance.sub(this.params.sERC20.amount));
         });
 
         it("it updates spender's allowance", async () => {
@@ -390,10 +384,10 @@ describe("sERC20", () => {
             .withArgs(this.signers.holders[0].address, ethers.constants.AddressZero, this.params.sERC20.amount);
         });
 
-        it("it emits a TransferSingle event at the sERC1155 layer", async () => {
+        it("it emits a TransferSingle event at the vault layer", async () => {
           await expect(this.data.tx)
-            .to.emit(this.contracts.sERC1155, "TransferSingle")
-            .withArgs(this.sERC20.contract.address, this.signers.holders[0].address, ethers.constants.AddressZero, this.data.id, this.params.sERC20.amount);
+            .to.emit(this.contracts.vault, "TransferSingle")
+            .withArgs(this.sERC20.address, this.signers.holders[0].address, ethers.constants.AddressZero, this.data.id, this.params.sERC20.amount);
         });
 
         it("it emits an Approval event", async () => {
@@ -403,7 +397,7 @@ describe("sERC20", () => {
 
       describe("» but token owner does not have enough balance", () => {
         before(async () => {
-          await setup(this);
+          await setup.sERC20(this);
           await this.sERC20.mint();
           await this.sERC20.approve({
             spender: this.signers.others[0],
@@ -423,7 +417,7 @@ describe("sERC20", () => {
 
     describe("» but spender does not have enough approved balance", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.mint();
       });
 
@@ -439,13 +433,13 @@ describe("sERC20", () => {
         describe("» and minted amount is inferior to cap", () => {
           describe("» and sERC20 is not paused", () => {
             before(async () => {
-              await setup(this);
+              await setup.sERC20(this);
               await this.sERC20.mint();
             });
 
             it("it mints tokens", async () => {
               expect(await this.sERC20.totalSupply()).to.equal(this.params.sERC20.balance);
-              expect(await this.sERC20.balanceOf(this.signers.holders[0])).to.equal(this.params.sERC20.balance);
+              expect(await this.sERC20.balanceOf(this.signers.holders[0].address)).to.equal(this.params.sERC20.balance);
             });
 
             it("it emits a Transfer event", async () => {
@@ -454,22 +448,16 @@ describe("sERC20", () => {
                 .withArgs(ethers.constants.AddressZero, this.signers.holders[0].address, this.params.sERC20.balance);
             });
 
-            it("it emits a TransferSingle event at the sERC1155 layer", async () => {
+            it("it emits a TransferSingle event at the vault layer", async () => {
               await expect(this.data.tx)
-                .to.emit(this.contracts.sERC1155, "TransferSingle")
-                .withArgs(
-                  this.sERC20.contract.address,
-                  ethers.constants.AddressZero,
-                  this.signers.holders[0].address,
-                  this.data.id,
-                  this.params.sERC20.balance
-                );
+                .to.emit(this.contracts.vault, "TransferSingle")
+                .withArgs(this.sERC20.address, ethers.constants.AddressZero, this.signers.holders[0].address, this.data.id, this.params.sERC20.balance);
             });
           });
 
           describe("» but sERC20 is paused", () => {
             before(async () => {
-              await setup(this);
+              await setup.sERC20(this);
               await this.sERC20.pause();
             });
 
@@ -481,7 +469,7 @@ describe("sERC20", () => {
 
         describe("» but amount is superior to cap", () => {
           before(async () => {
-            await setup(this);
+            await setup.sERC20(this);
           });
 
           it("it reverts", async () => {
@@ -496,7 +484,7 @@ describe("sERC20", () => {
 
       describe("» cap is already reached", () => {
         before(async () => {
-          await setup(this);
+          await setup.sERC20(this);
           await this.sERC20.mint({ amount: this.params.sERC20.cap });
         });
 
@@ -508,7 +496,7 @@ describe("sERC20", () => {
 
     describe("» caller does not have MINT_ROLE", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
       });
 
       it("it reverts", async () => {
@@ -520,7 +508,7 @@ describe("sERC20", () => {
   describe("# pause", () => {
     describe("» caller has PAUSE_ROLE", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.pause();
       });
 
@@ -531,7 +519,7 @@ describe("sERC20", () => {
 
     describe("# caller does not have PAUSE_ROLE", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
       });
 
       it("it reverts", async () => {
@@ -543,7 +531,7 @@ describe("sERC20", () => {
   describe("# unpause", () => {
     describe("» caller has PAUSE_ROLE", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.pause();
         await this.sERC20.unpause();
       });
@@ -555,7 +543,7 @@ describe("sERC20", () => {
 
     describe("» caller does not have PAUSE_ROLE", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.pause();
       });
 
@@ -568,7 +556,7 @@ describe("sERC20", () => {
   describe("# snapshot", () => {
     describe("» caller has SNAPSHOT_ROLE", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.mint();
         await this.sERC20.transfer({ to: this.signers.holders[1] });
         await this.sERC20.snapshot();
@@ -595,7 +583,7 @@ describe("sERC20", () => {
 
     describe("» caller does not have SNAPSHOT_ROLE", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
       });
 
       it("it reverts", async () => {
@@ -607,27 +595,27 @@ describe("sERC20", () => {
   describe("# onERC1155Transferred", () => {
     describe("» caller is vault", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.mint();
-        await this.sERC1155.safeTransferFrom();
+        await this.vault.safeTransferFrom();
       });
 
       it("it mirrors token transfer", async () => {
         await expect(this.data.tx)
           .to.emit(this.contracts.sERC20, "Transfer")
-          .withArgs(this.signers.holders[0].address, this.signers.others[0].address, this.params.sERC1155.amount);
+          .withArgs(this.signers.holders[0].address, this.signers.others[0].address, this.params.vault.amount);
       });
     });
 
     describe("» caller is not vault", () => {
       before(async () => {
-        await setup(this);
+        await setup.sERC20(this);
         await this.sERC20.mint();
       });
 
       it("it reverts", async () => {
         await expect(
-          this.sERC20.contract.onERC1155Transferred(this.signers.holders[0].address, this.signers.others[0].address, this.params.sERC1155.amount)
+          this.sERC20.contract.onERC1155Transferred(this.signers.holders[0].address, this.signers.others[0].address, this.params.vault.amount)
         ).to.be.revertedWith("sERC20: must be vault to use transfer hook");
       });
     });

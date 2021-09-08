@@ -1,0 +1,15 @@
+module.exports = {
+  params: {
+    unlockedURI: "ipfs://Qm.../unwrapped",
+    unavailableURI: "ipfs://Qm.../unavailable",
+    amount: ethers.utils.parseEther("10"),
+    amount1: ethers.utils.parseEther("70"),
+    amount2: ethers.utils.parseEther("12"),
+    amount3: ethers.utils.parseEther("1"),
+    amount4: ethers.utils.parseEther("3"),
+  },
+  constants: {
+    DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
+    DERRIDA: "0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce",
+  },
+};

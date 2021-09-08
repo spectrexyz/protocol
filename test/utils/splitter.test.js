@@ -8,12 +8,12 @@ describe("Splitter", () => {
 
   describe("# constructor", () => {
     before(async () => {
-      await setup(this);
+      await setup.splitter(this);
     });
 
     it("# it sets up permissions", async () => {
-      expect(await this.splitter.hasRole(await this.splitter.DEFAULT_ADMIN_ROLE(), this.signers.splitter.admin.address)).to.equal(true);
-      expect(await this.splitter.hasRole(await this.splitter.REGISTER_ROLE(), this.signers.splitter.registrar.address)).to.equal(true);
+      expect(await this.splitter.hasRole(this.constants.splitter.DEFAULT_ADMIN_ROLE, this.signers.splitter.admin.address)).to.equal(true);
+      expect(await this.splitter.hasRole(this.constants.splitter.REGISTER_ROLE, this.signers.splitter.registrar.address)).to.equal(true);
     });
   });
 
@@ -24,22 +24,22 @@ describe("Splitter", () => {
           describe("» and no share is worth zero", () => {
             describe("» and shares add up to 100%", () => {
               before(async () => {
-                await setup(this);
+                await setup.splitter(this);
                 await this.splitter.register();
+                this.data.split = await this.splitter.stateOf(this.sERC20.address);
               });
 
               it("it registers split", async () => {
-                const split = await this.splitter.stateOf(this.sERC20.contract.address);
+                expect(this.data.split.received).to.equal(0);
+                expect(this.data.split.totalWithdrawn).to.equal(0);
 
-                expect(split.received).to.equal(0);
-                expect(split.totalWithdrawn).to.equal(0);
-                expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[0].address)).to.equal(
+                expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[0].address)).to.equal(
                   this.params.splitter.shares[0]
                 );
-                expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[1].address)).to.equal(
+                expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[1].address)).to.equal(
                   this.params.splitter.shares[1]
                 );
-                expect(await this.splitter.shareOf(this.sERC20.contract.address, this.signers.splitter.beneficiaries[2].address)).to.equal(
+                expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[2].address)).to.equal(
                   this.params.splitter.shares[2]
                 );
               });
@@ -48,7 +48,7 @@ describe("Splitter", () => {
                 await expect(this.data.tx)
                   .to.emit(this.splitter.contract, "Register")
                   .withArgs(
-                    this.sERC20.contract.address,
+                    this.sERC20.address,
                     this.signers.splitter.beneficiaries.map((beneficiary) => beneficiary.address),
                     this.params.splitter.shares
                   );
@@ -57,7 +57,7 @@ describe("Splitter", () => {
 
             describe("» but shares do not add up 100%", () => {
               before(async () => {
-                await setup(this);
+                await setup.splitter(this);
               });
 
               it("it reverts", async () => {
@@ -72,7 +72,7 @@ describe("Splitter", () => {
 
           describe("» but one share is worth zero", () => {
             before(async () => {
-              await setup(this);
+              await setup.splitter(this);
             });
 
             it("it reverts", async () => {
@@ -87,7 +87,7 @@ describe("Splitter", () => {
 
         describe("» but one beneficiary is the zero address", () => {
           before(async () => {
-            await setup(this);
+            await setup.splitter(this);
           });
 
           it("it reverts", async () => {
@@ -102,7 +102,7 @@ describe("Splitter", () => {
 
       describe("» but beneficiaries and shares arrays do not have the same length", () => {
         before(async () => {
-          await setup(this);
+          await setup.splitter(this);
         });
 
         it("it reverts", async () => {
@@ -117,7 +117,7 @@ describe("Splitter", () => {
 
     describe("» sender does not have REGISTER_ROLE", () => {
       before(async () => {
-        await setup(this);
+        await setup.splitter(this);
       });
 
       it("it reverts", async () => {
@@ -130,14 +130,14 @@ describe("Splitter", () => {
     describe("» sERC20 is registered", () => {
       describe("» and there is something to withdraw", () => {
         before(async () => {
-          await setup(this);
+          await setup.splitter(this);
           await this.splitter.register();
           await this.sERC20.mint();
         });
 
         it("it updates split state", async () => {
           await this.sERC20.transfer({ amount: "1000" });
-          const split1 = await this.splitter.stateOf(this.sERC20.contract.address);
+          const split1 = await this.splitter.stateOf(this.sERC20.address);
           expect(split1.received).to.equal(1000);
           expect(split1.totalWithdrawn).to.equal(0);
 
@@ -191,13 +191,13 @@ describe("Splitter", () => {
         it("it emits a Withdraw event", async () => {
           await expect(this.data.tx)
             .to.emit(this.splitter.contract, "Withdraw")
-            .withArgs(this.sERC20.contract.address, this.signers.splitter.beneficiaries[2].address, 7200);
+            .withArgs(this.sERC20.address, this.signers.splitter.beneficiaries[2].address, 7200);
         });
       });
 
       describe("» but there is nothing to withdraw", () => {
         before(async () => {
-          await setup(this);
+          await setup.splitter(this);
           await this.splitter.register();
           await this.sERC20.mint();
           await this.sERC20.transfer({ amount: "1000" });
@@ -212,7 +212,7 @@ describe("Splitter", () => {
 
     describe("» sERC20 is not registered", () => {
       before(async () => {
-        await setup(this);
+        await setup.splitter(this);
       });
 
       it("it reverts", async () => {
@@ -225,14 +225,14 @@ describe("Splitter", () => {
     describe("» all sERC20s are registered", () => {
       describe("» and there is something to withdraw for all sERC20s", () => {
         before(async () => {
-          await setup(this);
+          await setup.splitter(this);
           await this.splitter.register();
           await this.sERC20.mint();
           await this.sERC20.transfer({ amount: "1000" });
           this.data.sERC201 = this.contracts.sERC20;
 
           await this.sERC721.mint();
-          await this.sERC1155.spectralize();
+          await this.vault.fractionalize();
           await this.splitter.register();
           await this.sERC20.mint();
           await this.sERC20.transfer({ amount: "2000" });
@@ -272,14 +272,14 @@ describe("Splitter", () => {
 
       describe("» but there is nothing to withdraw for one sERC20", () => {
         before(async () => {
-          await setup(this);
+          await setup.splitter(this);
           await this.splitter.register();
           await this.sERC20.mint();
           await this.sERC20.transfer({ amount: "1000" });
           this.data.sERC201 = this.contracts.sERC20;
 
           await this.sERC721.mint();
-          await this.sERC1155.spectralize();
+          await this.vault.fractionalize();
           await this.splitter.register();
           await this.sERC20.mint();
           await this.sERC20.transfer({ amount: "2000" });
@@ -296,14 +296,14 @@ describe("Splitter", () => {
 
     describe("» one sERC20 is not registered", () => {
       before(async () => {
-        await setup(this);
+        await setup.splitter(this);
         await this.splitter.register();
         await this.sERC20.mint();
         await this.sERC20.transfer({ amount: "1000" });
         this.data.sERC201 = this.contracts.sERC20;
 
         await this.sERC721.mint();
-        await this.sERC1155.spectralize();
+        await this.vault.fractionalize();
         await this.sERC20.mint();
         await this.sERC20.transfer({ amount: "2000" });
         this.data.sERC202 = this.contracts.sERC20;

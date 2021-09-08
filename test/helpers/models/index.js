@@ -5,6 +5,7 @@ const Broker = require("./broker");
 const Issuer = require("./issuer");
 const Splitter = require("./Splitter");
 const Template = require("./template");
+const Vault = require("./vault");
 
 module.exports = {
   sERC20,
@@ -14,4 +15,5 @@ module.exports = {
   Issuer,
   Splitter,
   Template,
+  Vault,
 };

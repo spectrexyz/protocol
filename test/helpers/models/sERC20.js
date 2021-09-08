@@ -5,11 +5,12 @@ class sERC20 {
   constructor(ctx) {
     this.ctx = ctx;
     this.contract = ctx.contracts.sERC20;
-
+    this.address = this.contract.address;
     this.name = this.contract.name;
     this.symbol = this.contract.symbol;
     this.decimals = this.contract.decimals;
     this.cap = this.contract.cap;
+    this.balanceOf = this.contract.balanceOf;
     this.hasRole = this.contract.hasRole;
     this.totalSupply = this.contract.totalSupply;
     this.totalSupplyAt = this.contract.totalSupplyAt;
@@ -61,14 +62,6 @@ class sERC20 {
 
     this.ctx.data.tx = await this.contract.initialize(this.ctx.params.sERC20.name, this.ctx.params.sERC20.symbol, opts.cap, opts.admin.address);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
-  }
-
-  async balanceOf(account) {
-    return await this.contract.balanceOf(account.address);
-  }
-
-  async hasRole(role, account) {
-    return await this.contract.hasRole(role, account.address);
   }
 
   async setRoleAdmin(opts = {}) {
@@ -171,10 +164,6 @@ class sERC20 {
     await this.grantRole({
       role: this.ctx.constants.sERC20.MINT_ROLE,
       account: this.ctx.signers.sERC20.minter,
-    });
-    await this.grantRole({
-      role: this.ctx.constants.sERC20.BURN_ROLE,
-      account: this.ctx.signers.sERC20.burner,
     });
     await this.grantRole({
       role: this.ctx.constants.sERC20.PAUSE_ROLE,

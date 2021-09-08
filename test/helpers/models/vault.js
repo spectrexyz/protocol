@@ -1,52 +1,51 @@
-const _sERC1155_ = require("../../../artifacts/contracts/vault/Vault.sol/Vault.json");
-const _ERC721Mock_ = require("../../../artifacts/contracts/test/ERC721Mock.sol/ERC721Mock.json");
+const _Vault_ = require("../../../artifacts/contracts/vault/Vault.sol/Vault.json");
 const sERC20 = require("./sERC20");
-// const { _throw } = require('../errors');
 
-class sERC1155 {
+class Vault {
   constructor(ctx) {
     this.ctx = ctx;
-    this.artifact = _sERC1155_;
-    this.contract = ctx.contracts.sERC1155;
+    this.artifact = _Vault_;
+    this.contract = ctx.contracts.vault;
+    this.address = this.contract.address;
     this.supportsInterface = this.contract.supportsInterface;
     this.hasRole = this.contract.hasRole;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.sERC20Base = this.contract.sERC20Base;
+    this.uri = this.contract.uri;
     this.unavailableURI = this.contract.unavailableURI;
     this.unlockedURI = this.contract.unlockedURI;
     this.balanceOf = this.contract.balanceOf;
     this.balanceOfBatch = this.contract.balanceOfBatch;
     this.isApprovedForAll = this.contract.isApprovedForAll;
-    this.uri = this.contract.uri;
     this.onERC721Received = this.contract.onERC721Received;
   }
 
   static async deploy(ctx) {
-    ctx.contracts.sERC1155 = await waffle.deployContract(ctx.signers.sERC1155.admin, _sERC1155_, [
+    ctx.contracts.vault = await waffle.deployContract(ctx.signers.vault.admin, _Vault_, [
       ctx.contracts.sERC20Base.address,
-      ctx.params.sERC1155.unavailableURI,
-      ctx.params.sERC1155.unlockedURI,
+      ctx.params.vault.unavailableURI,
+      ctx.params.vault.unlockedURI,
     ]);
 
-    ctx.sERC1155 = new sERC1155(ctx);
+    ctx.vault = new Vault(ctx);
   }
 
   async setApprovalForAll(opts = {}) {
     opts.from ??= this.ctx.signers.holders[0];
-    opts.operator ??= this.ctx.signers.sERC1155.operator;
-    opts.approve ??= true;
+    opts.operator ??= this.ctx.signers.vault.operator;
+    opts.status ??= true;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).setApprovalForAll(opts.operator.address, opts.approve);
+    this.ctx.data.tx = await this.contract.connect(opts.from).setApprovalForAll(opts.operator.address, opts.status);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async safeTransferFrom(opts = {}) {
-    opts.from = opts.from ? opts.from : this.ctx.signers.holders[0];
-    opts.operator = opts.operator ? opts.operator : opts.from;
-    opts.to = opts.to ? opts.to : this.ctx.signers.others[0];
-    opts.id = opts.id ? opts.id : this.ctx.data.id;
-    opts.amount = opts.amount ? opts.amount : this.ctx.params.sERC1155.amount;
-    opts.data = opts.data ? opts.data : ethers.constants.HashZero;
+    opts.from ??= this.ctx.signers.holders[0];
+    opts.operator ??= opts.from;
+    opts.to ??= this.ctx.signers.others[0];
+    opts.id ??= this.ctx.data.id;
+    opts.amount ??= this.ctx.params.vault.amount;
+    opts.data ??= ethers.constants.HashZero;
 
     this.ctx.data.tx = await this.contract.connect(opts.operator).safeTransferFrom(opts.from.address, opts.to.address, opts.id, opts.amount, opts.data);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -57,32 +56,29 @@ class sERC1155 {
     opts.operator ??= opts.from;
     opts.to ??= this.ctx.signers.others[0];
     opts.ids ??= [this.ctx.data.id1, this.ctx.data.id2];
-    opts.amounts ??= [this.ctx.params.sERC1155.amount1, this.ctx.params.sERC1155.amount2];
+    opts.amounts ??= [this.ctx.params.vault.amount1, this.ctx.params.vault.amount2];
     opts.data ??= ethers.constants.HashZero;
 
     this.ctx.data.tx = await this.contract.connect(opts.operator).safeBatchTransferFrom(opts.from.address, opts.to.address, opts.ids, opts.amounts, opts.data);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
-  async spectralize(opts = {}) {
+  async fractionalize(opts = {}) {
     opts.collection ??= this.ctx.contracts.sERC721;
     opts.transfer ??= false;
     opts.mock ??= false;
-    opts.guardian ??= this.ctx.signers.sERC1155.guardian;
+    opts.broker ??= this.ctx.signers.vault.broker;
 
     if (opts.mock) {
-      this.ctx.contracts.ERC721Mock = await waffle.deployContract(this.ctx.signers.root, _ERC721Mock_);
-
-      this.ctx.data.tx = await this.contract.spectralize(
+      this.ctx.data.tx = await this.contract.fractionalize(
         this.ctx.contracts.ERC721Mock.address,
         0,
         this.ctx.params.sERC20.name,
         this.ctx.params.sERC20.symbol,
         this.ctx.params.sERC20.cap,
         this.ctx.signers.sERC20.admin.address,
-        opts.guardian.address
+        opts.broker.address
       );
-
       this.ctx.data.receipt = await this.ctx.data.tx.wait();
       this.ctx.data.id = await this._id();
     } else {
@@ -93,26 +89,25 @@ class sERC1155 {
       } else {
         this.ctx.data.tx = await this.contract
           .connect(this.ctx.signers.root)
-          .spectralize(
+          .fractionalize(
             opts.collection.address,
             this.ctx.data.tokenId,
             this.ctx.params.sERC20.name,
             this.ctx.params.sERC20.symbol,
             this.ctx.params.sERC20.cap,
             this.ctx.signers.sERC20.admin.address,
-            opts.guardian.address
+            opts.broker.address
           );
         this.ctx.data.tx2 = this.ctx.data.tx; // fix a bug where an un-waited tx overrides the current tx somewhere
         this.ctx.data.receipt = await this.ctx.data.tx.wait();
         this.ctx.data.id = await this._id();
       }
     }
-
     this.ctx.sERC20 = await sERC20.at(this.ctx, await this.contract.sERC20Of(this.ctx.data.id), opts);
   }
 
   async unlock(opts = {}) {
-    opts.from ??= this.ctx.signers.sERC1155.guardian;
+    opts.from ??= this.ctx.signers.vault.broker;
     opts.byAddress ??= false;
 
     if (opts.byAddress) {
@@ -129,14 +124,14 @@ class sERC1155 {
   }
 
   async updateUnavailableURI(uri, opts = {}) {
-    opts.from ??= this.ctx.signers.sERC1155.admin;
+    opts.from ??= this.ctx.signers.vault.admin;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).updateUnavailableURI(uri);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async updateUnlockedURI(uri, opts = {}) {
-    opts.from ??= this.ctx.signers.sERC1155.admin;
+    opts.from ??= this.ctx.signers.vault.admin;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).updateUnlockedURI(uri);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -144,7 +139,7 @@ class sERC1155 {
 
   _data(opts = {}) {
     opts.short ??= false;
-    opts.derrida ??= this.ctx.constants.sERC1155.DERRIDA;
+    opts.derrida ??= this.ctx.constants.vault.DERRIDA;
 
     return opts.short
       ? ethers.utils.concat([
@@ -152,14 +147,14 @@ class sERC1155 {
           ethers.utils.formatBytes32String(this.ctx.params.sERC20.symbol),
           ethers.utils.defaultAbiCoder.encode(["uint256"], [this.ctx.params.sERC20.cap]),
           ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC20.admin.address]),
-          ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC1155.guardian.address]),
+          ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.vault.broker.address]),
         ])
       : ethers.utils.concat([
           ethers.utils.formatBytes32String(this.ctx.constants.name),
           ethers.utils.formatBytes32String(this.ctx.constants.symbol),
           ethers.utils.defaultAbiCoder.encode(["uint256"], [this.ctx.constants.cap]),
           ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC20.admin.address]),
-          ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.sERC1155.guardian.address]),
+          ethers.utils.defaultAbiCoder.encode(["address"], [this.ctx.signers.vault.broker.address]),
           ethers.utils.defaultAbiCoder.encode(["bytes32"], [opts.derrida]),
         ]);
   }
@@ -168,11 +163,11 @@ class sERC1155 {
     opts.transfer ??= false;
 
     if (opts.transfer)
-      return (await this.ctx.contracts.sERC1155.queryFilter(this.ctx.contracts.sERC1155.filters.Spectralize())).filter(
-        (event) => event.event === "Spectralize"
+      return (await this.ctx.contracts.vault.queryFilter(this.ctx.contracts.vault.filters.Fractionalize())).filter(
+        (event) => event.event === "Fractionalize"
       )[0].args.id;
-    else return this.ctx.data.receipt.events.filter((event) => event.event === "Spectralize")[0].args.id;
+    else return this.ctx.data.receipt.events.filter((event) => event.event === "Fractionalize")[0].args.id;
   }
 }
 
-module.exports = sERC1155;
+module.exports = Vault;

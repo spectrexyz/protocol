@@ -4,8 +4,7 @@ class Splitter {
   constructor(ctx) {
     this.ctx = ctx;
     this.contract = ctx.contracts.splitter;
-    this.DEFAULT_ADMIN_ROLE = this.contract.DEFAULT_ADMIN_ROLE;
-    this.REGISTER_ROLE = this.contract.REGISTER_ROLE;
+    this.address = this.contract.address;
     this.hasRole = this.contract.hasRole;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.stateOf = this.contract.stateOf;
@@ -15,10 +14,9 @@ class Splitter {
 
   static async deploy(ctx) {
     ctx.contracts.splitter = await waffle.deployContract(ctx.signers.splitter.admin, _Splitter_);
-
     ctx.splitter = new Splitter(ctx);
 
-    const tx = await ctx.contracts.splitter.grantRole(await ctx.splitter.REGISTER_ROLE(), ctx.signers.splitter.registrar.address);
+    const tx = await ctx.contracts.splitter.grantRole(await ctx.constants.splitter.REGISTER_ROLE, ctx.signers.splitter.registrar.address);
     await tx.wait();
   }
 

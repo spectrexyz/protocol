@@ -24,20 +24,37 @@ describe.only("Issuer", () => {
             });
 
             it("it initializes contract", async () => {
-              expect(await this.issuer.vault()).to.equal(this.contracts.bvault.address);
-              expect(await this.issuer.bank()).to.equal(this.signers.issuer.bank.address);
-              expect(await this.issuer.splitter()).to.equal(this.signers.issuer.splitter.address);
-              expect(await this.issuer.protocolFee()).to.equal(this.params.issuer.protocolFee);
+              expect(await this.issuer.vault()).to.equal(
+                this.contracts.bvault.address
+              );
+              expect(await this.issuer.bank()).to.equal(
+                this.signers.issuer.bank.address
+              );
+              expect(await this.issuer.splitter()).to.equal(
+                this.signers.issuer.splitter.address
+              );
+              expect(await this.issuer.protocolFee()).to.equal(
+                this.params.issuer.protocolFee
+              );
             });
 
             it("it sets up permissions", async () => {
-              expect(await this.issuer.hasRole(ethers.constants.HashZero, this.signers.issuer.admin.address)).to.equal(true);
+              expect(
+                await this.issuer.hasRole(
+                  this.constants.issuer.DEFAULT_ADMIN_ROLE,
+                  this.signers.issuer.admin.address
+                )
+              ).to.equal(true);
             });
           });
 
           describe("» but protocol fee is superior or equal to 100%", () => {
             it("it reverts", async () => {
-              await expect(Issuer.deploy(this, { protocolFee: this.constants.issuer.HUNDRED })).to.be.revertedWith(
+              await expect(
+                Issuer.deploy(this, {
+                  protocolFee: this.constants.issuer.HUNDRED,
+                })
+              ).to.be.revertedWith(
                 "Issuer: protocol fee must be inferior to 100%"
               );
             });
@@ -46,23 +63,33 @@ describe.only("Issuer", () => {
 
         describe("» but splitter is the zero address", () => {
           it("it reverts", async () => {
-            await expect(Issuer.deploy(this, { splitter: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
-              "Issuer: splitter cannot be the zero address"
-            );
+            await expect(
+              Issuer.deploy(this, {
+                splitter: { address: ethers.constants.AddressZero },
+              })
+            ).to.be.revertedWith("Issuer: splitter cannot be the zero address");
           });
         });
       });
 
       describe("» but bank is the zero address", () => {
         it("it reverts", async () => {
-          await expect(Issuer.deploy(this, { bank: { address: ethers.constants.AddressZero } })).to.be.revertedWith("Issuer: bank cannot be the zero address");
+          await expect(
+            Issuer.deploy(this, {
+              bank: { address: ethers.constants.AddressZero },
+            })
+          ).to.be.revertedWith("Issuer: bank cannot be the zero address");
         });
       });
     });
 
     describe("» vault is the zero address", () => {
       it("it reverts", async () => {
-        await expect(Issuer.deploy(this, { vault: { address: ethers.constants.AddressZero } })).to.be.revertedWith("Issuer: vault cannot be the zero address");
+        await expect(
+          Issuer.deploy(this, {
+            vault: { address: ethers.constants.AddressZero },
+          })
+        ).to.be.revertedWith("Issuer: vault cannot be the zero address");
       });
     });
   });
@@ -78,15 +105,25 @@ describe.only("Issuer", () => {
                 mint: false,
               });
               await this.issuer.register();
-              this.data.issuance = await this.issuer.issuanceOf(this.sERC20.contract.address);
+              this.data.issuance = await this.issuer.issuanceOf(
+                this.sERC20.contract.address
+              );
             });
 
             it.only("it registers issuance", async () => {
-              expect(this.data.issuance.state).to.equal(this.constants.issuer.issuances.state.OPEN);
+              expect(this.data.issuance.state).to.equal(
+                this.constants.issuer.issuances.state.OPEN
+              );
               // expect(this.data.issuance.pool).to.equal(this.sBootstrappingPool.contract.address);
-              expect(this.data.issuance.guardian).to.equal(this.signers.issuer.guardian.address);
-              expect(this.data.issuance.reserve).to.equal(this.params.issuance.reserve);
-              expect(this.data.issuance.allocation).to.equal(this.params.issuance.allocation);
+              expect(this.data.issuance.guardian).to.equal(
+                this.signers.issuer.guardian.address
+              );
+              expect(this.data.issuance.reserve).to.equal(
+                this.params.issuance.reserve
+              );
+              expect(this.data.issuance.allocation).to.equal(
+                this.params.issuance.allocation
+              );
               expect(this.data.issuance.fee).to.equal(this.params.issuance.fee);
               expect(this.data.issuance.nbOfProposals).to.equal(0);
               expect(this.data.issuance.flash).to.equal(true);
@@ -120,9 +157,13 @@ describe.only("Issuer", () => {
             it("it reverts", async () => {
               await expect(
                 this.sMinter.register({
-                  fee: this.constants.sMinter.HUNDRED.sub(this.params.sMinter.protocolFee),
+                  fee: this.constants.sMinter.HUNDRED.sub(
+                    this.params.sMinter.protocolFee
+                  ),
                 })
-              ).to.be.revertedWith("sMinter: cumulated fees must be inferior to 100%");
+              ).to.be.revertedWith(
+                "sMinter: cumulated fees must be inferior to 100%"
+              );
             });
           });
         });
@@ -138,7 +179,9 @@ describe.only("Issuer", () => {
           });
 
           it("it reverts", async () => {
-            await expect(this.sMinter.register({ initialPrice: "0" })).to.be.revertedWith("sMinter: initial price cannot be null");
+            await expect(
+              this.sMinter.register({ initialPrice: "0" })
+            ).to.be.revertedWith("sMinter: initial price cannot be null");
           });
         });
       });
@@ -158,7 +201,9 @@ describe.only("Issuer", () => {
             this.sMinter.register({
               beneficiary: { address: ethers.constants.AddressZero },
             })
-          ).to.be.revertedWith("sMinter: beneficiary cannot be the zero address");
+          ).to.be.revertedWith(
+            "sMinter: beneficiary cannot be the zero address"
+          );
         });
       });
     });
@@ -174,7 +219,9 @@ describe.only("Issuer", () => {
       });
 
       it("it reverts", async () => {
-        await expect(this.sMinter.register({ from: this.signers.others[0] })).to.be.revertedWith("sMinter: must have REGISTER_ROLE to register");
+        await expect(
+          this.sMinter.register({ from: this.signers.others[0] })
+        ).to.be.revertedWith("sMinter: must have REGISTER_ROLE to register");
       });
     });
   });

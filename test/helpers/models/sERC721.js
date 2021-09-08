@@ -24,7 +24,7 @@ class sERC721 {
 
   async transfer(opts = {}) {
     opts.from ??= this.ctx.signers.sERC721.owners[0];
-    opts.to ??= this.ctx.contracts.sERC1155;
+    opts.to ??= this.ctx.contracts.vault;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).transferFrom(opts.from.address, opts.to.address, this.ctx.data.tokenId);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -33,13 +33,13 @@ class sERC721 {
   async approve(opts = {}) {
     opts.from ??= this.ctx.signers.sERC721.owners[0];
 
-    this.ctx.data.tx = await this.ctx.contracts.sERC721.connect(opts.from).approve(this.ctx.contracts.sERC1155.address, this.ctx.data.tokenId);
+    this.ctx.data.tx = await this.ctx.contracts.sERC721.connect(opts.from).approve(this.ctx.contracts.vault.address, this.ctx.data.tokenId);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async safeTransferFrom(opts = {}) {
     opts.from ??= this.ctx.signers.sERC721.owners[0];
-    opts.to ??= this.ctx.contracts.sERC1155;
+    opts.to ??= this.ctx.contracts.vault;
     opts.data ??= "0x00";
 
     this.ctx.data.tx = await this.contract
