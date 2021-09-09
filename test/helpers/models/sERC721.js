@@ -25,7 +25,7 @@ class sERC721 {
 
   async transfer(opts = {}) {
     opts.from ??= this.ctx.signers.sERC721.owners[0];
-    opts.to ??= this.ctx.contracts.vault;
+    opts.to ??= this.ctx.vault;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).transferFrom(opts.from.address, opts.to.address, this.ctx.data.tokenId);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
