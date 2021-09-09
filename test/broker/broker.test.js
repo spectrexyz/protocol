@@ -9,6 +9,7 @@ const {
   itWithdrawsProposalLikeExpected,
   itEnablesFlashBuyoutLikeExpected,
 } = require("./broker.behavior");
+const { Broker } = require("../helpers/models");
 
 describe("Broker", () => {
   before(async () => {
@@ -16,17 +17,73 @@ describe("Broker", () => {
   });
 
   describe("# constructor", () => {
-    before(async () => {
-      await setup.broker(this);
+    describe("» vault is not the zero address", () => {
+      describe("» and issuer is not the zero address", () => {
+        describe("» and bank is not the zero address", () => {
+          describe("» and protocol fee is inferior to 100%", () => {
+            before(async () => {
+              await setup.broker(this);
+            });
+
+            it("it initializes broker", async () => {
+              expect(await this.broker.vault()).to.equal(this.vault.address);
+              expect(await this.broker.issuer()).to.equal(this.contracts.issuerMock.address);
+              expect(await this.broker.bank()).to.equal(this.signers.broker.bank.address);
+              expect(await this.broker.protocolFee()).to.equal(this.params.broker.protocolFee);
+            });
+
+            it("it sets up permissions", async () => {
+              expect(await this.broker.hasRole(this.constants.broker.DEFAULT_ADMIN_ROLE, this.signers.broker.admin.address)).to.equal(true);
+            });
+          });
+
+          describe("» but protocol fee is superior or equal to 100%", () => {
+            before(async () => {
+              await setup.broker(this);
+            });
+
+            it("it reverts", async () => {
+              await expect(Broker.deploy(this, { protocolFee: this.constants.broker.HUNDRED })).to.be.revertedWith(
+                "Broker: protocol fee must be inferior to 100%"
+              );
+            });
+          });
+        });
+
+        describe("» but bank is the zero address", () => {
+          before(async () => {
+            await setup.broker(this);
+          });
+
+          it("it reverts", async () => {
+            await expect(Broker.deploy(this, { bank: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
+              "Broker: bank cannot be the zero address"
+            );
+          });
+        });
+      });
+
+      describe("» but issuer is the zero address", () => {
+        before(async () => {
+          await setup.broker(this);
+        });
+
+        it("it reverts", async () => {
+          await expect(Broker.deploy(this, { issuer: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
+            "Broker: issuer cannot be the zero address"
+          );
+        });
+      });
     });
 
-    it("it initializes broker", async () => {
-      expect(await this.broker.vault()).to.equal(this.vault.address);
-      expect(await this.broker.issuer()).to.equal(this.contracts.issuerMock.address);
-    });
+    describe("» vault is the zero address", () => {
+      before(async () => {
+        await setup.broker(this);
+      });
 
-    it("it sets up permissions", async () => {
-      expect(await this.broker.hasRole(this.constants.broker.DEFAULT_ADMIN_ROLE, this.signers.broker.admin.address)).to.equal(true);
+      it("it reverts", async () => {
+        await expect(Broker.deploy(this, { vault: { address: ethers.constants.AddressZero } })).to.be.revertedWith("Broker: vault cannot be the zero address");
+      });
     });
   });
 
@@ -115,9 +172,11 @@ describe("Broker", () => {
             await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
             this.data.previousTotalSupply = await this.sERC20.totalSupply();
+            this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
             await this.broker.buyout();
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
+            this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
           });
 
           itBuysOutLikeExpected(this, { value: true, collateral: true });
@@ -130,9 +189,11 @@ describe("Broker", () => {
             await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
             this.data.previousTotalSupply = await this.sERC20.totalSupply();
+            this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
             await this.broker.buyout({ value: 0 });
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
+            this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
           });
 
           itBuysOutLikeExpected(this, { value: false, collateral: true });
@@ -145,9 +206,11 @@ describe("Broker", () => {
             await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
             this.data.previousTotalSupply = await this.sERC20.totalSupply();
+            this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
             await this.broker.buyout();
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
+            this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
           });
 
           itBuysOutLikeExpected(this, { value: true, collateral: false });
@@ -284,9 +347,12 @@ describe("Broker", () => {
               await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
               await advanceTime(this.params.broker.timelock);
               await this.broker.createProposal();
+              this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
               await this.broker.acceptProposal();
               this.data.sale = await this.broker.saleOf(this.sERC20.address);
               this.data.proposal = await this.broker.proposalFor(this.sERC20.address, this.data.proposalId);
+              this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+              this.data.expectedFee = this.params.broker.value.mul(this.params.broker.protocolFee).div(this.constants.broker.HUNDRED);
             });
 
             it("it updates proposal state", async () => {
@@ -298,7 +364,7 @@ describe("Broker", () => {
             });
 
             it("it updates sale stock", async () => {
-              expect(this.data.sale.stock).to.equal(this.params.broker.value);
+              expect(this.data.sale.stock).to.equal(this.params.broker.value.sub(this.data.expectedFee));
             });
 
             it("it burns locked tokens", async () => {
@@ -313,6 +379,10 @@ describe("Broker", () => {
               await expect(this.data.tx).to.emit(this.contracts.issuerMock, "Close").withArgs(this.sERC20.address);
             });
 
+            it("it pays protocol fee", async () => {
+              expect(this.data.lastBankBalance.sub(this.data.previousBankBalance)).to.equal(this.data.expectedFee);
+            });
+
             it("it emits a AcceptProposal event", async () => {
               await expect(this.data.tx).to.emit(this.broker.contract, "AcceptProposal").withArgs(this.sERC20.address, this.data.proposalId);
             });
@@ -320,7 +390,7 @@ describe("Broker", () => {
             it("it emits a Buyout event", async () => {
               await expect(this.data.tx)
                 .to.emit(this.broker.contract, "Buyout")
-                .withArgs(this.sERC20.address, this.signers.broker.buyer.address, this.params.broker.value, this.params.broker.balance);
+                .withArgs(this.sERC20.address, this.signers.broker.buyer.address, this.params.broker.value, this.params.broker.balance, this.data.expectedFee);
             });
           });
 
@@ -529,7 +599,8 @@ describe("Broker", () => {
           this.data.previousClaimerETHBalance = await this.signers.others[0].getBalance();
           await this.broker.claim();
           this.data.sale = await this.broker.saleOf(this.sERC20.address);
-          this.data.expectedValue = this.params.broker.value.div(ethers.BigNumber.from("2"));
+          this.data.expectedFee = this.params.broker.value.mul(this.params.broker.protocolFee).div(this.constants.broker.HUNDRED);
+          this.data.expectedValue = this.params.broker.value.sub(this.data.expectedFee).div(ethers.BigNumber.from("2"));
           this.data.lastClaimerETHBalance = await this.signers.others[0].getBalance();
         });
 
@@ -542,7 +613,7 @@ describe("Broker", () => {
         });
 
         it("it updates sale's stock", async () => {
-          expect(this.data.sale.stock).to.equal(this.params.broker.value.sub(this.data.expectedValue));
+          expect(this.data.sale.stock).to.equal(this.params.broker.value.sub(this.data.expectedFee).sub(this.data.expectedValue));
         });
 
         it("it emits a claim event", async () => {

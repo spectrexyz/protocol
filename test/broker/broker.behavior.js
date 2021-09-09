@@ -25,26 +25,35 @@ const itBuysOutLikeExpected = (ctx, opts = {}) => {
   it("it updates sale state", async () => {
     expect(ctx.data.sale.state).to.equal(ctx.constants.broker.sales.state.Closed);
   });
+
   it("it updates sale stock", async () => {
-    opts.value = opts.value ? ctx.params.broker.value : 0;
+    opts.value = opts.value ? ctx.params.broker.value : ethers.BigNumber.from("0");
     opts.collateral = opts.collateral ? ctx.params.broker.balance : 0;
-    expect(ctx.data.sale.stock).to.equal(opts.value);
+    opts.expectedFee =
+      opts.value.toString() > "0" ? ctx.params.broker.value.mul(ctx.params.broker.protocolFee).div(ctx.constants.broker.HUNDRED) : ethers.BigNumber.from("0");
+    expect(ctx.data.sale.stock).to.equal(opts.value.sub(opts.expectedFee));
   });
+
   it("it burns buyer's tokens", async () => {
     expect(await ctx.sERC20.balanceOf(ctx.signers.broker.buyer.address)).to.equal(0);
   });
+
   it("it transfers NFT", async () => {
     expect(await ctx.sERC721.ownerOf(ctx.data.tokenId)).to.equal(ctx.signers.broker.buyer.address);
   });
+
   it("it closes sERC20 issuance", async () => {
     await expect(ctx.data.tx).to.emit(ctx.contracts.issuerMock, "Close").withArgs(ctx.sERC20.address);
   });
+
+  it("it pays protocol fee", async () => {
+    expect(ctx.data.lastBankBalance.sub(ctx.data.previousBankBalance)).to.equal(opts.expectedFee);
+  });
+
   it("it emits a Buyout event", async () => {
-    opts.value = opts.value ? ctx.params.broker.value : 0;
-    opts.collateral = opts.collateral ? ctx.params.broker.balance : 0;
     await expect(ctx.data.tx)
       .to.emit(ctx.broker.contract, "Buyout")
-      .withArgs(ctx.sERC20.address, ctx.signers.broker.buyer.address, opts.value, opts.collateral);
+      .withArgs(ctx.sERC20.address, ctx.signers.broker.buyer.address, opts.value, opts.collateral, opts.expectedFee);
   });
 };
 

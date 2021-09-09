@@ -35,6 +35,7 @@ const _signers = async (ctx) => {
     signers.sERC721.owners[0],
     signers.sERC721.owners[1],
     signers.broker.admin,
+    signers.broker.bank,
     signers.broker.guardian,
     signers.broker.buyer,
     signers.broker.registrar,

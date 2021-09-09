@@ -11,15 +11,28 @@ class Broker {
     this.saleOf = this.contract.saleOf;
     this.proposalFor = this.contract.proposalFor;
     this.issuer = this.contract.issuer;
+    this.bank = this.contract.bank;
+    this.protocolFee = this.contract.protocolFee;
     this.hasRole = this.contract.hasRole;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.priceOfFor = this.contract.priceOfFor;
     this.twapOf = ctx.contracts.issuerMock.twapOf;
   }
 
-  static async deploy(ctx, opts) {
+  static async deploy(ctx, opts = {}) {
     ctx.contracts.issuerMock = await waffle.deployContract(ctx.signers.root, _IssuerMock_);
-    ctx.contracts.broker = await waffle.deployContract(ctx.signers.broker.admin, _Broker_, [ctx.vault.address, ctx.contracts.issuerMock.address]);
+
+    opts.vault ??= ctx.vault;
+    opts.issuer ??= ctx.contracts.issuerMock;
+    opts.bank ??= ctx.signers.broker.bank;
+    opts.protocolFee ??= ctx.params.broker.protocolFee;
+
+    ctx.contracts.broker = await waffle.deployContract(ctx.signers.broker.admin, _Broker_, [
+      opts.vault.address,
+      opts.issuer.address,
+      opts.bank.address,
+      opts.protocolFee,
+    ]);
 
     ctx.broker = new Broker(ctx);
 
