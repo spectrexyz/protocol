@@ -71,7 +71,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
      * @param guardian The account authorized to enable flash issuance and accept / reject proposals otherwise [also receives ETH proceeds].
      * @param reserve The reserve price below which sERC20 tokens can be issued [expressed in sERC20 per ETH and 1e18 decimals].
      * @param allocation The pre-allocated percentage of sERC20s [expressed with 1e18 decimals].
-     * @param fee The minting fee.
+     * @param fee The issuance fee.
      * @param flash True if flash issuance is enabled, false otherwise.
      */
     function register(
