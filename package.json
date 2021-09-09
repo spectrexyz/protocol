@@ -15,6 +15,7 @@
     "test:token": "npx hardhat test test/token/*",
     "test:utils": "npx hardhat test test/utils/*",
     "test:vault": "npx hardhat test test/vault/*",
+    "test": "npx hardhat test",
     "test:gas": "REPORT_GAS=true npx hardhat test",
     "test:coverage": "npx hardhat coverage"
   },

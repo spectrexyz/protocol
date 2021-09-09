@@ -127,16 +127,6 @@ class Broker {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
-  async escape(opts = {}) {
-    opts.from ??= this.ctx.signers.broker.escaper;
-    opts.sERC20s ??= [this.ctx.data.sERC20.contract.address, this.ctx.sERC20.contract.address];
-    opts.beneficiaries ??= [this.ctx.signers.broker.beneficiaries[0].address, this.ctx.signers.broker.beneficiaries[1].address];
-    opts.datas ??= [ethers.constants.HashZero, ethers.constants.HashZero];
-
-    this.ctx.data.tx = await this.contract.connect(opts.from).escape(opts.sERC20s, opts.beneficiaries, opts.datas);
-    this.ctx.data.receipt = await this.ctx.data.tx.wait();
-  }
-
   async claim(opts = {}) {
     opts.from ??= this.ctx.signers.others[0];
     opts.sERC20 ??= this.ctx.sERC20.contract.address;
@@ -144,7 +134,7 @@ class Broker {
     await this.ctx.sERC20.approve({
       from: opts.from,
       spender: this.ctx.broker.contract,
-      amount: await this.ctx.sERC20.balanceOf(opts.from),
+      amount: await this.ctx.sERC20.balanceOf(opts.from.address),
     });
 
     this.ctx.data.gasSpent = this.ctx.data.receipt.gasUsed.mul(this.ctx.data.tx.gasPrice);
@@ -153,6 +143,16 @@ class Broker {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
 
     this.ctx.data.gasSpent = this.ctx.data.gasSpent.add(this.ctx.data.receipt.gasUsed.mul(this.ctx.data.tx.gasPrice));
+  }
+
+  async escape(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.escaper;
+    opts.sERC20s ??= [this.ctx.data.sERC20.contract.address, this.ctx.sERC20.contract.address];
+    opts.beneficiaries ??= [this.ctx.signers.broker.beneficiaries[0].address, this.ctx.signers.broker.beneficiaries[1].address];
+    opts.datas ??= [ethers.constants.HashZero, ethers.constants.HashZero];
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).escape(opts.sERC20s, opts.beneficiaries, opts.datas);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }
 

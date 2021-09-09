@@ -1,7 +1,14 @@
 const { expect } = require("chai");
 const { initialize, setup } = require("../helpers");
 const { advanceTime } = require("../helpers/time");
-const { itRegistersLikeExpected, itBuysOutLikeExpected, itCreatesProposalLikeExpected } = require("./broker.behavior");
+const {
+  itRegistersLikeExpected,
+  itBuysOutLikeExpected,
+  itCreatesProposalLikeExpected,
+  itRejectsProposalLikeExpected,
+  itWithdrawsProposalLikeExpected,
+  itEnablesFlashBuyoutLikeExpected,
+} = require("./broker.behavior");
 
 describe("Broker", () => {
   before(async () => {
@@ -104,12 +111,10 @@ describe("Broker", () => {
           before(async () => {
             await setup.broker(this);
             await this.broker.register();
-
             await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
             await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
             this.data.previousTotalSupply = await this.sERC20.totalSupply();
-
             await this.broker.buyout();
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
@@ -122,11 +127,9 @@ describe("Broker", () => {
           before(async () => {
             await setup.broker(this);
             await this.broker.register();
-
             await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
             this.data.previousTotalSupply = await this.sERC20.totalSupply();
-
             await this.broker.buyout({ value: 0 });
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
@@ -139,11 +142,9 @@ describe("Broker", () => {
           before(async () => {
             await setup.broker(this);
             await this.broker.register();
-
             await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
             this.data.previousTotalSupply = await this.sERC20.totalSupply();
-
             await this.broker.buyout();
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.lastTotalSupply = await this.sERC20.totalSupply();
@@ -156,7 +157,6 @@ describe("Broker", () => {
           before(async () => {
             await setup.broker(this);
             await this.broker.register();
-
             await advanceTime(this.params.broker.timelock);
           });
 
@@ -170,7 +170,6 @@ describe("Broker", () => {
         before(async () => {
           await setup.broker(this);
           await this.broker.register({ flash: false });
-
           await advanceTime(this.params.broker.timelock);
         });
 
@@ -199,11 +198,9 @@ describe("Broker", () => {
           before(async () => {
             await setup.broker(this);
             await this.broker.register({ flash: false });
-
             await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
             await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
-
             await this.broker.createProposal();
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.proposal = await this.broker.proposalFor(this.sERC20.address, this.data.proposalId);
@@ -219,10 +216,8 @@ describe("Broker", () => {
           before(async () => {
             await setup.broker(this);
             await this.broker.register({ flash: false });
-
             await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
-
             await this.broker.createProposal({ value: 0 });
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.proposal = await this.broker.proposalFor(this.sERC20.address, this.data.proposalId);
@@ -238,10 +233,8 @@ describe("Broker", () => {
           before(async () => {
             await setup.broker(this);
             await this.broker.register({ flash: false });
-
             await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
             await advanceTime(this.params.broker.timelock);
-
             await this.broker.createProposal();
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
             this.data.proposal = await this.broker.proposalFor(this.sERC20.address, this.data.proposalId);
@@ -258,7 +251,6 @@ describe("Broker", () => {
         before(async () => {
           await setup.broker(this);
           await this.broker.register();
-
           await advanceTime(this.params.broker.timelock);
         });
 
@@ -288,11 +280,9 @@ describe("Broker", () => {
             before(async () => {
               await setup.broker(this);
               await this.broker.register({ flash: false });
-
               await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
               await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
               await advanceTime(this.params.broker.timelock);
-
               await this.broker.createProposal();
               await this.broker.acceptProposal();
               this.data.sale = await this.broker.saleOf(this.sERC20.address);
@@ -338,7 +328,6 @@ describe("Broker", () => {
             before(async () => {
               await setup.broker(this);
               await this.broker.register({ flash: false });
-
               await advanceTime(this.params.broker.timelock);
               await this.broker.createProposal();
               await this.broker.enableFlashBuyout();
@@ -354,7 +343,6 @@ describe("Broker", () => {
           before(async () => {
             await setup.broker(this);
             await this.broker.register({ flash: false });
-
             await advanceTime(this.params.broker.timelock);
             await this.broker.createProposal();
             await advanceTime(this.params.broker.lifespan.add(ethers.BigNumber.from("1")));
@@ -370,11 +358,9 @@ describe("Broker", () => {
         before(async () => {
           await setup.broker(this);
           await this.broker.register({ flash: false });
-
           await advanceTime(this.params.broker.timelock);
           await this.broker.createProposal();
           this.data.firstProposalId = this.data.proposalId;
-
           await this.broker.createProposal();
           await this.broker.acceptProposal({ proposalId: this.data.firstProposalId });
         });
@@ -389,7 +375,6 @@ describe("Broker", () => {
       before(async () => {
         await setup.broker(this);
         await this.broker.register({ flash: false });
-
         await advanceTime(this.params.broker.timelock);
         await this.broker.createProposal();
       });
@@ -400,8 +385,7 @@ describe("Broker", () => {
     });
   });
 
-  // todo
-  describe.only("# rejectProposal", () => {
+  describe("# rejectProposal", () => {
     describe("» caller is sale's guardian", () => {
       describe("» and proposal is pending", () => {
         before(async () => {
@@ -416,22 +400,7 @@ describe("Broker", () => {
           this.data.proposal = await this.broker.proposalFor(this.sERC20.address, this.data.proposalId);
         });
 
-        it("it updates proposal state", async () => {
-          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Rejected);
-        });
-
-        it("it refunds locked tokens", async () => {
-          expect(await this.sERC20.balanceOf(this.contracts.broker)).to.equal(0);
-          expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(this.params.broker.balance);
-        });
-
-        it("it refunds locked ETH", async () => {
-          expect(await this.signers.broker.buyer.getBalance()).to.equal(this.data.previousBuyerETHBalance.add(this.params.broker.value));
-        });
-
-        it("it emits a RejectProposal event", async () => {
-          await expect(this.data.tx).to.emit(this.broker.contract, "RejectProposal").withArgs(this.sERC20.address, this.data.proposalId);
-        });
+        itRejectsProposalLikeExpected(this);
       });
 
       describe("» and proposal is lapsed", () => {
@@ -448,22 +417,7 @@ describe("Broker", () => {
           this.data.proposal = await this.broker.proposalFor(this.sERC20.address, this.data.proposalId);
         });
 
-        it("it updates proposal state", async () => {
-          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Rejected);
-        });
-
-        it("it refunds locked tokens", async () => {
-          expect(await this.sERC20.balanceOf(this.contracts.broker)).to.equal(0);
-          expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(this.params.broker.balance);
-        });
-
-        it("it refunds locked ETH", async () => {
-          expect(await this.signers.broker.buyer.getBalance()).to.equal(this.data.previousBuyerETHBalance.add(this.params.broker.value));
-        });
-
-        it("it emits a RejectProposal event", async () => {
-          await expect(this.data.tx).to.emit(this.broker.contract, "RejectProposal").withArgs(this.sERC20.address, this.data.proposalId);
-        });
+        itRejectsProposalLikeExpected(this);
       });
 
       describe("» but proposal is neither pending nor lapsed", () => {
@@ -510,23 +464,7 @@ describe("Broker", () => {
           this.data.proposal = await this.broker.proposalFor(this.sERC20.address, 0);
         });
 
-        it("it updates proposal's state", async () => {
-          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Withdrawn);
-        });
-
-        it("it refunds sERC20s", async () => {
-          expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(this.params.broker.balance);
-        });
-
-        it("it refunds ETH", async () => {
-          expect(this.data.lastBuyerETHBalance.sub(this.data.previousBuyerETHBalance).add(this.data.receipt.gasUsed.mul(this.data.tx.gasPrice))).to.equal(
-            this.params.broker.value
-          );
-        });
-
-        it("it emits a WithdrawProposal event", async () => {
-          await expect(this.data.tx).to.emit(this.broker.contract, "WithdrawProposal").withArgs(this.sERC20.address, this.data.proposalId);
-        });
+        itWithdrawsProposalLikeExpected(this);
       });
 
       describe("» proposal is lapsed", () => {
@@ -543,23 +481,7 @@ describe("Broker", () => {
           this.data.proposal = await this.broker.proposalFor(this.sERC20.address, 0);
         });
 
-        it("it updates proposal's state", async () => {
-          expect(this.data.proposal.state).to.equal(this.constants.broker.proposals.state.Withdrawn);
-        });
-
-        it("it refunds sERC20s", async () => {
-          expect(await this.sERC20.balanceOf(this.signers.broker.buyer)).to.equal(this.params.broker.balance);
-        });
-
-        it("it refunds ETH", async () => {
-          expect(this.data.lastBuyerETHBalance.sub(this.data.previousBuyerETHBalance).add(this.data.receipt.gasUsed.mul(this.data.tx.gasPrice))).to.equal(
-            this.params.broker.value
-          );
-        });
-
-        it("it emits a WithdrawProposal event", async () => {
-          await expect(this.data.tx).to.emit(this.broker.contract, "WithdrawProposal").withArgs(this.sERC20.address, this.data.proposalId);
-        });
+        itWithdrawsProposalLikeExpected(this);
       });
 
       describe("» but proposal is neither pending not lapsed", () => {
@@ -602,7 +524,6 @@ describe("Broker", () => {
           await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
           await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
           await this.sERC20.mint({ to: this.signers.others[1], amount: this.params.broker.balance });
-
           await advanceTime(this.params.broker.timelock);
           await this.broker.buyout();
           this.data.previousClaimerETHBalance = await this.signers.others[0].getBalance();
@@ -613,7 +534,7 @@ describe("Broker", () => {
         });
 
         it("it burns claimer tokens", async () => {
-          expect(await this.sERC20.balanceOf(this.signers.others[0])).to.equal(0);
+          expect(await this.sERC20.balanceOf(this.signers.others[0].address)).to.equal(0);
         });
 
         it("it pays claimer", async () => {
@@ -638,7 +559,6 @@ describe("Broker", () => {
           await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
           await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
           await this.sERC20.mint({ to: this.signers.others[1], amount: this.params.broker.balance });
-
           await advanceTime(this.params.broker.timelock);
           await this.broker.buyout();
           await this.broker.claim();
@@ -657,7 +577,6 @@ describe("Broker", () => {
         await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
         await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
         await this.sERC20.mint({ to: this.signers.others[1], amount: this.params.broker.balance });
-
         await advanceTime(this.params.broker.timelock);
       });
 
@@ -678,13 +597,7 @@ describe("Broker", () => {
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
           });
 
-          it("it enables flash buyout", async () => {
-            expect(this.data.sale.flash).to.equal(true);
-          });
-
-          it("it emits a EnableFlashBuyout event", async () => {
-            await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout").withArgs(this.sERC20.address);
-          });
+          itEnablesFlashBuyoutLikeExpected(this);
         });
 
         describe("» and sale is opened", () => {
@@ -696,13 +609,7 @@ describe("Broker", () => {
             this.data.sale = await this.broker.saleOf(this.sERC20.address);
           });
 
-          it("it enables flash buyout", async () => {
-            expect(this.data.sale.flash).to.equal(true);
-          });
-
-          it("it emits a EnableFlashBuyout event", async () => {
-            await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout").withArgs(this.sERC20.address);
-          });
+          itEnablesFlashBuyoutLikeExpected(this);
         });
 
         describe("» but sale is neither pending nor opened", () => {
@@ -755,7 +662,7 @@ describe("Broker", () => {
           this.data.tokenId0 = this.data.tokenId;
           this.data.sERC20 = this.sERC20;
           await this.sERC721.mint();
-          await this.sERC1155.spectralize({ guardian: this.broker.contract });
+          await this.vault.fractionalize({ broker: this.broker.contract });
           await this.broker.register();
           this.data.tokenId1 = this.data.tokenId;
           await this.broker.escape();
@@ -766,10 +673,10 @@ describe("Broker", () => {
           expect(await this.sERC721.ownerOf(this.data.tokenId1)).to.equal(this.signers.broker.beneficiaries[1].address);
         });
 
-        it("it emits a Escape events", async () => {
+        it("it emits an Escape event", async () => {
           await expect(this.data.tx)
             .to.emit(this.broker.contract, "Escape")
-            .withArgs(this.data.sERC20.contract.address, this.signers.broker.beneficiaries[0].address, ethers.constants.HashZero);
+            .withArgs(this.data.sERC20.address, this.signers.broker.beneficiaries[0].address, ethers.constants.HashZero);
 
           await expect(this.data.tx)
             .to.emit(this.broker.contract, "Escape")
@@ -783,7 +690,7 @@ describe("Broker", () => {
           await this.broker.register();
           this.data.sERC20 = this.sERC20;
           await this.sERC721.mint();
-          await this.sERC1155.spectralize({ guardian: this.broker.contract });
+          await this.vault.fractionalize({ broker: this.broker.contract });
           await this.broker.register();
         });
 
@@ -803,7 +710,7 @@ describe("Broker", () => {
         await this.broker.register();
         this.data.sERC20 = this.sERC20;
         await this.sERC721.mint();
-        await this.sERC1155.spectralize({ guardian: this.broker.contract });
+        await this.vault.fractionalize({ broker: this.broker.contract });
         await this.broker.register();
       });
 
@@ -843,8 +750,8 @@ describe("Broker", () => {
           (await this.sERC20.totalSupply()) // supply
             .mul(await this.broker.twapOf(this.sERC20.address)) // price
             .mul(this.params.broker.multiplier)
-            .div(ethers.utils.parseEther("1")) // DECIMALS for TWAP
-            .div(ethers.utils.parseEther("1")) // DECIMALS for multiplier
+            .div(this.constants.broker.DECIMALS) // DECIMALS for TWAP
+            .div(this.constants.broker.DECIMALS) // DECIMALS for multiplier
             .div(ethers.BigNumber.from("2")) // buyer holds half the supply
         );
         expect(this.data.price.collateral).to.equal(this.params.broker.balance);

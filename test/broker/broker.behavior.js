@@ -78,8 +78,60 @@ const itCreatesProposalLikeExpected = (ctx, opts = {}) => {
   });
 };
 
+const itRejectsProposalLikeExpected = (ctx, opts = {}) => {
+  it("it updates proposal state", async () => {
+    expect(ctx.data.proposal.state).to.equal(ctx.constants.broker.proposals.state.Rejected);
+  });
+
+  it("it refunds locked collateral", async () => {
+    expect(await ctx.sERC20.balanceOf(ctx.contracts.broker.address)).to.equal(0);
+    expect(await ctx.sERC20.balanceOf(ctx.signers.broker.buyer.address)).to.equal(ctx.params.broker.balance);
+  });
+
+  it("it refunds locked ETH", async () => {
+    expect(await ctx.signers.broker.buyer.getBalance()).to.equal(ctx.data.previousBuyerETHBalance.add(ctx.params.broker.value));
+  });
+
+  it("it emits a RejectProposal event", async () => {
+    await expect(ctx.data.tx).to.emit(ctx.broker.contract, "RejectProposal").withArgs(ctx.sERC20.address, ctx.data.proposalId);
+  });
+};
+
+const itWithdrawsProposalLikeExpected = (ctx, opts = {}) => {
+  it("it updates proposal's state", async () => {
+    expect(ctx.data.proposal.state).to.equal(ctx.constants.broker.proposals.state.Withdrawn);
+  });
+
+  it("it refunds locked collateral", async () => {
+    expect(await ctx.sERC20.balanceOf(ctx.signers.broker.buyer.address)).to.equal(ctx.params.broker.balance);
+  });
+
+  it("it refunds locked ETH", async () => {
+    expect(ctx.data.lastBuyerETHBalance.sub(ctx.data.previousBuyerETHBalance).add(ctx.data.receipt.gasUsed.mul(ctx.data.tx.gasPrice))).to.equal(
+      ctx.params.broker.value
+    );
+  });
+
+  it("it emits a WithdrawProposal event", async () => {
+    await expect(ctx.data.tx).to.emit(ctx.broker.contract, "WithdrawProposal").withArgs(ctx.sERC20.address, ctx.data.proposalId);
+  });
+};
+
+const itEnablesFlashBuyoutLikeExpected = (ctx, opts = {}) => {
+  it("it enables flash buyout", async () => {
+    expect(ctx.data.sale.flash).to.equal(true);
+  });
+
+  it("it emits a EnableFlashBuyout event", async () => {
+    await expect(ctx.data.tx).to.emit(ctx.broker.contract, "EnableFlashBuyout").withArgs(ctx.sERC20.address);
+  });
+};
+
 module.exports = {
   itRegistersLikeExpected,
   itBuysOutLikeExpected,
   itCreatesProposalLikeExpected,
+  itRejectsProposalLikeExpected,
+  itWithdrawsProposalLikeExpected,
+  itEnablesFlashBuyoutLikeExpected,
 };
