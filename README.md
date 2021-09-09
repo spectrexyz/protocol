@@ -21,7 +21,7 @@
 
 ## Introduction
 
-For a deeper documentation of spectre ⇌ protocol see here.
+For a deeper documentation of spectre ⇌ protocol see [here](https://spectre.xyz/litepaper).
 
 ## Usage
 
