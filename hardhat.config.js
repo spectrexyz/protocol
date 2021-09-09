@@ -31,6 +31,9 @@ module.exports = {
         count: 50,
       },
     },
+    frame: {
+      url: "http://localhost:1248",
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS ? true : false,
