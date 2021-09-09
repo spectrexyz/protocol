@@ -372,7 +372,7 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
         bytes calldata data
     ) external override {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to escape NFTs");
-        require(_tokenTypes[collection][tokenId] != 0, "Vault: NFT is locked");
+        require(_tokenTypes[collection][tokenId] == 0, "Vault: NFT is locked");
         require(collection.ownerOf(tokenId) == address(this), "Vault: NFT is not owned by this vault");
 
         collection.safeTransferFrom(address(this), recipient, tokenId, data);
