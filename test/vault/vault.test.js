@@ -1017,6 +1017,61 @@ describe("Vault", () => {
       });
     });
 
+    describe("# escape", () => {
+      describe("» caller has DEFAULT_ADMIN_ROLE", () => {
+        describe("» and NFT is not locked", () => {
+          describe("» and NFT is owned by the vault", () => {
+            before(async () => {
+              await setup.vault(this, { fractionalize: false });
+              await this.sERC721.transfer();
+              await this.vault.escape();
+            });
+
+            it("it transfers NFT", async () => {
+              expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.others[0].address);
+            });
+
+            it("it emits an Escape event", async () => {
+              await expect(this.data.tx)
+                .to.emit(this.vault.contract, "Escape")
+                .withArgs(this.sERC721.address, this.data.tokenId, this.signers.others[0].address);
+            });
+          });
+
+          describe("» but NFT is not owned by the vault", () => {
+            before(async () => {
+              await setup.vault(this, { fractionalize: false });
+            });
+
+            it("it reverts", async () => {
+              await expect(this.vault.escape()).to.be.revertedWith("Vault: NFT is not owned by this vault");
+            });
+          });
+        });
+
+        describe("» but NFT is locked", () => {
+          before(async () => {
+            await setup.vault(this);
+          });
+
+          it("it reverts", async () => {
+            await expect(this.vault.escape()).to.be.revertedWith("Vault: NFT is locked");
+          });
+        });
+      });
+
+      describe("» caller does not have DEFAULT_ADMIN_ROLE", () => {
+        before(async () => {
+          await setup.vault(this, { fractionalize: false });
+          await this.sERC721.transfer();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.vault.escape({ from: this.signers.others[0] })).to.be.revertedWith("Vault: must have DEFAULT_ADMIN_ROLE to escape NFTs");
+        });
+      });
+    });
+
     describe("# setUnavailableURI", () => {
       describe("» caller has DEFAULT_ADMIN_ROLE", () => {
         before(async () => {
@@ -1189,6 +1244,20 @@ describe("Vault", () => {
             this.vault.contract.connect(this.signers.others[0]).onERC20Transferred(ethers.constants.AddressZero, ethers.constants.AddressZero, 0)
           ).to.be.revertedWith("Vault: must be sERC20 to use transfer hook");
         });
+      });
+    });
+
+    describe("# spectreOf", () => {
+      before(async () => {
+        await setup.vault(this);
+        this.data.spectre = await this.vault.contract["spectreOf(address)"](this.sERC20.address);
+      });
+
+      it("it returns the queried spectre", async () => {
+        expect(this.data.spectre.state).to.equal(this.constants.vault.spectres.state.Locked);
+        expect(this.data.spectre.collection).to.equal(this.sERC721.address);
+        expect(this.data.spectre.tokenId).to.equal(this.data.tokenId);
+        expect(this.data.spectre.broker).to.equal(this.signers.vault.broker.address);
       });
     });
   });

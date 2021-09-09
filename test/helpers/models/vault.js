@@ -1,3 +1,4 @@
+const { ethers } = require("ethers");
 const _Vault_ = require("../../../artifacts/contracts/vault/Vault.sol/Vault.json");
 const sERC20 = require("./sERC20");
 
@@ -122,6 +123,17 @@ class Vault {
         ["unlock(uint256,address,bytes)"](this.ctx.data.id, this.ctx.signers.sERC721.owners[1].address, ethers.constants.HashZero);
     }
 
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async escape(opts = {}) {
+    opts.from ??= this.ctx.signers.vault.admin;
+    opts.collection = this.ctx.sERC721;
+    opts.tokenId ??= this.ctx.data.tokenId;
+    opts.recipient ??= this.ctx.signers.others[0];
+    opts.data ??= ethers.constants.HashZero;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).escape(opts.collection.address, opts.tokenId, opts.recipient.address, opts.data);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
