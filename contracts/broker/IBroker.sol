@@ -13,7 +13,7 @@ interface IBroker {
     event RejectProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event WithdrawProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event Claim(sIERC20 indexed sERC20, address indexed holder, uint256 value, uint256 collateral);
-    event Buyout(sIERC20 indexed sERC20, address indexed buyer, uint256 value, uint256 collateral);
+    event Buyout(sIERC20 indexed sERC20, address indexed buyer, uint256 value, uint256 collateral, uint256 fee);
     event EnableFlashBuyout(sIERC20 indexed sERC20);
     event Escape(sIERC20 indexed sERC20, address indexed beneficiary, bytes data);
 
@@ -49,6 +49,10 @@ interface IBroker {
     function vault() external view returns (IVault);
 
     function issuer() external view returns (IIssuer);
+
+    function bank() external view returns (address);
+
+    function protocolFee() external view returns (uint256);
 
     function priceOfFor(sIERC20 sERC20, address buyer) external view returns (uint256 value, uint256 collateral);
 

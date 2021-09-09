@@ -24,18 +24,25 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     uint256 public constant MINIMUM_TIMELOCK = 1 weeks;
     uint256 public constant DECIMALS = 1e18; // !IMPORTANT: is the same as Issuer.DECIMALS
+    uint256 public constant HUNDRED = 1e20;
     bytes32 private constant _MINT_ROLE = keccak256("MINT_ROLE");
 
     IVault private immutable _vault;
     IIssuer private immutable _issuer;
+    address private _bank;
+    uint256 private _protocolFee;
     mapping(sIERC20 => Sales.Sale) private _sales;
 
-    constructor(IVault vault_, IIssuer issuer_) {
+    constructor(IVault vault_, IIssuer issuer_, address bank_, uint256 protocolFee_) {
         require(address(vault_) != address(0), "Broker: vault cannot be the zero address");
         require(address(issuer_) != address(0), "Broker: issuer cannot be the zero address");
+        require(address(bank_) != address(0), "Broker: bank cannot be the zero address");
+        require(protocolFee_ < HUNDRED, "Broker: protocol fee must be inferior to 100%");
 
         _vault = vault_;
         _issuer = issuer_;
+        _bank = bank_;
+        _protocolFee = protocolFee_;
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
@@ -266,6 +273,19 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
+     * @notice Return the broker's bank.
+     */
+    function bank() public view override returns (address) {
+        return _bank;
+    }
+    /**
+     * @notice Return the broker's protocol fee.
+     */
+    function protocolFee() public view override returns (uint256) {
+        return _protocolFee;
+    }
+
+    /**
      * @notice Return what it costs for `buyer` to buyout the NFT pegged to `sERC20`.
      */
     function priceOfFor(sIERC20 sERC20, address buyer) public view override returns (uint256 value, uint256 collateral) {
@@ -334,8 +354,11 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         uint256 collateral,
         bool locked
     ) private {
+        uint256 fee = value * _protocolFee / HUNDRED;
+
         sale._state = Sales.State.Closed;
-        sale.stock = value;
+        sale.stock = value - fee;
+
         _issuer.close(sERC20);
 
         if (collateral > 0) {
@@ -344,8 +367,9 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         }
 
         _vault.unlock(sERC20, buyer, "");
+        if (fee > 0) payable(_bank).sendValue(fee);
 
-        emit Buyout(sERC20, buyer, value, collateral);
+        emit Buyout(sERC20, buyer, value, collateral, fee);
     }
 
     function _enableFlashBuyout(sIERC20 sERC20, Sales.Sale storage sale) private {
