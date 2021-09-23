@@ -17,12 +17,14 @@
     "test:vault": "npx hardhat test test/vault/*",
     "test": "npx hardhat test",
     "test:gas": "REPORT_GAS=true npx hardhat test",
-    "test:coverage": "npx hardhat coverage"
+    "test:coverage": "npx hardhat coverage",
+    "deploy": "npx hardhat run --network frame scripts/deploy.js"
   },
   "dependencies": {
-    "@balancer-labs/v2-pool-weighted": "^1.0.0",
-    "@balancer-labs/v2-solidity-utils": "^1.0.0",
-    "@balancer-labs/v2-vault": "^1.0.0",
+    "@balancer-labs/v2-pool-utils": "^2.0.1",
+    "@balancer-labs/v2-pool-weighted": "^2.0.1",
+    "@balancer-labs/v2-solidity-utils": "^2.0.0",
+    "@balancer-labs/v2-vault": "^2.0.0",
     "@openzeppelin/contracts": "^4.0.0",
     "@openzeppelin/contracts-0.7": "npm:@openzeppelin/contracts@^3.4.0",
     "@openzeppelin/contracts-upgradeable": "^4.0.0",
