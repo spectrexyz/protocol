@@ -2,6 +2,7 @@ const { expect } = require("chai");
 
 const itRegistersLikeExpected = (ctx, opts = {}) => {
   opts.flash ??= true;
+  opts.escape ??= true;
 
   it("it registers sale", async () => {
     expect(ctx.data.sale.state).to.equal(ctx.constants.broker.sales.state.Pending);
@@ -12,6 +13,7 @@ const itRegistersLikeExpected = (ctx, opts = {}) => {
     expect(ctx.data.sale.stock).to.equal(0);
     expect(ctx.data.sale.nbOfProposals).to.equal(0);
     expect(ctx.data.sale.flash).to.equal(opts.flash);
+    expect(ctx.data.sale.escape).to.equal(opts.escape);
   });
 
   it("it emits a Register event", async () => {
@@ -136,6 +138,26 @@ const itEnablesFlashBuyoutLikeExpected = (ctx, opts = {}) => {
   });
 };
 
+const itEnablesEscapeLikeExpected = (ctx, opts = {}) => {
+  it("it enables escape", async () => {
+    expect(ctx.data.sale.escape).to.equal(true);
+  });
+
+  it("it emits a EnableEscape event", async () => {
+    await expect(ctx.data.tx).to.emit(ctx.broker.contract, "EnableEscape").withArgs(ctx.sERC20.address);
+  });
+};
+
+const itDisablesEscapeLikeExpected = (ctx, opts = {}) => {
+  it("it disables escape", async () => {
+    expect(ctx.data.sale.escape).to.equal(false);
+  });
+
+  it("it emits a DisableEscape event", async () => {
+    await expect(ctx.data.tx).to.emit(ctx.broker.contract, "DisableEscape").withArgs(ctx.sERC20.address);
+  });
+};
+
 module.exports = {
   itRegistersLikeExpected,
   itBuysOutLikeExpected,
@@ -143,4 +165,6 @@ module.exports = {
   itRejectsProposalLikeExpected,
   itWithdrawsProposalLikeExpected,
   itEnablesFlashBuyoutLikeExpected,
+  itEnablesEscapeLikeExpected,
+  itDisablesEscapeLikeExpected,
 };

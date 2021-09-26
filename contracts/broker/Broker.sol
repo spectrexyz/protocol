@@ -33,7 +33,12 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     uint256 private _protocolFee;
     mapping(sIERC20 => Sales.Sale) private _sales;
 
-    constructor(IVault vault_, IIssuer issuer_, address bank_, uint256 protocolFee_) {
+    constructor(
+        IVault vault_,
+        IIssuer issuer_,
+        address bank_,
+        uint256 protocolFee_
+    ) {
         require(address(vault_) != address(0), "Broker: vault cannot be the zero address");
         require(address(issuer_) != address(0), "Broker: issuer cannot be the zero address");
         require(address(bank_) != address(0), "Broker: bank cannot be the zero address");
@@ -57,6 +62,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
      * @param multiplier The sale's buyout multiplier [expressed with 1e18 decimals].
      * @param timelock The period of time after which the sale opens [in seconds].
      * @param flash True if flash buyout is enabled, false otherwise.
+     * @param escape True if spectre's multisig is allowed to escape sERC20's pegged NFT, false otherwise.
      */
     function register(
         sIERC20 sERC20,
@@ -64,13 +70,14 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         uint256 reserve,
         uint256 multiplier,
         uint256 timelock,
-        bool flash
+        bool flash,
+        bool escape
     ) external override {
         Sales.Sale storage sale = _sales[sERC20];
 
         require(hasRole(REGISTER_ROLE, _msgSender()), "Broker: must have REGISTER_ROLE to register");
+        require(guardian != address(0), "Broker: guardian cannot be the zero address");
         require(timelock >= MINIMUM_TIMELOCK, "Broker: invalid timelock");
-        require(flash || guardian != address(0), "Broker: guardian cannot be the zero address if flash buyout is disabled");
 
         sale._state = Sales.State.Pending;
         sale.guardian = guardian;
@@ -81,6 +88,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         emit Register(sERC20, guardian, reserve, multiplier, block.timestamp + timelock);
 
         if (flash) _enableFlashBuyout(sERC20, sale);
+        if (escape) _enableEscape(sERC20, sale);
     }
 
     /**
@@ -237,13 +245,43 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
+     * @notice Enable escape for the NFT pegged to `sERC20`.
+     * @param sERC20 The sERC20 whose pegged NFT is to be made escapable.
+     */
+    function enableEscape(sIERC20 sERC20) external override {
+        Sales.Sale storage sale = _sales[sERC20];
+        Sales.State state = sale.state();
+
+        require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to enable escape");
+        require(state == Sales.State.Pending || state == Sales.State.Opened, "Broker: invalid sale state");
+        require(!sale.escape, "Broker: escape already enabled");
+
+        _enableEscape(sERC20, sale);
+    }
+
+    /**
+     * @notice Disable escape for the NFT pegged to `sERC20`.
+     * @param sERC20 The sERC20 whose pegged NFT is to be made un-escapable.
+     */
+    function disableEscape(sIERC20 sERC20) external override {
+        Sales.Sale storage sale = _sales[sERC20];
+        Sales.State state = sale.state();
+
+        require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to disable escape");
+        require(state == Sales.State.Pending || state == Sales.State.Opened, "Broker: invalid sale state");
+        require(sale.escape, "Broker: escape already disabled");
+
+        _disableEscape(sERC20, sale);
+    }
+
+    /**
      * @notice Transfer all the NFTs pegged to `sERC20s `to `beneficiaries` with `datas` as ERC721#safeTransferFrom callback datas.
      * @dev This function is only meant to be used in case of an emergency or upgrade to transfer NFTs to a safer or up-to-date place.
      * @param sERC20s The sERC20s whose pegged NFTs are transferred.
      * @param beneficiaries The addresses escaped NFTs are transferred to.
      * @param datas The ERC721#transfer callback datas.
      */
-    function escape(
+    function _escape_(
         sIERC20[] calldata sERC20s,
         address[] calldata beneficiaries,
         bytes[] calldata datas
@@ -252,6 +290,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         require(sERC20s.length == beneficiaries.length && sERC20s.length == datas.length, "Broker: parameters lengths mismatch");
 
         for (uint256 i = 0; i < sERC20s.length; i++) {
+            require(_sales[sERC20s[i]].escape, "Broker: escape is disabled");
+
             _vault.unlock(sERC20s[i], beneficiaries[i], datas[i]);
 
             emit Escape(sERC20s[i], beneficiaries[i], datas[i]);
@@ -278,6 +318,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     function bank() public view override returns (address) {
         return _bank;
     }
+
     /**
      * @notice Return the broker's protocol fee.
      */
@@ -331,7 +372,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
             uint256 opening,
             uint256 stock,
             uint256 nbOfProposals,
-            bool flash
+            bool flash,
+            bool escape
         )
     {
         Sales.Sale storage sale = _sales[sERC20];
@@ -344,6 +386,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         stock = sale.stock;
         nbOfProposals = sale.nbOfProposals;
         flash = sale.flash;
+        escape = sale.escape;
     }
 
     function _buyout(
@@ -354,7 +397,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         uint256 collateral,
         bool locked
     ) private {
-        uint256 fee = value * _protocolFee / HUNDRED;
+        uint256 fee = (value * _protocolFee) / HUNDRED;
 
         sale._state = Sales.State.Closed;
         sale.stock = value - fee;
@@ -376,6 +419,18 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         sale.flash = true;
 
         emit EnableFlashBuyout(sERC20);
+    }
+
+    function _enableEscape(sIERC20 sERC20, Sales.Sale storage sale) private {
+        sale.escape = true;
+
+        emit EnableEscape(sERC20);
+    }
+
+    function _disableEscape(sIERC20 sERC20, Sales.Sale storage sale) private {
+        sale.escape = false;
+
+        emit DisableEscape(sERC20);
     }
 
     function _priceOfFor(

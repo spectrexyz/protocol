@@ -52,6 +52,7 @@ class Broker {
     opts.multiplier ??= this.ctx.params.broker.multiplier;
     opts.timelock ??= this.ctx.params.broker.timelock;
     opts.flash ??= true;
+    opts.escape ??= true;
     opts.from ??= this.ctx.signers.broker.registrar;
 
     // grant broker DEFAULT_ADMIN_ROLE over sERC20
@@ -68,7 +69,7 @@ class Broker {
 
     this.ctx.data.tx = await this.contract
       .connect(opts.from)
-      .register(opts.sERC20.address, opts.guardian.address, opts.reserve, opts.multiplier, opts.timelock, opts.flash);
+      .register(opts.sERC20.address, opts.guardian.address, opts.reserve, opts.multiplier, opts.timelock, opts.flash, opts.escape);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -140,6 +141,22 @@ class Broker {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
+  async enableEscape(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.guardian;
+    opts.sERC20 ??= this.ctx.sERC20.contract;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).enableEscape(opts.sERC20.address);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async disableEscape(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.guardian;
+    opts.sERC20 ??= this.ctx.sERC20.contract;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).disableEscape(opts.sERC20.address);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
   async claim(opts = {}) {
     opts.from ??= this.ctx.signers.others[0];
     opts.sERC20 ??= this.ctx.sERC20.contract.address;
@@ -164,7 +181,7 @@ class Broker {
     opts.beneficiaries ??= [this.ctx.signers.broker.beneficiaries[0].address, this.ctx.signers.broker.beneficiaries[1].address];
     opts.datas ??= [ethers.constants.HashZero, ethers.constants.HashZero];
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).escape(opts.sERC20s, opts.beneficiaries, opts.datas);
+    this.ctx.data.tx = await this.contract.connect(opts.from)._escape_(opts.sERC20s, opts.beneficiaries, opts.datas);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }

@@ -8,6 +8,8 @@ const {
   itRejectsProposalLikeExpected,
   itWithdrawsProposalLikeExpected,
   itEnablesFlashBuyoutLikeExpected,
+  itEnablesEscapeLikeExpected,
+  itDisablesEscapeLikeExpected,
 } = require("./broker.behavior");
 const { Broker } = require("../helpers/models");
 
@@ -89,26 +91,53 @@ describe("Broker", () => {
 
   describe("# register", () => {
     describe("» caller has REGISTER_ROLE", () => {
-      describe("» and timelock period is valid", () => {
-        describe("» and flash buyout is enabled", () => {
-          before(async () => {
-            await setup.broker(this);
-            await this.broker.register();
-            this.data.sale = await this.broker.saleOf(this.sERC20.address);
-            this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
-              this.params.broker.timelock
-            );
+      describe("» and guardian is not the zero address", () => {
+        describe("» and timelock period is valid", () => {
+          describe("» and flash buyout is enabled", () => {
+            describe("» and escape is enabled", () => {
+              before(async () => {
+                await setup.broker(this);
+                await this.broker.register();
+                this.data.sale = await this.broker.saleOf(this.sERC20.address);
+                this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+                  this.params.broker.timelock
+                );
+              });
+
+              itRegistersLikeExpected(this);
+
+              it("it emits a EnableFlashBuyout event", async () => {
+                await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
+              });
+
+              it("it emits a EnableEscape event", async () => {
+                await expect(this.data.tx).to.emit(this.broker.contract, "EnableEscape");
+              });
+            });
+
+            describe("» but escape is disabled", () => {
+              before(async () => {
+                await setup.broker(this);
+                await this.broker.register({ escape: false });
+                this.data.sale = await this.broker.saleOf(this.sERC20.address);
+                this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+                  this.params.broker.timelock
+                );
+              });
+
+              itRegistersLikeExpected(this, { escape: false });
+
+              it("it emits a EnableFlashBuyout event", async () => {
+                await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
+              });
+
+              it("it does not emit a EnableEscape event", async () => {
+                await expect(this.data.tx).to.not.emit(this.broker.contract, "EnableEscape");
+              });
+            });
           });
 
-          itRegistersLikeExpected(this);
-
-          it("it emits a EnableFlashBuyout event", async () => {
-            await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
-          });
-        });
-
-        describe("» but flash buyout is disabled", () => {
-          describe("» and guardian is not the zero address", () => {
+          describe("» but flash buyout is disabled", () => {
             before(async () => {
               await setup.broker(this);
               await this.broker.register({ flash: false });
@@ -123,29 +152,33 @@ describe("Broker", () => {
             it("it does not emit a EnableFlashBuyout event", async () => {
               await expect(this.data.tx).to.not.emit(this.broker.contract, "EnableFlashBuyout");
             });
+
+            it("it emits a EnableEscape event", async () => {
+              await expect(this.data.tx).to.emit(this.broker.contract, "EnableEscape");
+            });
+          });
+        });
+
+        describe("» but timelock period is invalid", () => {
+          before(async () => {
+            await setup.broker(this);
           });
 
-          describe("» but guardian is the zero address", () => {
-            before(async () => {
-              await setup.broker(this);
-            });
-
-            it("it reverts", async () => {
-              await expect(this.broker.register({ flash: false, guardian: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
-                "Broker: guardian cannot be the zero address if flash buyout is disabled"
-              );
-            });
+          it("it reverts", async () => {
+            await expect(this.broker.register({ timelock: "100" })).to.be.revertedWith("Broker: invalid timelock");
           });
         });
       });
 
-      describe("» but timelock period is invalid", () => {
+      describe("» but guardian is the zero address", () => {
         before(async () => {
           await setup.broker(this);
         });
 
         it("it reverts", async () => {
-          await expect(this.broker.register({ timelock: "100" })).to.be.revertedWith("Broker: invalid timelock");
+          await expect(this.broker.register({ guardian: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
+            "Broker: guardian cannot be the zero address"
+          );
         });
       });
     });
@@ -724,34 +757,181 @@ describe("Broker", () => {
     });
   });
 
-  describe("# escape", () => {
-    describe("» caller has ESCAPE_ROLE", () => {
-      describe("» and parameters lengths match", () => {
+  describe("# enableEscape", () => {
+    describe("» caller is sale's guardian", () => {
+      describe("» and escape is disabled", () => {
+        describe("» and sale is pending", () => {
+          before(async () => {
+            await setup.broker(this);
+            await this.broker.register({ escape: false });
+            await this.broker.enableEscape();
+            this.data.sale = await this.broker.saleOf(this.sERC20.address);
+          });
+
+          itEnablesEscapeLikeExpected(this);
+        });
+
+        describe("» and sale is opened", () => {
+          before(async () => {
+            await setup.broker(this);
+            await this.broker.register({ escape: false });
+            await advanceTime(this.params.broker.timelock);
+            await this.broker.enableEscape();
+            this.data.sale = await this.broker.saleOf(this.sERC20.address);
+          });
+
+          itEnablesEscapeLikeExpected(this);
+        });
+
+        describe("» but sale is neither pending nor opened", () => {
+          before(async () => {
+            await setup.broker(this);
+            await this.broker.register({ escape: false });
+            await advanceTime(this.params.broker.timelock);
+            await this.broker.buyout();
+          });
+
+          it("it reverts", async () => {
+            await expect(this.broker.enableEscape()).to.be.revertedWith("Broker: invalid sale state");
+          });
+        });
+      });
+
+      describe("» but escape is already enabled", () => {
         before(async () => {
           await setup.broker(this);
           await this.broker.register();
-          this.data.tokenId0 = this.data.tokenId;
-          this.data.sERC20 = this.sERC20;
-          await this.sERC721.mint();
-          await this.vault.fractionalize({ broker: this.broker.contract });
-          await this.broker.register();
-          this.data.tokenId1 = this.data.tokenId;
-          await this.broker.escape();
         });
 
-        it("it transfers NFTs", async () => {
-          expect(await this.sERC721.ownerOf(this.data.tokenId0)).to.equal(this.signers.broker.beneficiaries[0].address);
-          expect(await this.sERC721.ownerOf(this.data.tokenId1)).to.equal(this.signers.broker.beneficiaries[1].address);
+        it("it reverts", async () => {
+          await expect(this.broker.enableEscape()).to.be.revertedWith("Broker: escape already enabled");
+        });
+      });
+    });
+
+    describe("» but caller is not guardian", () => {
+      before(async () => {
+        await setup.broker(this);
+        await this.broker.register({ escape: false });
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.enableEscape({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must be sale's guardian to enable escape");
+      });
+    });
+  });
+
+  describe("# disableEscape", () => {
+    describe("» caller is sale's guardian", () => {
+      describe("» and escape is enabled", () => {
+        describe("» and sale is pending", () => {
+          before(async () => {
+            await setup.broker(this);
+            await this.broker.register();
+            await this.broker.disableEscape();
+            this.data.sale = await this.broker.saleOf(this.sERC20.address);
+          });
+
+          itDisablesEscapeLikeExpected(this);
         });
 
-        it("it emits an Escape event", async () => {
-          await expect(this.data.tx)
-            .to.emit(this.broker.contract, "Escape")
-            .withArgs(this.data.sERC20.address, this.signers.broker.beneficiaries[0].address, ethers.constants.HashZero);
+        describe("» and sale is opened", () => {
+          before(async () => {
+            await setup.broker(this);
+            await this.broker.register();
+            await advanceTime(this.params.broker.timelock);
+            await this.broker.disableEscape();
+            this.data.sale = await this.broker.saleOf(this.sERC20.address);
+          });
 
-          await expect(this.data.tx)
-            .to.emit(this.broker.contract, "Escape")
-            .withArgs(this.sERC20.address, this.signers.broker.beneficiaries[1].address, ethers.constants.HashZero);
+          itDisablesEscapeLikeExpected(this);
+        });
+
+        describe("» but sale is neither pending nor opened", () => {
+          before(async () => {
+            await setup.broker(this);
+            await this.broker.register();
+            await advanceTime(this.params.broker.timelock);
+            await this.broker.buyout();
+          });
+
+          it("it reverts", async () => {
+            await expect(this.broker.disableEscape()).to.be.revertedWith("Broker: invalid sale state");
+          });
+        });
+      });
+
+      describe("» but escape is already disabled", () => {
+        before(async () => {
+          await setup.broker(this);
+          await this.broker.register({ escape: false });
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.disableEscape()).to.be.revertedWith("Broker: escape already disabled");
+        });
+      });
+    });
+
+    describe("» but caller is not guardian", () => {
+      before(async () => {
+        await setup.broker(this);
+        await this.broker.register();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.disableEscape({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must be sale's guardian to disable escape");
+      });
+    });
+  });
+
+  describe("# escape", () => {
+    describe("» caller has ESCAPE_ROLE", () => {
+      describe("» and parameters lengths match", () => {
+        describe("» and all NFTs are escapable", () => {
+          before(async () => {
+            await setup.broker(this);
+            await this.broker.register();
+            this.data.tokenId0 = this.data.tokenId;
+            this.data.sERC20 = this.sERC20;
+            await this.sERC721.mint();
+            await this.vault.fractionalize({ broker: this.broker.contract });
+            await this.broker.register();
+            this.data.tokenId1 = this.data.tokenId;
+            await this.broker.escape();
+          });
+
+          it("it transfers NFTs", async () => {
+            expect(await this.sERC721.ownerOf(this.data.tokenId0)).to.equal(this.signers.broker.beneficiaries[0].address);
+            expect(await this.sERC721.ownerOf(this.data.tokenId1)).to.equal(this.signers.broker.beneficiaries[1].address);
+          });
+
+          it("it emits an Escape event", async () => {
+            await expect(this.data.tx)
+              .to.emit(this.broker.contract, "Escape")
+              .withArgs(this.data.sERC20.address, this.signers.broker.beneficiaries[0].address, ethers.constants.HashZero);
+
+            await expect(this.data.tx)
+              .to.emit(this.broker.contract, "Escape")
+              .withArgs(this.sERC20.address, this.signers.broker.beneficiaries[1].address, ethers.constants.HashZero);
+          });
+        });
+
+        describe("» but one NFT is not escapable", () => {
+          before(async () => {
+            await setup.broker(this);
+            await this.broker.register();
+            this.data.tokenId0 = this.data.tokenId;
+            this.data.sERC20 = this.sERC20;
+            await this.sERC721.mint();
+            await this.vault.fractionalize({ broker: this.broker.contract });
+            await this.broker.register({ escape: false });
+            this.data.tokenId1 = this.data.tokenId;
+          });
+
+          it("it reverts", async () => {
+            await expect(this.broker.escape()).to.be.revertedWith("Broker: escape is disabled");
+          });
         });
       });
 

@@ -21,6 +21,7 @@ library Sales {
         uint256 nbOfProposals;
         mapping(uint256 => Proposals.Proposal) proposals;
         bool flash;
+        bool escape;
     }
 
     function state(Sale storage sale) internal view returns (State) {

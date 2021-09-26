@@ -15,6 +15,8 @@ interface IBroker {
     event Claim(sIERC20 indexed sERC20, address indexed holder, uint256 value, uint256 collateral);
     event Buyout(sIERC20 indexed sERC20, address indexed buyer, uint256 value, uint256 collateral, uint256 fee);
     event EnableFlashBuyout(sIERC20 indexed sERC20);
+    event EnableEscape(sIERC20 indexed sERC20);
+    event DisableEscape(sIERC20 indexed sERC20);
     event Escape(sIERC20 indexed sERC20, address indexed beneficiary, bytes data);
 
     function register(
@@ -23,7 +25,8 @@ interface IBroker {
         uint256 minimum,
         uint256 multiplier,
         uint256 timelock,
-        bool flash
+        bool flash,
+        bool escape
     ) external;
 
     function buyout(sIERC20 sERC20) external payable;
@@ -40,7 +43,11 @@ interface IBroker {
 
     function enableFlashBuyout(sIERC20 sERC20) external;
 
-    function escape(
+    function enableEscape(sIERC20 sERC20) external;
+
+    function disableEscape(sIERC20 sERC20) external;
+
+    function _escape_(
         sIERC20[] calldata sERC20s,
         address[] calldata beneficiaries,
         bytes[] calldata datas
@@ -78,6 +85,7 @@ interface IBroker {
             uint256 opening,
             uint256 stock,
             uint256 nbOfProposals,
-            bool flash
+            bool flash,
+            bool escape
         );
 }
