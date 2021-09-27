@@ -12,6 +12,7 @@
     "lint": "npx prettier --write contracts/",
     "test:broker": "npx hardhat test test/broker/*",
     "test:issuer": "npx hardhat test test/issuer/*",
+    "test:pool": "npx hardhat test test/pool/*",
     "test:token": "npx hardhat test test/token/*",
     "test:utils": "npx hardhat test test/utils/*",
     "test:vault": "npx hardhat test test/vault/*",

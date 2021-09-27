@@ -1,7 +1,7 @@
 const _Authorizer_ = require("../../../artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json");
 const _Vault_ = require("../../../artifacts/@balancer-labs/v2-vault/contracts/Vault.sol/Vault.json");
 const _OracleMock_ = require("../../../artifacts/contracts/test/OracleMock.sol/OracleMock.json");
-const _WETH_ = require("../../../artifacts/contracts/test/WETH.sol/WETH.json");
+const _WETH_ = require("../../../artifacts/contracts/mock/WETH.sol/WETH.json");
 
 class Balancer {
   static async deploy(ctx, opts) {

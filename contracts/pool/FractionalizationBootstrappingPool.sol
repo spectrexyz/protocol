@@ -22,7 +22,7 @@ import "@balancer-labs/v2-pool-weighted/contracts/WeightedMath.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/WeightedOracleMath.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/WeightedPoolUserDataHelpers.sol";
 
-contract WeightedPool2Tokens is
+contract FractionalizationBootstrappingPool is
     IMinimalSwapInfoPool,
     BasePoolAuthorization,
     BalancerPoolToken,
@@ -90,14 +90,13 @@ contract WeightedPool2Tokens is
         uint256 swapFeePercentage;
         uint256 pauseWindowDuration;
         uint256 bufferPeriodDuration;
-        address owner;
         bool sERC20IsToken0;
     }
 
     constructor(NewPoolParams memory params)
         Authentication(bytes32(uint256(msg.sender)))
         BalancerPoolToken(params.name, params.symbol)
-        BasePoolAuthorization(params.owner)
+        BasePoolAuthorization(address(0))
         TemporarilyPausable(params.pauseWindowDuration, params.bufferPeriodDuration)
     {
         _setSwapFeePercentage(params.swapFeePercentage);
