@@ -1,6 +1,6 @@
 const _Authorizer_ = require("../../../artifacts/@balancer-labs/v2-vault/contracts/Authorizer.sol/Authorizer.json");
 const _Vault_ = require("../../../artifacts/@balancer-labs/v2-vault/contracts/Vault.sol/Vault.json");
-const _OracleMock_ = require("../../../artifacts/contracts/test/OracleMock.sol/OracleMock.json");
+const _OracleMock_ = require("../../../artifacts/contracts/mock/OracleMock.sol/OracleMock.json");
 const _QueryProcessor_ = require("../../../artifacts/@balancer-labs/v2-pool-utils/contracts/oracle/QueryProcessor.sol/QueryProcessor.json");
 const _WETH_ = require("../../../artifacts/contracts/mock/WETH.sol/WETH.json");
 const Decimal = require("decimal.js");
@@ -34,7 +34,7 @@ class Pool {
   static async deploy(ctx, opts) {
     let token0, token1, sERC20IsToken0;
 
-    opts.mint ??= true;
+    opts.mint ??= false;
     opts.name ??= ctx.params.pool.name;
     opts.symbol ??= ctx.params.pool.symbol;
     opts.sMaxNormalizedWeight ??= ctx.params.pool.sMaxNormalizedWeight;
@@ -60,36 +60,6 @@ class Pool {
       token1 = ctx.contracts.WETH.address;
       sERC20IsToken0 = true;
     }
-
-    // if (opts.invalidMaxWeight) {
-    //   if (opts.tooBig) {
-    //     opts.startWeight = ctx.constants.sBootstrappingPool.ONE;
-    //   } else {
-    //     opts.startWeight = 0;
-    //   }
-    // } else {
-    //   opts.maxWeight = ctx.params.sBootstrappingPool.sERC20MaxWeight;
-    // }
-
-    // if (opts.invalidMinWeight) {
-    //   if (opts.tooBig) {
-    //     opts.endWeight = ctx.constants.sBootstrappingPool.ONE;
-    //   } else {
-    //     opts.endWeight = 0;
-    //   }
-    // } else {
-    //   opts.minWeight = ctx.params.sBootstrappingPool.sERC20MinWeight;
-    // }
-
-    // if (opts.invalidSwapFee) {
-    //   if (opts.tooBig) {
-    //     opts.swapFeePercentage = ethers.BigNumber.from("500000000000000001");
-    //   } else {
-    //     opts.swapFeePercentage = 0;
-    //   }
-    // } else {
-    //   opts.swapFeePercentage = ctx.params.sBootstrappingPool.swapFeePercentage;
-    // }
 
     const params = {
       vault: ctx.contracts.bVault.address,
@@ -140,16 +110,18 @@ class Pool {
 
     let token0, token1, amount0, amount1;
 
-    if (ethers.BigNumber.from(this.ctx.contracts.WETH.address).lte(ethers.BigNumber.from(this.ctx.contracts.sERC20.address))) {
-      token0 = ethers.constants.AddressZero;
-      token1 = this.ctx.contracts.sERC20.address;
-      amount0 = opts.reward ? 0 : this.ctx.params.sBootstrappingPool.pooled.ETH;
-      amount1 = this.ctx.params.sBootstrappingPool.pooled.sERC20;
-    } else {
-      token0 = this.ctx.contracts.sERC20.address;
+    await this.ctx.sERC20.approve({ spender: this.ctx.contracts.bVault });
+
+    if (this.sERC20IsToken0) {
+      token0 = this.ctx.sERC20.address;
       token1 = ethers.constants.AddressZero;
-      amount0 = this.ctx.params.sBootstrappingPool.pooled.sERC20;
-      amount1 = opts.reward ? 0 : this.ctx.params.sBootstrappingPool.pooled.ETH;
+      amount0 = this.ctx.params.pool.pooled.sERC20;
+      amount1 = opts.reward ? 0 : this.ctx.params.pool.pooled.ETH;
+    } else {
+      token0 = ethers.constants.AddressZero;
+      token1 = this.ctx.sERC20.address;
+      amount0 = opts.reward ? 0 : this.ctx.params.pool.pooled.ETH;
+      amount1 = this.ctx.params.pool.pooled.sERC20;
     }
 
     if (opts.init) {
@@ -167,15 +139,17 @@ class Pool {
       fromInternalBalance: false,
     };
 
-    this.ctx.data.tx = await this.ctx.contracts.Vault.connect(opts.from).joinPool(this.ctx.data.poolId, opts.from.address, opts.from.address, joinPoolRequest, {
-      value: this.ctx.params.sBootstrappingPool.pooled.ETH,
-    });
+    this.ctx.data.tx = await this.ctx.contracts.bVault
+      .connect(opts.from)
+      .joinPool(this.ctx.data.poolId, opts.from.address, opts.from.address, joinPoolRequest, {
+        value: this.ctx.params.pool.pooled.ETH,
+      });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
   async pairPrice() {
     const BASE = new Decimal(10).pow(new Decimal(18));
-    const { balances } = await this.ctx.contracts.Vault.getPoolTokens(this.ctx.data.poolId);
+    const { balances } = await this.ctx.contracts.bVault.getPoolTokens(this.ctx.data.poolId);
     const weights = await this.getNormalizedWeights();
 
     const numerator = this._decimal(balances[0]).div(this._decimal(weights[0]).div(BASE));
@@ -188,7 +162,7 @@ class Pool {
     opts.sERC20 ??= false;
 
     const BASE = new Decimal(10).pow(new Decimal(18));
-    const { balances } = await this.ctx.contracts.Vault.getPoolTokens(this.ctx.data.poolId);
+    const { balances } = await this.ctx.contracts.bVault.getPoolTokens(this.ctx.data.poolId);
     const weights = await this.getNormalizedWeights();
     const totalSupply = await this.totalSupply();
 
@@ -204,24 +178,18 @@ class Pool {
   }
 
   async expectedWeights(pct) {
-    const ONE = this._decimal(this.ctx.constants.sBootstrappingPool.ONE);
+    const ONE = this._decimal(this.ctx.constants.pool.ONE);
 
     const cap = this._decimal(await this.ctx.sERC20.cap());
     const supply = this._decimal(await this.ctx.sERC20.totalSupply());
 
-    const delta = this._decimal(this.ctx.params.sBootstrappingPool.normalizedEndWeight.sub(this.ctx.params.sBootstrappingPool.normalizedStartWeight));
+    const delta = this._decimal(this.ctx.params.pool.sMaxNormalizedWeight.sub(this.ctx.params.pool.sMinNormalizedWeight));
     const gamma = delta.mul(supply);
 
-    const sWeight = this._decimal(this.ctx.params.sBootstrappingPool.normalizedStartWeight).add(gamma.div(cap));
+    const sWeight = this._decimal(this.ctx.params.pool.sMaxNormalizedWeight).sub(gamma.div(cap));
     const eWeight = ONE.sub(sWeight);
 
     return this.sERC20IsToken0 ? [this._bn(sWeight), this._bn(eWeight)] : [this._bn(eWeight), this._bn(sWeight)];
-  }
-
-  async expectedMaxWeightTokenIndex() {
-    const weights = await this.getNormalizedWeights();
-
-    return weights[0].gte(weights[1]) ? 0 : 1;
   }
 
   _decimal(number) {

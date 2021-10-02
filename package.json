@@ -12,7 +12,8 @@
     "lint": "npx prettier --write contracts/",
     "test:broker": "npx hardhat test test/broker/*",
     "test:issuer": "npx hardhat test test/issuer/*",
-    "test:pool": "npx hardhat test test/pool/*",
+    "test:pool": "npx hardhat test test/pool/*.js",
+    "test:pool:balancer": "npx mocha --extension ts --require ts-node/register --require hardhat/register --recursive",
     "test:token": "npx hardhat test test/token/*",
     "test:utils": "npx hardhat test test/utils/*",
     "test:vault": "npx hardhat test test/vault/*",
@@ -32,17 +33,24 @@
     "@openzeppelin/contracts-upgradeable-0.7": "npm:@openzeppelin/contracts-upgradeable@^3.4.0"
   },
   "devDependencies": {
+    "@balancer-labs/balancer-js": "^1.0.1",
     "@nomiclabs/hardhat-ethers": "^2.0.1",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
-    "chai": "^4.3.0",
+    "@types/chai": "^4.2.22",
+    "@types/mocha": "^9.0.0",
+    "chai": "^4.3.4",
     "decimal.js": "^10.3.1",
     "ethereum-waffle": "^3.2.2",
     "ethers": "^5.0.30",
     "hardhat": "^2.5.0",
     "hardhat-gas-reporter": "^1.0.4",
+    "mocha": "^7.2.0",
     "prettier": "^2.3.2",
     "prettier-plugin-solidity": "^1.0.0-beta.17",
-    "solidity-coverage": "^0.7.17"
+    "solidity-coverage": "^0.7.17",
+    "tiny-invariant": "^1.1.0",
+    "ts-node": "^8.10.2",
+    "typescript": "^4.4.3"
   },
   "prettier": {
     "overrides": [

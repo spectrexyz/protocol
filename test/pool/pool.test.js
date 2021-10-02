@@ -13,12 +13,12 @@ describe("FractionalizationBootstrappingPool", () => {
     await initialize(this);
   });
 
-  describe.only("⇛ constructor", () => {
+  describe("# constructor", () => {
     describe("» sERC20 minimum weight is valid", () => {
       describe("» and sERC20 maximum weight is valid", () => {
         describe("» and swap fee is valid", () => {
           before(async () => {
-            await setup.pool(this, { mint: false });
+            await setup.pool(this);
           });
 
           it("it sets up the pool's name", async () => {
@@ -156,125 +156,115 @@ describe("FractionalizationBootstrappingPool", () => {
     });
   });
 
-  // describe("# pokeWeights", () => {
-  //   describe("» oracle", () => {
-  //     before(async () => {
-  //       await setup(this, { balancer: true });
-  //       await this.pool.join({ init: true });
-  //       await this.pool.join();
+  describe("# poke", () => {
+    describe("» oracle", () => {
+      before(async () => {
+        await setup.pool(this, { mint: true });
 
-  //       this.data.previousPoolData = await this.pool.getMiscData();
-  //       this.data.previousInvariant = await this.pool.getInvariant();
-  //       this.data.previousPairPrice = await this.pool.pairPrice();
-  //       this.data.previousBTPPrice = await this.pool.BTPPrice();
+        await this.pool.join({ init: true });
+        await this.pool.join();
 
-  //       // move time forward to create a new oracle sample
-  //       await advanceTime(ethers.BigNumber.from("180"));
-  //       await this.sERC20.mint(this, { amount: this.params.sERC20.cap });
-  //       await this.pool.pokeWeights();
-  //       this.data.currentTimestamp = await currentTimestamp();
+        this.data.previousPoolData = await this.pool.getMiscData();
+        this.data.previousInvariant = await this.pool.getInvariant();
+        this.data.previousPairPrice = await this.pool.pairPrice();
+        this.data.previousBTPPrice = await this.pool.BTPPrice();
 
-  //       this.data.latestCachedPairPrice = await this.pool.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
-  //       this.data.latestCachedBPTPrice = await this.pool.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
-  //       this.data.latestCachedInvariant = await this.pool.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
-  //       this.data.latestInvariant = await this.pool.getLastInvariant();
-  //       this.data.latestPoolData = await this.pool.getMiscData();
-  //       this.data.currentInvariant = await this.pool.getInvariant();
-  //     });
+        // move time forward to create a new oracle sample
+        await advanceTime(ethers.BigNumber.from("180"));
+        await this.sERC20.mint(this, { amount: this.params.sERC20.cap });
+        await this.pool.poke();
 
-  //     it("it updates the oracle index and timestamp", async () => {
-  //       expect(this.data.latestPoolData.oracleIndex).to.equal(this.data.previousPoolData.oracleIndex.add(1));
-  //       expect(this.data.latestPoolData.oracleSampleCreationTimestamp).to.equal(this.data.currentTimestamp);
-  //     });
+        this.data.currentTimestamp = await currentTimestamp();
+        this.data.latestCachedPairPrice = await this.pool.getLatest(this.constants.pool.ORACLE_VARIABLE.PAIR_PRICE);
+        this.data.latestCachedBPTPrice = await this.pool.getLatest(this.constants.pool.ORACLE_VARIABLE.BPT_PRICE);
+        this.data.latestCachedInvariant = await this.pool.getLatest(this.constants.pool.ORACLE_VARIABLE.INVARIANT);
+        this.data.latestInvariant = await this.pool.getLastInvariant();
+        this.data.latestPoolData = await this.pool.getMiscData();
+        this.data.currentInvariant = await this.pool.getInvariant();
+      });
 
-  //     it("stores the pre-poke spot price", async () => {
-  //       expect(this.data.latestCachedPairPrice).to.be.near(this.data.previousPairPrice, MAX_RELATIVE_ERROR);
-  //     });
+      it("it updates the oracle index and timestamp", async () => {
+        expect(this.data.latestPoolData.oracleIndex).to.equal(this.data.previousPoolData.oracleIndex.add(1));
+        expect(this.data.latestPoolData.oracleSampleCreationTimestamp).to.equal(this.data.currentTimestamp);
+      });
 
-  //     it("stores the pre-poke BTP price", async () => {
-  //       expect(this.data.latestCachedBPTPrice).to.be.near(this.data.previousBTPPrice, MAX_RELATIVE_ERROR * 2);
-  //     });
+      it("it caches the pre-poke spot price", async () => {
+        expect(this.data.latestCachedPairPrice).to.be.near(this.constants.ONE, MAX_RELATIVE_ERROR);
+      });
 
-  //     it("stores the pre-poke invariant", async () => {
-  //       expect(this.data.latestCachedInvariant).to.be.near(this.data.previousInvariant, MAX_RELATIVE_ERROR);
-  //     });
+      it("it caches the pre-poke BTP price", async () => {
+        expect(this.data.latestCachedBPTPrice).to.be.near(this.data.previousBTPPrice, MAX_RELATIVE_ERROR * 2);
+      });
 
-  //     it("it caches the current invariant", async () => {
-  //       expect(this.data.latestInvariant).to.equal(this.data.currentInvariant);
-  //       expect(await this.contracts.OracleMock.fromLowResLog(this.data.latestPoolData.logInvariant)).to.be.near(this.data.currentInvariant, MAX_RELATIVE_ERROR);
-  //     });
+      it("it caches the pre-poke invariant", async () => {
+        expect(this.data.latestCachedInvariant).to.be.near(this.data.previousInvariant, MAX_RELATIVE_ERROR);
+      });
 
-  //     it("it caches the current supply", async () => {
-  //       expect(await this.contracts.OracleMock.fromLowResLog(this.data.latestPoolData.logTotalSupply)).to.be.near(
-  //         await this.pool.totalSupply(),
-  //         MAX_RELATIVE_ERROR
-  //       );
-  //     });
-  //   });
+      it("it caches the current invariant", async () => {
+        expect(this.data.latestInvariant).to.equal(this.data.currentInvariant);
+        expect(await this.contracts.oracleMock.fromLowResLog(this.data.latestPoolData.logInvariant)).to.be.near(this.data.currentInvariant, MAX_RELATIVE_ERROR);
+      });
 
-  //   describe("» math", () => {
-  //     describe("» sERC20 supply is 0% of its cap", () => {
-  //       before(async () => {
-  //         await setup(this, { balancer: true, mint: false });
-  //         await this.pool.pokeWeights();
+      it("it stores the current supply", async () => {
+        expect(await this.contracts.oracleMock.fromLowResLog(this.data.latestPoolData.logTotalSupply)).to.be.near(
+          await this.pool.totalSupply(),
+          MAX_RELATIVE_ERROR
+        );
+      });
+    });
 
-  //         this.data.weights = await this.pool.getNormalizedWeights();
-  //         this.data.expectedWeights = await this.pool.expectedWeights();
-  //       });
+    describe("» math", () => {
+      describe("» sERC20 supply is 0% of its cap", () => {
+        before(async () => {
+          await setup.pool(this);
 
-  //       it("it updates weights accordingly", async () => {
-  //         expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
-  //         expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
-  //       });
+          await this.pool.poke();
 
-  //       it("it updates maxWeightTokenIndex accordingly", async () => {
-  //         expect(await this.pool.maxWeightTokenIndex()).to.equal(await this.pool.expectedMaxWeightTokenIndex());
-  //       });
-  //     });
+          this.data.weights = await this.pool.getNormalizedWeights();
+          this.data.expectedWeights = await this.pool.expectedWeights();
+        });
 
-  //     describe("» sERC20 supply is 50% of the its cap", () => {
-  //       before(async () => {
-  //         await setup(this, { balancer: true, mint: false });
+        it("it updates tokens weights accordingly", async () => {
+          expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
+          expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
+        });
+      });
 
-  //         await this.sERC20.mint({ amount: this.params.sERC20.cap.div(ethers.BigNumber.from("2")) });
-  //         await this.pool.pokeWeights();
+      describe("» sERC20 supply is 50% of the its cap", () => {
+        before(async () => {
+          await setup.pool(this);
 
-  //         this.data.weights = await this.pool.getNormalizedWeights();
-  //         this.data.expectedWeights = await this.pool.expectedWeights();
-  //       });
+          await this.sERC20.mint({ amount: this.params.sERC20.cap.div(ethers.BigNumber.from("2")) });
+          await this.pool.poke();
 
-  //       it("it updates weights accordingly", async () => {
-  //         expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
-  //         expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
-  //       });
+          this.data.weights = await this.pool.getNormalizedWeights();
+          this.data.expectedWeights = await this.pool.expectedWeights();
+        });
 
-  //       it("it updates maxWeightTokenIndex accordingly", async () => {
-  //         expect(await this.pool.maxWeightTokenIndex()).to.equal(await this.pool.expectedMaxWeightTokenIndex());
-  //       });
-  //     });
+        it("it updates tokens weights accordingly", async () => {
+          expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
+          expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
+        });
+      });
 
-  //     describe("» sERC20 supply is 100% of the its cap", () => {
-  //       before(async () => {
-  //         await setup(this, { balancer: true, mint: false });
+      describe("» sERC20 supply is 100% of the its cap", () => {
+        before(async () => {
+          await setup.pool(this);
 
-  //         await this.sERC20.mint({ amount: this.params.sERC20.cap });
-  //         await this.pool.pokeWeights();
+          await this.sERC20.mint({ amount: this.params.sERC20.cap });
+          await this.pool.poke();
 
-  //         this.data.weights = await this.pool.getNormalizedWeights();
-  //         this.data.expectedWeights = await this.pool.expectedWeights();
-  //       });
+          this.data.weights = await this.pool.getNormalizedWeights();
+          this.data.expectedWeights = await this.pool.expectedWeights();
+        });
 
-  //       it("it updates weights accordingly", async () => {
-  //         expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
-  //         expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
-  //       });
-
-  //       it("it updates maxWeightTokenIndex accordingly", async () => {
-  //         expect(await this.pool.maxWeightTokenIndex()).to.equal(await this.pool.expectedMaxWeightTokenIndex());
-  //       });
-  //     });
-  //   });
-  // });
+        it("it updates tokens weights accordingly", async () => {
+          expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
+          expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
+        });
+      });
+    });
+  });
 
   // describe("# join ⇌ reward", () => {
   //   before(async () => {
