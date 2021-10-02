@@ -189,7 +189,7 @@ describe("FractionalizationBootstrappingPool", () => {
       });
 
       it("it caches the pre-poke spot price", async () => {
-        expect(this.data.latestCachedPairPrice).to.be.near(this.constants.ONE, MAX_RELATIVE_ERROR);
+        expect(this.data.latestCachedPairPrice).to.be.near(this.data.previousPairPrice, MAX_RELATIVE_ERROR);
       });
 
       it("it caches the pre-poke BTP price", async () => {
@@ -266,37 +266,43 @@ describe("FractionalizationBootstrappingPool", () => {
     });
   });
 
-  // describe("# join ⇌ reward", () => {
-  //   before(async () => {
-  //     await setup(this, { balancer: true });
-  //     await this.pool.join({ init: true });
-  //     await this.pool.join();
+  describe("# join ⇌ reward", () => {
+    before(async () => {
+      await setup.pool(this, { mint: true });
 
-  //     this.data.previousTotalSupply = await this.pool.totalSupply();
-  //     this.data.previousBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
-  //     this.data.previousBTPPrice = await this.pool.BTPPrice({ sERC20: true });
+      await this.pool.join({ init: true });
+      await this.pool.join();
 
-  //     await this.pool.join({ reward: true });
-  //     this.data.latestTotalSupply = await this.pool.totalSupply();
-  //     this.data.latestBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
-  //     this.data.latestBTPPrice = await this.pool.BTPPrice({ sERC20: true });
-  //   });
+      this.data.previousTotalSupply = await this.pool.totalSupply();
+      this.data.previousBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
+      this.data.previousBTPPrice = await this.pool.BTPPrice({ sERC20: true });
 
-  //   it("it mints no BPT", async () => {
-  //     expect(await this.pool.totalSupply()).to.equal(this.data.previousTotalSupply);
-  //   });
+      await this.pool.join({ reward: true });
 
-  //   it("it updates pool balances", async () => {
-  //     expect(this.data.latestBalances[0]).to.equal(
-  //       this.pool.sERC20IsToken0 ? this.data.previousBalances[0].add(this.params.pool.pooled.sERC20) : this.data.previousBalances[0]
-  //     );
-  //     expect(this.data.latestBalances[1]).to.equal(
-  //       this.pool.sERC20IsToken0 ? this.data.previousBalances[1] : this.data.previousBalances[1].add(this.params.pool.pooled.sERC20)
-  //     );
-  //   });
+      this.data.latestTotalSupply = await this.pool.totalSupply();
+      this.data.latestBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
+      this.data.latestBTPPrice = await this.pool.BTPPrice({ sERC20: true });
+    });
 
-  //   it("it updates BPT price", async () => {
-  //     expect(this.data.latestBTPPrice).to.be.gt(this.data.previousBTPPrice);
-  //   });
-  // });
+    it("it mints no BPT", async () => {
+      expect(await this.pool.totalSupply()).to.equal(this.data.previousTotalSupply);
+    });
+
+    it("it updates the pool's balances", async () => {
+      expect(this.data.latestBalances[0]).to.equal(
+        this.pool.sERC20IsToken0
+          ? this.data.previousBalances[0].add(this.params.pool.pooled.sERC20)
+          : this.data.previousBalances[0].add(this.params.pool.pooled.ETH)
+      );
+      expect(this.data.latestBalances[1]).to.equal(
+        this.pool.sERC20IsToken0
+          ? this.data.previousBalances[1].add(this.params.pool.pooled.ETH)
+          : this.data.previousBalances[1].add(this.params.pool.pooled.sERC20)
+      );
+    });
+
+    it("it updates BPT price", async () => {
+      expect(this.data.latestBTPPrice).to.be.gt(this.data.previousBTPPrice);
+    });
+  });
 });

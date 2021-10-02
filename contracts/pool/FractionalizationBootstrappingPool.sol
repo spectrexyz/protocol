@@ -3,6 +3,8 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./FractionalizationBootstrappingPoolMiscData.sol";
+import "./FractionalizationBootstrappingPoolUserDataHelpers.sol";
+
 import "./interfaces/sIERC20.sol";
 
 import "@balancer-labs/v2-solidity-utils/contracts/math/FixedPoint.sol";
@@ -20,7 +22,8 @@ import "@balancer-labs/v2-pool-utils/contracts/oracle/Buffer.sol";
 
 import "@balancer-labs/v2-pool-weighted/contracts/WeightedMath.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/WeightedOracleMath.sol";
-import "@balancer-labs/v2-pool-weighted/contracts/WeightedPoolUserDataHelpers.sol";
+
+import "hardhat/console.sol";
 
 contract FractionalizationBootstrappingPool is
     IMinimalSwapInfoPool,
@@ -32,8 +35,16 @@ contract FractionalizationBootstrappingPool is
     WeightedOracleMath
 {
     using FixedPoint for uint256;
-    using WeightedPoolUserDataHelpers for bytes;
+    using FractionalizationBootstrappingPoolUserDataHelpers for bytes;
     using FractionalizationBootstrappingPoolMiscData for bytes32;
+
+    enum JoinKind {
+        INIT,
+        EXACT_TOKENS_IN_FOR_BPT_OUT,
+        TOKEN_IN_FOR_EXACT_BPT_OUT,
+        ALL_TOKENS_IN_FOR_EXACT_BPT_OUT,
+        REWARD
+    }
 
     uint256 private constant _MINIMUM_BPT = 1e6;
 
@@ -423,8 +434,8 @@ contract FractionalizationBootstrappingPool is
         address,
         bytes memory userData
     ) private returns (uint256, uint256[] memory) {
-        BaseWeightedPool.JoinKind kind = userData.joinKind();
-        _require(kind == BaseWeightedPool.JoinKind.INIT, Errors.UNINITIALIZED);
+        JoinKind kind = userData.joinKind();
+        _require(kind == JoinKind.INIT, Errors.UNINITIALIZED);
 
         uint256[] memory amountsIn = userData.initialAmountsIn();
         InputHelpers.ensureInputLengthMatch(amountsIn.length, 2);
@@ -492,14 +503,16 @@ contract FractionalizationBootstrappingPool is
         uint256[] memory normalizedWeights,
         bytes memory userData
     ) private view returns (uint256, uint256[] memory) {
-        BaseWeightedPool.JoinKind kind = userData.joinKind();
+        JoinKind kind = userData.joinKind();
 
-        if (kind == BaseWeightedPool.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT) {
+        if (kind == JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT) {
             return _joinExactTokensInForBPTOut(balances, normalizedWeights, userData);
-        } else if (kind == BaseWeightedPool.JoinKind.TOKEN_IN_FOR_EXACT_BPT_OUT) {
+        } else if (kind == JoinKind.TOKEN_IN_FOR_EXACT_BPT_OUT) {
             return _joinTokenInForExactBPTOut(balances, normalizedWeights, userData);
-        } else if (kind == BaseWeightedPool.JoinKind.ALL_TOKENS_IN_FOR_EXACT_BPT_OUT) {
+        } else if (kind == JoinKind.ALL_TOKENS_IN_FOR_EXACT_BPT_OUT) {
             return _joinAllTokensInForExactBPTOut(balances, userData);
+        } else if (kind == JoinKind.REWARD) {
+            return userData.rewardIn();
         } else {
             _revert(Errors.UNHANDLED_JOIN_KIND);
         }

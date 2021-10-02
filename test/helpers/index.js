@@ -3,8 +3,7 @@ const _ERC1155ReceiverMock_ = require("../../artifacts/contracts/mock/ERC1155Rec
 const _ERC721Mock_ = require("../../artifacts/contracts/mock/ERC721Mock.sol/ERC721Mock.json");
 const _ERC721SenderMock_ = require("../../artifacts/contracts/mock/ERC721SenderMock.sol/ERC721SenderMock.json");
 const config = require("./config");
-const { Broker, Balancer, Issuer, Vault, sERC721, Pool, Splitter } = require("./models");
-const { resolveConfigFile } = require("prettier");
+const { Broker, Issuer, Vault, sERC721, Pool, PoolFactory, Splitter } = require("./models");
 
 const _signers = async (ctx) => {
   const signers = {
@@ -117,59 +116,6 @@ const mock = {
   },
 };
 
-const setupback = async (ctx, opts = {}) => {
-  opts.approve ??= true;
-  opts.balancer ??= false;
-  opts.spectralize ??= true;
-  opts.minter ??= false;
-  opts.register ??= true;
-  opts.broker ??= false;
-  opts.template ??= false;
-
-  ctx.contracts.sERC20Base = await waffle.deployContract(ctx.signers.root, _sERC20_);
-
-  await sERC721.deploy(ctx);
-  await sERC1155.deploy(ctx);
-  await ctx.sERC721.mint(opts);
-  await Splitter.deploy(ctx);
-
-  if (opts.spectralize) {
-    await ctx.sERC1155.spectralize();
-  }
-
-  if (opts.balancer || opts.template) {
-    // await sBootstrappingPool.deploy(ctx, opts);
-    // ctx.data.poolId = await ctx.sBootstrappingPool.getPoolId();
-  }
-
-  if (opts.issuer || opts.template) {
-    await Balancer.deploy(ctx, opts);
-    await Issuer.deploy(ctx, opts);
-
-    await ctx.issuer.grantRole({ role: await ctx.issuer.REGISTER_ROLE(), account: ctx.signers.issuer.registerer });
-
-    await ctx.sERC20.grantRole({
-      role: ctx.constants.sERC20.MINT_ROLE,
-      account: ctx.issuer.contract,
-    });
-  }
-
-  if (opts.broker || opts.template) {
-    await Broker.deploy(ctx, opts);
-    await ctx.sERC721.mint(opts);
-    await ctx.sERC1155.spectralize({ guardian: ctx.broker.contract });
-
-    await ctx.sERC20.grantRole({
-      role: ctx.constants.sERC20.BURN_ROLE,
-      account: ctx.broker.contract,
-    });
-  }
-
-  if (opts.template) {
-    await Template.deploy(ctx, opts);
-  }
-};
-
 const setup = {
   sERC20: async (ctx, opts = {}) => {
     await setup.vault(ctx, opts);
@@ -216,6 +162,19 @@ const setup = {
     await ctx.vault.fractionalize({ broker: ctx.broker });
 
     await Pool.deploy(ctx, opts);
+  },
+  poolFactory: async (ctx, opts = {}) => {
+    opts.fractionalize ??= true;
+
+    ctx.contracts.sERC20Base = await waffle.deployContract(ctx.signers.root, _sERC20_);
+
+    await sERC721.deploy(ctx);
+    await Vault.deploy(ctx);
+
+    await ctx.sERC721.mint(opts);
+    await ctx.vault.fractionalize({ broker: ctx.broker });
+
+    await PoolFactory.deploy(ctx, opts);
   },
 };
 

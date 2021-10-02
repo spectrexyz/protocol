@@ -3,12 +3,15 @@ const _Vault_ = require("../../../artifacts/@balancer-labs/v2-vault/contracts/Va
 const _OracleMock_ = require("../../../artifacts/contracts/mock/OracleMock.sol/OracleMock.json");
 const _QueryProcessor_ = require("../../../artifacts/@balancer-labs/v2-pool-utils/contracts/oracle/QueryProcessor.sol/QueryProcessor.json");
 const _WETH_ = require("../../../artifacts/contracts/mock/WETH.sol/WETH.json");
+const _FractionalizationBootstrappingPool_ = require("../../../artifacts/contracts/pool/FractionalizationBootstrappingPool.sol/FractionalizationBootstrappingPool.json");
+
 const Decimal = require("decimal.js");
 
 class Pool {
   constructor(ctx, sERC20IsToken0) {
     this.ctx = ctx;
     this.contract = ctx.contracts.pool;
+    this.address = this.contract.address;
     this.sERC20IsToken0 = sERC20IsToken0;
 
     this.name = this.contract.name;
@@ -93,6 +96,16 @@ class Pool {
     ctx.pool = new Pool(ctx, sERC20IsToken0);
   }
 
+  static async at(ctx, address, opts = {}) {
+    opts.permissions ??= true;
+    opts.root ??= ctx.signers.root;
+
+    ctx.contracts.pool = new ethers.Contract(address, _FractionalizationBootstrappingPool_.abi, opts.root);
+    ctx.data.poolId = await ctx.contracts.pool.getPoolId();
+
+    return new Pool(ctx);
+  }
+
   async poke() {
     this.ctx.data.tx = await this.contract.poke();
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
@@ -102,7 +115,7 @@ class Pool {
     const JOIN_KIND_INIT = 0;
     const JOIN_EXACT_TOKENS = 1;
     const JOIN_EXACT_BPT = 2;
-    const JOIN_REWARD = 3;
+    const JOIN_REWARD = 4;
 
     opts.from ??= this.ctx.signers.holders[0];
     opts.init ??= false;
@@ -116,11 +129,11 @@ class Pool {
       token0 = this.ctx.sERC20.address;
       token1 = ethers.constants.AddressZero;
       amount0 = this.ctx.params.pool.pooled.sERC20;
-      amount1 = opts.reward ? 0 : this.ctx.params.pool.pooled.ETH;
+      amount1 = this.ctx.params.pool.pooled.ETH;
     } else {
       token0 = ethers.constants.AddressZero;
       token1 = this.ctx.sERC20.address;
-      amount0 = opts.reward ? 0 : this.ctx.params.pool.pooled.ETH;
+      amount0 = this.ctx.params.pool.pooled.ETH;
       amount1 = this.ctx.params.pool.pooled.sERC20;
     }
 
