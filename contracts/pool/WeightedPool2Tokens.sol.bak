@@ -1,9 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
-
-import "./FractionalizationBootstrappingPoolMiscData.sol";
-import "./interfaces/sIERC20.sol";
 
 import "@balancer-labs/v2-solidity-utils/contracts/math/FixedPoint.sol";
 import "@balancer-labs/v2-solidity-utils/contracts/helpers/InputHelpers.sol";
@@ -18,11 +28,12 @@ import "@balancer-labs/v2-pool-utils/contracts/BalancerPoolToken.sol";
 import "@balancer-labs/v2-pool-utils/contracts/oracle/PoolPriceOracle.sol";
 import "@balancer-labs/v2-pool-utils/contracts/oracle/Buffer.sol";
 
-import "@balancer-labs/v2-pool-weighted/contracts/WeightedMath.sol";
-import "@balancer-labs/v2-pool-weighted/contracts/WeightedOracleMath.sol";
-import "@balancer-labs/v2-pool-weighted/contracts/WeightedPoolUserDataHelpers.sol";
+import "./WeightedMath.sol";
+import "./WeightedOracleMath.sol";
+import "./WeightedPoolUserDataHelpers.sol";
+import "./WeightedPool2TokensMiscData.sol";
 
-contract FractionalizationBootstrappingPool is
+contract WeightedPool2Tokens is
     IMinimalSwapInfoPool,
     BasePoolAuthorization,
     BalancerPoolToken,
@@ -33,7 +44,7 @@ contract FractionalizationBootstrappingPool is
 {
     using FixedPoint for uint256;
     using WeightedPoolUserDataHelpers for bytes;
-    using FractionalizationBootstrappingPoolMiscData for bytes32;
+    using WeightedPool2TokensMiscData for bytes32;
 
     uint256 private constant _MINIMUM_BPT = 1e6;
 
@@ -51,8 +62,12 @@ contract FractionalizationBootstrappingPool is
     IERC20 internal immutable _token0;
     IERC20 internal immutable _token1;
 
-    uint256 private _normalizedWeight0;
-    uint256 private _normalizedWeight1;
+    uint256 private immutable _normalizedWeight0;
+    uint256 private immutable _normalizedWeight1;
+
+    // The protocol fees will always be charged using the token associated with the max weight in the pool.
+    // Since these Pools will register tokens only once, we can assume this index will be constant.
+    uint256 private immutable _maxWeightTokenIndex;
 
     // All token balances are normalized to behave as if the token had 18 decimals. We assume a token's decimals will
     // not change throughout its lifetime, and store the corresponding scaling factor for each at construction time.
@@ -60,13 +75,7 @@ contract FractionalizationBootstrappingPool is
     uint256 internal immutable _scalingFactor0;
     uint256 internal immutable _scalingFactor1;
 
-    // We store sERC20's maximum weight and sERC20's maximum weight - minimum weight delta to optimize computation.
-    sIERC20 private immutable _sERC20;
-    uint256 private immutable _cap;
-    uint256 private immutable _sMaxNormalizedWeight;
-    uint256 private immutable _sWeightsDelta;
-    bool private immutable _sERC20IsToken0;
-
+    event OracleEnabledChanged(bool enabled);
     event SwapFeePercentageChanged(uint256 swapFeePercentage);
 
     modifier onlyVault(bytes32 poolId) {
@@ -81,12 +90,12 @@ contract FractionalizationBootstrappingPool is
         string symbol;
         IERC20 token0;
         IERC20 token1;
-        uint256 sMaxNormalizedWeight;
-        uint256 sMinNormalizedWeight;
+        uint256 normalizedWeight0;
+        uint256 normalizedWeight1;
         uint256 swapFeePercentage;
         uint256 pauseWindowDuration;
         uint256 bufferPeriodDuration;
-        bool sERC20IsToken0;
+        bool oracleEnabled;
         address owner;
     }
 
@@ -101,6 +110,7 @@ contract FractionalizationBootstrappingPool is
         BasePoolAuthorization(params.owner)
         TemporarilyPausable(params.pauseWindowDuration, params.bufferPeriodDuration)
     {
+        _setOracleEnabled(params.oracleEnabled);
         _setSwapFeePercentage(params.swapFeePercentage);
 
         bytes32 poolId = params.vault.registerPool(IVault.PoolSpecialization.TWO_TOKEN);
@@ -121,71 +131,17 @@ contract FractionalizationBootstrappingPool is
         _scalingFactor0 = _computeScalingFactor(params.token0);
         _scalingFactor1 = _computeScalingFactor(params.token1);
 
-        _sERC20IsToken0 = params.sERC20IsToken0;
-        sIERC20 sERC20 = params.sERC20IsToken0 ? sIERC20(address(params.token0)) : sIERC20(address(params.token1));
-        _sERC20 = sERC20;
-        _cap = sERC20.cap();
-
         // Ensure each normalized weight is above them minimum and find the token index of the maximum weight
-        require(
-            params.sMaxNormalizedWeight > params.sMinNormalizedWeight,
-            "FractionalizationBootstrappingPool: sERC20 max weight must be superior to sERC20 min weight"
-        );
-        _require(params.sMinNormalizedWeight >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
-        _require(FixedPoint.ONE.sub(params.sMaxNormalizedWeight) >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
+        _require(params.normalizedWeight0 >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
+        _require(params.normalizedWeight1 >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
 
-        _sMaxNormalizedWeight = params.sMaxNormalizedWeight;
-        uint256 sWeightDelta = params.sMaxNormalizedWeight.sub(params.sMinNormalizedWeight);
-        _sWeightsDelta = sWeightDelta;
+        // Ensure that the normalized weights sum to ONE
+        uint256 normalizedSum = params.normalizedWeight0.add(params.normalizedWeight1);
+        _require(normalizedSum == FixedPoint.ONE, Errors.NORMALIZED_WEIGHT_INVARIANT);
 
-        uint256[] memory weights = _weightsFor(sERC20, params.sMaxNormalizedWeight, sWeightDelta, params.sERC20IsToken0);
-        _normalizedWeight0 = weights[0];
-        _normalizedWeight1 = weights[1];
-    }
-
-    // FractionalizationBootstrappingPool specific functions
-
-    function poke() external {
-        if (totalSupply() > 0) {
-            (, uint256[] memory balances, ) = getVault().getPoolTokens(getPoolId());
-            _updateOracle(0, balances[0], balances[1]);
-
-            uint256[] memory weights = _weightsFor(_sERC20, _sMaxNormalizedWeight, _sWeightsDelta, _sERC20IsToken0);
-            _normalizedWeight0 = weights[0];
-            _normalizedWeight1 = weights[1];
-
-            _lastInvariant = WeightedMath._calculateInvariant(weights, balances);
-            _cacheInvariantAndSupply();
-        } else {
-            uint256[] memory weights = _weightsFor(_sERC20, _sMaxNormalizedWeight, _sWeightsDelta, _sERC20IsToken0);
-            _normalizedWeight0 = weights[0];
-            _normalizedWeight1 = weights[1];
-        }
-    }
-
-    function _weightsFor(
-        sIERC20 sERC20,
-        uint256 sMaxNormalizedWeight,
-        uint256 sWeightsDelta,
-        bool sERC20IsToken0
-    ) private view returns (uint256[] memory) {
-        uint256[] memory weights = new uint256[](2);
-        uint256 supply = sERC20.totalSupply();
-        uint256 gamma = sWeightsDelta * supply;
-        require(gamma / sWeightsDelta == supply, "FractionalizationBootstrappingPool: math overflow");
-
-        uint256 sWeight = sMaxNormalizedWeight.sub(gamma / sERC20.cap()); // cap is always > 0
-        uint256 eWeight = FixedPoint.ONE.sub(sWeight);
-
-        if (sERC20IsToken0) {
-            weights[0] = sWeight;
-            weights[1] = eWeight;
-        } else {
-            weights[0] = eWeight;
-            weights[1] = sWeight;
-        }
-
-        return weights;
+        _normalizedWeight0 = params.normalizedWeight0;
+        _normalizedWeight1 = params.normalizedWeight1;
+        _maxWeightTokenIndex = params.normalizedWeight0 >= params.normalizedWeight1 ? 0 : 1;
     }
 
     // Getters / Setters
@@ -206,6 +162,7 @@ contract FractionalizationBootstrappingPool is
             int256 logTotalSupply,
             uint256 oracleSampleCreationTimestamp,
             uint256 oracleIndex,
+            bool oracleEnabled,
             uint256 swapFeePercentage
         )
     {
@@ -214,6 +171,7 @@ contract FractionalizationBootstrappingPool is
         logTotalSupply = miscData.logTotalSupply();
         oracleSampleCreationTimestamp = miscData.oracleSampleCreationTimestamp();
         oracleIndex = miscData.oracleIndex();
+        oracleEnabled = miscData.oracleEnabled();
         swapFeePercentage = miscData.swapFeePercentage();
     }
 
@@ -236,6 +194,26 @@ contract FractionalizationBootstrappingPool is
 
     function _isOwnerOnlyAction(bytes32 actionId) internal view virtual override returns (bool) {
         return (actionId == getActionId(BasePool.setSwapFeePercentage.selector)) || (actionId == getActionId(BasePool.setAssetManagerPoolConfig.selector));
+    }
+
+    /**
+     * @dev Balancer Governance can always enable the Oracle, even if it was originally not enabled. This allows for
+     * Pools that unexpectedly drive much more volume and liquidity than expected to serve as Price Oracles.
+     *
+     * Note that the Oracle can only be enabled - it can never be disabled.
+     */
+    function enableOracle() external whenNotPaused authenticate {
+        _setOracleEnabled(true);
+
+        // Cache log invariant and supply only if the pool was initialized
+        if (totalSupply() > 0) {
+            _cacheInvariantAndSupply();
+        }
+    }
+
+    function _setOracleEnabled(bool enabled) internal {
+        _miscData = _miscData.setOracleEnabled(enabled);
+        emit OracleEnabledChanged(enabled);
     }
 
     // Caller must be approved by the Vault's Authorizer
@@ -466,7 +444,7 @@ contract FractionalizationBootstrappingPool is
         address,
         uint256[] memory balances,
         uint256,
-        uint256,
+        uint256 protocolSwapFeePercentage,
         bytes memory userData
     )
         private
@@ -477,6 +455,22 @@ contract FractionalizationBootstrappingPool is
         )
     {
         uint256[] memory normalizedWeights = _normalizedWeights();
+
+        // Due protocol swap fee amounts are computed by measuring the growth of the invariant between the previous join
+        // or exit event and now - the invariant's growth is due exclusively to swap fees. This avoids spending gas
+        // computing them on each individual swap
+        uint256 invariantBeforeJoin = WeightedMath._calculateInvariant(normalizedWeights, balances);
+
+        uint256[] memory dueProtocolFeeAmounts = _getDueProtocolFeeAmounts(
+            balances,
+            normalizedWeights,
+            _lastInvariant,
+            invariantBeforeJoin,
+            protocolSwapFeePercentage
+        );
+
+        // Update current balances by subtracting the protocol fee amounts
+        _mutateAmounts(balances, dueProtocolFeeAmounts, FixedPoint.sub);
         (uint256 bptAmountOut, uint256[] memory amountsIn) = _doJoin(balances, normalizedWeights, userData);
 
         // Update the invariant with the balances the Pool will have after the join, in order to compute the
@@ -484,7 +478,7 @@ contract FractionalizationBootstrappingPool is
         _mutateAmounts(balances, amountsIn, FixedPoint.add);
         _lastInvariant = WeightedMath._calculateInvariant(normalizedWeights, balances);
 
-        return (bptAmountOut, amountsIn, new uint256[](2));
+        return (bptAmountOut, amountsIn, dueProtocolFeeAmounts);
     }
 
     function _doJoin(
@@ -616,7 +610,7 @@ contract FractionalizationBootstrappingPool is
         address,
         uint256[] memory balances,
         uint256 lastChangeBlock,
-        uint256,
+        uint256 protocolSwapFeePercentage,
         bytes memory userData
     )
         private
@@ -634,7 +628,15 @@ contract FractionalizationBootstrappingPool is
         if (_isNotPaused()) {
             // Update price oracle with the pre-exit balances
             _updateOracle(lastChangeBlock, balances[0], balances[1]);
-            dueProtocolFeeAmounts = new uint256[](2);
+
+            // Due protocol swap fee amounts are computed by measuring the growth of the invariant between the previous
+            // join or exit event and now - the invariant's growth is due exclusively to swap fees. This avoids
+            // spending gas calculating the fees on each individual swap.
+            uint256 invariantBeforeExit = WeightedMath._calculateInvariant(normalizedWeights, balances);
+            dueProtocolFeeAmounts = _getDueProtocolFeeAmounts(balances, normalizedWeights, _lastInvariant, invariantBeforeExit, protocolSwapFeePercentage);
+
+            // Update current balances by subtracting the protocol fee amounts
+            _mutateAmounts(balances, dueProtocolFeeAmounts, FixedPoint.sub);
         } else {
             // If the contract is paused, swap protocol fee amounts are not charged and the oracle is not updated
             // to avoid extra calculations and reduce the potential for errors.
@@ -738,7 +740,7 @@ contract FractionalizationBootstrappingPool is
         uint256 balanceToken1
     ) internal {
         bytes32 miscData = _miscData;
-        if (block.number > lastChangeBlock) {
+        if (miscData.oracleEnabled() && block.number > lastChangeBlock) {
             int256 logSpotPrice = WeightedOracleMath._calcLogSpotPrice(_normalizedWeight0, balanceToken0, _normalizedWeight1, balanceToken1);
 
             int256 logBPTPrice = WeightedOracleMath._calcLogBPTPrice(_normalizedWeight0, balanceToken0, miscData.logTotalSupply());
@@ -773,10 +775,11 @@ contract FractionalizationBootstrappingPool is
      */
     function _cacheInvariantAndSupply() internal {
         bytes32 miscData = _miscData;
-
-        miscData = miscData.setLogInvariant(LogCompression.toLowResLog(_lastInvariant));
-        miscData = miscData.setLogTotalSupply(LogCompression.toLowResLog(totalSupply()));
-        _miscData = miscData;
+        if (miscData.oracleEnabled()) {
+            miscData = miscData.setLogInvariant(LogCompression.toLowResLog(_lastInvariant));
+            miscData = miscData.setLogTotalSupply(LogCompression.toLowResLog(totalSupply()));
+            _miscData = miscData;
+        }
     }
 
     function _getOracleIndex() internal view override returns (uint256) {
@@ -842,6 +845,34 @@ contract FractionalizationBootstrappingPool is
     }
 
     // Helpers
+
+    function _getDueProtocolFeeAmounts(
+        uint256[] memory balances,
+        uint256[] memory normalizedWeights,
+        uint256 previousInvariant,
+        uint256 currentInvariant,
+        uint256 protocolSwapFeePercentage
+    ) private view returns (uint256[] memory) {
+        // Initialize with zeros
+        uint256[] memory dueProtocolFeeAmounts = new uint256[](2);
+
+        // Early return if the protocol swap fee percentage is zero, saving gas.
+        if (protocolSwapFeePercentage == 0) {
+            return dueProtocolFeeAmounts;
+        }
+
+        // The protocol swap fees are always paid using the token with the largest weight in the Pool. As this is the
+        // token that is expected to have the largest balance, using it to pay fees should not unbalance the Pool.
+        dueProtocolFeeAmounts[_maxWeightTokenIndex] = WeightedMath._calcDueTokenProtocolSwapFeeAmount(
+            balances[_maxWeightTokenIndex],
+            normalizedWeights[_maxWeightTokenIndex],
+            previousInvariant,
+            currentInvariant,
+            protocolSwapFeePercentage
+        );
+
+        return dueProtocolFeeAmounts;
+    }
 
     /**
      * @dev Mutates `amounts` by applying `mutation` with each entry in `arguments`.

@@ -18,6 +18,7 @@ const _signers = async (ctx) => {
     broker: {
       beneficiaries: [],
     },
+    pool: {},
     others: [],
   };
 
@@ -49,6 +50,7 @@ const _signers = async (ctx) => {
     signers.issuer.guardian,
     signers.issuer.recipient,
     signers.issuer.registerer,
+    signers.pool.owner,
     signers.splitter.admin,
     signers.splitter.registrar,
     signers.splitter.beneficiaries[0],
@@ -77,10 +79,12 @@ const initialize = async (ctx) => {
   };
 
   ctx.constants = {
+    ONE: ethers.BigNumber.from(1),
     sERC20: config.sERC20.constants,
-    vault: config.vault.constants,
     broker: config.broker.constants,
+    pool: config.pool.constants,
     splitter: config.splitter.constants,
+    vault: config.vault.constants,
   };
 
   ctx.signers = await _signers();

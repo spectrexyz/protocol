@@ -6,5 +6,4 @@ import "@balancer-labs/v2-vault/contracts/Authorizer.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/WeightedPool2Tokens.sol";
 import "@balancer-labs/v2-pool-utils/contracts/oracle/QueryProcessor.sol";
 
-
 contract Imports {}

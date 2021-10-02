@@ -8,57 +8,65 @@ const MAX_RELATIVE_ERROR = 0.00005;
 
 chai.use(near);
 
-describe("pool", () => {
+describe("FractionalizationBootstrappingPool", () => {
   before(async () => {
     await initialize(this);
   });
 
-  describe("⇛ constructor", () => {
-    describe("» sERC20 maximum weight is valid", () => {
-      describe("» and sERC20 minimum weight is valid", () => {
+  describe.only("⇛ constructor", () => {
+    describe("» sERC20 minimum weight is valid", () => {
+      describe("» and sERC20 maximum weight is valid", () => {
         describe("» and swap fee is valid", () => {
           before(async () => {
             await setup.pool(this, { mint: false });
           });
 
-          it("it sets up the pool name", async () => {
+          it("it sets up the pool's name", async () => {
             expect(await this.pool.name()).to.equal(this.params.pool.name);
           });
 
-          it("it sets up the pool symbol", async () => {
+          it("it sets up the pool's symbol", async () => {
             expect(await this.pool.symbol()).to.equal(this.params.pool.symbol);
           });
 
-          it("it sets up the pool decimals", async () => {
+          it("it sets up the pool's decimals", async () => {
             expect(await this.pool.decimals()).to.equal(18);
           });
 
-          it("it sets up the vault", async () => {
-            expect(await this.pool.getVault()).to.equal(this.contracts.bVault.address);
-          });
-
-          it("it sets up the swap fee", async () => {
-            expect(await this.pool.getSwapFeePercentage()).to.equal(this.params.pool.swapFeePercentage);
-          });
-
-          it("it sets up the authorizer", async () => {
+          it("it sets up the pool's authorizer", async () => {
             expect(await this.pool.getAuthorizer()).to.equal(this.contracts.authorizer.address);
           });
 
-          it("it sets up no owner", async () => {
-            expect(await this.pool.getOwner()).to.equal("0x0000000000000000000000000000000000000000");
+          it("it sets up the pool's owner", async () => {
+            expect(await this.pool.getOwner()).to.equal(this.signers.pool.owner.address);
           });
 
-          it("it starts with no BPT", async () => {
-            expect(await this.pool.totalSupply()).to.equal(0);
+          it("it sets up the pool's pausable data", async () => {
+            const state = await this.pool.getPausedState();
+
+            expect(state.paused).to.equal(false);
+            expect(state.pauseWindowEndTime).to.equal(this.data.timestamp.add(this.params.pool.pauseWindowDuration));
+            expect(state.bufferPeriodEndTime).to.equal(this.params.pool.bufferPeriodDuration.add(state.pauseWindowEndTime));
           });
 
-          it("it initializes tokens weights", async () => {
+          it("it sets up the pool's swap fee", async () => {
+            expect(await this.pool.getSwapFeePercentage()).to.equal(this.params.pool.swapFeePercentage);
+          });
+
+          it("it sets up the pool's vault", async () => {
+            expect(await this.pool.getVault()).to.equal(this.contracts.bVault.address);
+          });
+
+          it("it sets up the pool's tokens weights", async () => {
             const weights = await this.pool.getNormalizedWeights();
 
-            expect(weights[0]).to.equal(this.constants.pool.ONE.sub(this.params.pool.normalizedStartWeight));
-            expect(weights[1]).to.equal(this.params.pool.normalizedStartWeight);
-            expect(await this.pool.maxWeightTokenIndex()).to.equal(this.pool.sERC20IsToken0 ? 1 : 0);
+            if (this.pool.sERC20IsToken0) {
+              expect(weights[0]).to.equal(this.params.pool.sMaxNormalizedWeight);
+              expect(weights[1]).to.equal(this.constants.pool.ONE.sub(this.params.pool.sMaxNormalizedWeight));
+            } else {
+              expect(weights[0]).to.equal(this.constants.pool.ONE.sub(this.params.pool.sMaxNormalizedWeight));
+              expect(weights[1]).to.equal(this.params.pool.sMaxNormalizedWeight);
+            }
           });
 
           it("it registers the pool in the vault", async () => {
@@ -68,20 +76,22 @@ describe("pool", () => {
             expect(pool[1]).to.equal(this.constants.pool.TWO_TOKEN_POOL);
           });
 
-          it("it registers tokens in the vault", async () => {
+          it("it registers the pool's tokens in the vault", async () => {
             const { tokens, balances } = await this.contracts.bVault.getPoolTokens(this.data.poolId);
 
-            expect(tokens[0]).to.equal(this.contracts.WETH.address);
-            expect(tokens[1]).to.equal(this.contracts.sERC20.address);
             expect(balances[0]).to.equal(0);
             expect(balances[1]).to.equal(0);
+
+            if (this.pool.sERC20IsToken0) {
+              expect(tokens[0]).to.equal(this.sERC20.address);
+              expect(tokens[1]).to.equal(this.contracts.WETH.address);
+            } else {
+              expect(tokens[0]).to.equal(this.contracts.WETH.address);
+              expect(tokens[1]).to.equal(this.sERC20.address);
+            }
           });
 
-          it("it enables the oracle", async () => {
-            expect((await this.pool.getMiscData()).oracleEnabled).to.equal(true);
-          });
-
-          it("it disable asset managers", async () => {
+          it("it registers the pool's tokens asset managers as the zero address", async () => {
             expect((await this.contracts.bVault.getPoolTokenInfo(this.data.poolId, this.contracts.WETH.address)).assetManager).to.equal(
               ethers.constants.AddressZero
             );
@@ -92,36 +102,56 @@ describe("pool", () => {
         });
 
         describe("» but swap fee is invalid", () => {
-          it("it reverts [swap fee too big]", async () => {
-            await expect(setup(this, { balancer: true, mint: false, invalidSwapFee: true, tooBig: true })).to.be.revertedWith("BAL#202");
+          describe("» because swap fee is too big", () => {
+            it("it reverts", async () => {
+              await expect(
+                setup.pool(this, { mint: false, swapFeePercentage: this.constants.pool.MAX_SWAP_FEE_PERCENTAGE.add(this.constants.ONE) })
+              ).to.be.revertedWith("BAL#202");
+            });
           });
 
-          it("it reverts [swap fee too small]", async () => {
-            await expect(setup(this, { balancer: true, mint: false, invalidSwapFee: true })).to.be.revertedWith("BAL#203");
+          describe("» because swap fee is too small", () => {
+            it("it reverts", async () => {
+              await expect(
+                setup.pool(this, { mint: false, swapFeePercentage: this.constants.pool.MIN_SWAP_FEE_PERCENTAGE.sub(this.constants.ONE) })
+              ).to.be.revertedWith("BAL#203");
+            });
           });
         });
       });
 
-      describe("» but end weight is invalid", () => {
-        it("it reverts [sERC20EndWeight too big]", async () => {
-          await expect(setup(this, { balancer: true, mint: false, invalidEndWeight: true, tooBig: true })).to.be.revertedWith("BAL#302");
+      describe("» but sERC20 maximum weight is invalid", () => {
+        describe("» because sERC20 maximum weight is too big", () => {
+          it("it reverts", async () => {
+            await expect(setup.pool(this, { mint: false, sMaxNormalizedWeight: this.constants.pool.ONE })).to.be.revertedWith("BAL#302");
+          });
         });
 
-        it("it reverts [sERC20EndWeight too small]", async () => {
-          await expect(setup(this, { balancer: true, mint: false, invalidEndWeight: true })).to.be.revertedWith(
-            "pool: sERC20 max weigth must be superior to sERC20 min weight"
-          );
+        describe("» because sERC20 maximum weight is smaller than sERC20 minimum weight", () => {
+          it("it reverts", async () => {
+            await expect(setup.pool(this, { mint: false, sMaxNormalizedWeight: this.params.pool.sMinNormalizedWeight })).to.be.revertedWith(
+              "FractionalizationBootstrappingPool: sERC20 max weight must be superior to sERC20 min weight"
+            );
+          });
         });
       });
     });
 
-    describe("» but start weight is invalid", () => {
-      it("it reverts [sERC20StartWeight too big]", async () => {
-        await expect(setup(this, { balancer: true, mint: false, invalidStartWeight: true, tooBig: true })).to.be.revertedWith("BAL#302");
+    describe("» but sERC20 minimal weight is invalid", () => {
+      describe("» because sERC20 minimal weight is too small", () => {
+        it("it reverts", async () => {
+          await expect(setup.pool(this, { mint: false, sMinNormalizedWeight: this.constants.pool.MIN_WEIGHT.sub(this.constants.ONE) })).to.be.revertedWith(
+            "BAL#302"
+          );
+        });
       });
 
-      it("it reverts [sERC20StartWeight too small]", async () => {
-        await expect(setup(this, { balancer: true, mint: false, invalidStartWeight: true })).to.be.revertedWith("BAL#302");
+      describe("» because sERC20 minimal weight is bigger than sERC20 maximal weight", () => {
+        it("it reverts", async () => {
+          await expect(setup.pool(this, { mint: false, sMinNormalizedWeight: this.params.pool.sMaxNormalizedWeight })).to.be.revertedWith(
+            "FractionalizationBootstrappingPool: sERC20 max weight must be superior to sERC20 min weight"
+          );
+        });
       });
     });
   });

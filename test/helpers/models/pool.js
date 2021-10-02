@@ -28,6 +28,7 @@ class Pool {
     this.getAuthorizer = this.contract.getAuthorizer;
     this.getSwapFeePercentage = this.contract.getSwapFeePercentage;
     this.getTimeWeightedAverage = this.contract.getTimeWeightedAverage;
+    this.getPausedState = this.contract.getPausedState;
   }
 
   static async deploy(ctx, opts) {
@@ -41,6 +42,7 @@ class Pool {
     opts.swapFeePercentage ??= ctx.params.pool.swapFeePercentage;
     opts.pauseWindowDuration ??= ctx.params.pool.pauseWindowDuration;
     opts.bufferPeriodDuration ??= ctx.params.pool.bufferPeriodDuration;
+    opts.owner ??= ctx.signers.pool.owner;
 
     ctx.contracts.authorizer = await waffle.deployContract(ctx.signers.root, _Authorizer_, [ctx.signers.root.address]);
     ctx.contracts.oracleMock = await waffle.deployContract(ctx.signers.root, _OracleMock_);
@@ -101,6 +103,7 @@ class Pool {
       pauseWindowDuration: opts.pauseWindowDuration,
       bufferPeriodDuration: opts.bufferPeriodDuration,
       sERC20IsToken0,
+      owner: opts.owner.address,
     };
 
     ctx.contracts.QueryProcessor = await waffle.deployContract(ctx.signers.root, _QueryProcessor_, []);
@@ -110,15 +113,18 @@ class Pool {
       },
     });
 
-    ctx.contracts.pool = await (await PoolFactory.connect(ctx.signers.root).deploy(params)).deployed();
-
+    ctx.data.tx = await PoolFactory.connect(ctx.signers.root).deploy(params);
+    ctx.contracts.pool = await ctx.data.tx.deployed();
+    ctx.data.receipt = await ctx.data.tx.deployTransaction.wait();
+    ctx.data.timestamp = ethers.BigNumber.from((await ethers.provider.getBlock(ctx.data.receipt.blockNumber)).timestamp);
+    ctx.data.poolId = await ctx.contracts.pool.getPoolId();
     await ctx.sERC20.approve();
 
     ctx.pool = new Pool(ctx, sERC20IsToken0);
   }
 
-  async pokeWeights() {
-    this.ctx.data.tx = await this.contract.pokeWeights();
+  async poke() {
+    this.ctx.data.tx = await this.contract.poke();
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
