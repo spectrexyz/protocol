@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
@@ -14,13 +14,13 @@ contract FractionalizationBootstrappingPoolFactory is BasePoolSplitCodeFactory, 
     constructor(IVault vault) BasePoolSplitCodeFactory(vault, type(FractionalizationBootstrappingPool).creationCode) {}
 
     /**
-     * @notice Deploys a new `FractionalizationBootstrappingPool`.
+     * @notice Deploys a new FractionalizationBootstrappingPool.
      */
     function create(
         string memory name,
         string memory symbol,
-        IERC20 token0,
-        IERC20 token1,
+        address token0,
+        address token1,
         uint256 sMaxNormalizedWeight,
         uint256 sMinNormalizedWeight,
         uint256 swapFeePercentage,
@@ -32,8 +32,8 @@ contract FractionalizationBootstrappingPoolFactory is BasePoolSplitCodeFactory, 
             vault: getVault(),
             name: name,
             symbol: symbol,
-            token0: token0,
-            token1: token1,
+            token0: IERC20(token0),
+            token1: IERC20(token1),
             sMaxNormalizedWeight: sMaxNormalizedWeight,
             sMinNormalizedWeight: sMinNormalizedWeight,
             swapFeePercentage: swapFeePercentage,

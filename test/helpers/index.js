@@ -72,6 +72,7 @@ const initialize = async (ctx) => {
     sERC20: config.sERC20.params,
     sERC721: config.sERC721.params,
     broker: config.broker.params,
+    issuer: config.issuer.params,
     pool: config.pool.params,
     splitter: config.splitter.params,
     vault: config.vault.params,
@@ -81,6 +82,7 @@ const initialize = async (ctx) => {
     ONE: ethers.BigNumber.from(1),
     sERC20: config.sERC20.constants,
     broker: config.broker.constants,
+    issuer: config.issuer.constants,
     pool: config.pool.constants,
     splitter: config.splitter.constants,
     vault: config.vault.constants,
@@ -131,6 +133,19 @@ const setup = {
 
     await ctx.sERC721.mint(opts);
     await ctx.vault.fractionalize({ broker: ctx.broker });
+  },
+  issuer: async (ctx, opts = {}) => {
+    opts.fractionalize ??= true;
+
+    ctx.contracts.sERC20Base = await waffle.deployContract(ctx.signers.root, _sERC20_);
+
+    await sERC721.deploy(ctx);
+    await Vault.deploy(ctx);
+
+    await ctx.sERC721.mint(opts);
+    await ctx.vault.fractionalize({ broker: ctx.broker });
+    await PoolFactory.deploy(ctx, opts);
+    await Issuer.deploy(ctx, opts);
   },
   splitter: async (ctx, opts = {}) => {
     await setup.vault(ctx, opts);

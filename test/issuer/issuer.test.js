@@ -14,71 +14,93 @@ describe.only("Issuer", () => {
     await initialize(this);
   });
 
-  describe("⇛ constructor", () => {
+  describe("# constructor", () => {
     describe("» vault is not the zero address", () => {
-      describe("» and bank is not the zero address", () => {
-        describe("» and splitter is not the zero address", () => {
-          describe("» and protocol fee is inferior to 100%", () => {
-            before(async () => {
-              await setup(this, { issuer: true, mint: false });
+      describe("» and pool factory is not the zero address", () => {
+        describe("» and WETH is not the zero address", () => {
+          describe("» and bank is not the zero address", () => {
+            describe("» and splitter is not the zero address", () => {
+              describe("» and protocol fee is inferior to 100%", () => {
+                before(async () => {
+                  await setup.issuer(this);
+                });
+
+                it("it sets up the issuer's vault", async () => {
+                  expect(await this.issuer.vault()).to.equal(this.contracts.bVault.address);
+                });
+
+                it("it sets up the issuer's pool factory", async () => {
+                  expect(await this.issuer.poolFactory()).to.equal(this.poolFactory.address);
+                });
+
+                it("it sets up the issuer's bank", async () => {
+                  expect(await this.issuer.bank()).to.equal(this.signers.issuer.bank.address);
+                });
+
+                it("it sets up the issuer's splitter", async () => {
+                  expect(await this.issuer.splitter()).to.equal(this.signers.issuer.splitter.address);
+                });
+
+                it("it sets up the issuer's protocol fee", async () => {
+                  expect(await this.issuer.protocolFee()).to.equal(this.params.issuer.protocolFee);
+                });
+
+                it("it sets up the issuer's permissions", async () => {
+                  expect(await this.issuer.hasRole(this.constants.issuer.DEFAULT_ADMIN_ROLE, this.signers.issuer.admin.address)).to.equal(true);
+                });
+              });
+
+              describe("» but protocol fee is superior or equal to 100%", () => {
+                it("it reverts", async () => {
+                  await expect(
+                    Issuer.deploy(this, {
+                      protocolFee: this.constants.issuer.HUNDRED,
+                    })
+                  ).to.be.revertedWith("Issuer: protocol fee must be inferior to 100%");
+                });
+              });
             });
 
-            it("it initializes contract", async () => {
-              expect(await this.issuer.vault()).to.equal(
-                this.contracts.bvault.address
-              );
-              expect(await this.issuer.bank()).to.equal(
-                this.signers.issuer.bank.address
-              );
-              expect(await this.issuer.splitter()).to.equal(
-                this.signers.issuer.splitter.address
-              );
-              expect(await this.issuer.protocolFee()).to.equal(
-                this.params.issuer.protocolFee
-              );
-            });
-
-            it("it sets up permissions", async () => {
-              expect(
-                await this.issuer.hasRole(
-                  this.constants.issuer.DEFAULT_ADMIN_ROLE,
-                  this.signers.issuer.admin.address
-                )
-              ).to.equal(true);
+            describe("» but splitter is the zero address", () => {
+              it("it reverts", async () => {
+                await expect(
+                  Issuer.deploy(this, {
+                    splitter: { address: ethers.constants.AddressZero },
+                  })
+                ).to.be.revertedWith("Issuer: splitter cannot be the zero address");
+              });
             });
           });
 
-          describe("» but protocol fee is superior or equal to 100%", () => {
+          describe("» but bank is the zero address", () => {
             it("it reverts", async () => {
               await expect(
                 Issuer.deploy(this, {
-                  protocolFee: this.constants.issuer.HUNDRED,
+                  bank: { address: ethers.constants.AddressZero },
                 })
-              ).to.be.revertedWith(
-                "Issuer: protocol fee must be inferior to 100%"
-              );
+              ).to.be.revertedWith("Issuer: bank cannot be the zero address");
             });
           });
         });
 
-        describe("» but splitter is the zero address", () => {
+        describe("» but WETH is the zero address", () => {
           it("it reverts", async () => {
             await expect(
               Issuer.deploy(this, {
-                splitter: { address: ethers.constants.AddressZero },
+                WETH: { address: ethers.constants.AddressZero },
               })
-            ).to.be.revertedWith("Issuer: splitter cannot be the zero address");
+            ).to.be.revertedWith("Issuer: WETH cannot be the zero address");
           });
         });
       });
 
-      describe("» but bank is the zero address", () => {
+      describe("» but pool factory is the zero address", () => {
         it("it reverts", async () => {
           await expect(
             Issuer.deploy(this, {
-              bank: { address: ethers.constants.AddressZero },
+              poolFactory: { address: ethers.constants.AddressZero },
             })
-          ).to.be.revertedWith("Issuer: bank cannot be the zero address");
+          ).to.be.revertedWith("Issuer: pool factory cannot be the zero address");
         });
       });
     });
@@ -98,72 +120,58 @@ describe.only("Issuer", () => {
     describe("» caller has REGISTER_ROLE", () => {
       describe("» and guardian is not the zero address", () => {
         describe("» and reserve price is not null", () => {
-          describe.only("» and minting fee is inferior to 100%", () => {
-            before(async () => {
-              await setup(this, {
-                issuer: true,
-                mint: false,
+          describe.only("» and allocation is inferior to 100%", () => {
+            describe("» and minting fee is inferior to 100%", () => {
+              before(async () => {
+                await setup.issuer(this);
+                await this.issuer.register();
+                this.data.issuance = await this.issuer.issuanceOf(this.sERC20.contract.address);
               });
-              await this.issuer.register();
-              this.data.issuance = await this.issuer.issuanceOf(
-                this.sERC20.contract.address
-              );
-            });
 
-            it.only("it registers issuance", async () => {
-              expect(this.data.issuance.state).to.equal(
-                this.constants.issuer.issuances.state.OPEN
-              );
-              // expect(this.data.issuance.pool).to.equal(this.sBootstrappingPool.contract.address);
-              expect(this.data.issuance.guardian).to.equal(
-                this.signers.issuer.guardian.address
-              );
-              expect(this.data.issuance.reserve).to.equal(
-                this.params.issuance.reserve
-              );
-              expect(this.data.issuance.allocation).to.equal(
-                this.params.issuance.allocation
-              );
-              expect(this.data.issuance.fee).to.equal(this.params.issuance.fee);
-              expect(this.data.issuance.nbOfProposals).to.equal(0);
-              expect(this.data.issuance.flash).to.equal(true);
-            });
+              it("it deploys FractionalizationBootstrappingPool", async () => {
+                expect(await this.pool.getPoolId()).to.equal(this.data.issuance.poolId);
+              });
 
-            it("it emits a Register event", async () => {
-              await expect(this.data.tx)
-                .to.emit(this.sMinter.contract, "Register")
-                .withArgs(
-                  this.sERC20.contract.address,
-                  this.sBootstrappingPool.contract.address,
-                  this.signers.sMinter.beneficiary.address,
-                  this.params.sMinter.initialPrice,
-                  this.params.sMinter.allocation,
-                  this.params.sMinter.fee,
-                  this.params.sMinter.protocolFee
-                );
-            });
-          });
+              it("it registers issuance", async () => {
+                expect(this.data.issuance.state).to.equal(this.constants.issuer.issuances.state.Opened);
+                expect(this.data.issuance.pool).to.equal(this.pool.address);
+                expect(this.data.issuance.guardian).to.equal(this.signers.issuer.guardian.address);
+                expect(this.data.issuance.reserve).to.equal(this.params.issuer.reserve);
+                expect(this.data.issuance.allocation).to.equal(this.params.issuer.allocation);
+                expect(this.data.issuance.fee).to.equal(this.params.issuer.fee);
+                expect(this.data.issuance.nbOfProposals).to.equal(0);
+                expect(this.data.issuance.flash).to.equal(true);
+              });
 
-          describe("» but minting fee is superior or equal to 100%", () => {
-            before(async () => {
-              await setup(this, {
-                balancer: true,
-                minter: true,
-                mint: false,
-                register: false,
+              it("it emits a Register event", async () => {
+                await expect(this.data.tx)
+                  .to.emit(this.issuer.contract, "Register")
+                  .withArgs(
+                    this.sERC20.contract.address,
+                    this.signers.issuer.guardian.address,
+                    this.pool.address,
+                    this.params.pool.sMaxNormalizedWeight,
+                    this.params.pool.sMinNormalizedWeight,
+                    this.params.pool.swapFeePercentage,
+                    this.params.issuer.reserve,
+                    this.params.issuer.allocation,
+                    this.params.issuer.fee
+                  );
               });
             });
 
-            it("it reverts", async () => {
-              await expect(
-                this.sMinter.register({
-                  fee: this.constants.sMinter.HUNDRED.sub(
-                    this.params.sMinter.protocolFee
-                  ),
-                })
-              ).to.be.revertedWith(
-                "sMinter: cumulated fees must be inferior to 100%"
-              );
+            describe("» but minting fee is superior or equal to 100%", () => {
+              before(async () => {
+                await setup.issuer(this);
+              });
+
+              it("it reverts", async () => {
+                await expect(
+                  this.issuer.register({
+                    fee: this.constants.issuer.HUNDRED,
+                  })
+                ).to.be.revertedWith("Issuer: minting fee must be inferior to 100%");
+              });
             });
           });
         });
@@ -179,9 +187,7 @@ describe.only("Issuer", () => {
           });
 
           it("it reverts", async () => {
-            await expect(
-              this.sMinter.register({ initialPrice: "0" })
-            ).to.be.revertedWith("sMinter: initial price cannot be null");
+            await expect(this.sMinter.register({ initialPrice: "0" })).to.be.revertedWith("sMinter: initial price cannot be null");
           });
         });
       });
@@ -201,9 +207,7 @@ describe.only("Issuer", () => {
             this.sMinter.register({
               beneficiary: { address: ethers.constants.AddressZero },
             })
-          ).to.be.revertedWith(
-            "sMinter: beneficiary cannot be the zero address"
-          );
+          ).to.be.revertedWith("sMinter: beneficiary cannot be the zero address");
         });
       });
     });
@@ -219,9 +223,7 @@ describe.only("Issuer", () => {
       });
 
       it("it reverts", async () => {
-        await expect(
-          this.sMinter.register({ from: this.signers.others[0] })
-        ).to.be.revertedWith("sMinter: must have REGISTER_ROLE to register");
+        await expect(this.sMinter.register({ from: this.signers.others[0] })).to.be.revertedWith("sMinter: must have REGISTER_ROLE to register");
       });
     });
   });

@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import "./IIssuer.sol";
 import "./interfaces/IBalancer.sol";
-import "./interfaces/ISpectralizationBootstrappingPool.sol";
+import "./interfaces/IFractionalizationBootstrappingPool.sol";
+import "./interfaces/IFractionalizationBootstrappingPoolFactory.sol";
 import "./libraries/Issuances.sol";
 import "../token/sIERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
@@ -30,6 +31,8 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     }
 
     IBVault private immutable _vault;
+    IFractionalizationBootstrappingPoolFactory private immutable _poolFactory;
+    address private immutable _WETH;
     address private _bank;
     address private _splitter;
     uint256 private _protocolFee;
@@ -37,16 +40,22 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
 
     constructor(
         IBVault vault_,
+        IFractionalizationBootstrappingPoolFactory poolFactory_,
+        address WETH_,
         address bank_,
         address splitter_,
         uint256 protocolFee_
     ) {
         require(address(vault_) != address(0), "Issuer: vault cannot be the zero address");
+        require(address(poolFactory_) != address(0), "Issuer: pool factory cannot be the zero address");
+        require(address(WETH_) != address(0), "Issuer: WETH cannot be the zero address");
         require(bank_ != address(0), "Issuer: bank cannot be the zero address");
         require(splitter_ != address(0), "Issuer: splitter cannot be the zero address");
         require(protocolFee_ < HUNDRED, "Issuer: protocol fee must be inferior to 100%");
 
         _vault = vault_;
+        _poolFactory = poolFactory_;
+        _WETH = WETH_;
         _bank = bank_;
         _splitter = splitter_;
         _protocolFee = protocolFee_;
@@ -67,7 +76,6 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
      *        granted REGISTER_ROLE.
      *      - Other parameters are checked because they are passed by users and forwarded unchecked by templates.
      * @param sERC20 The sERC20 to initiate the issuance of.
-     * @param pool The address of the sERC20's Balancer pool.
      * @param guardian The account authorized to enable flash issuance and accept / reject proposals otherwise [also receives ETH proceeds].
      * @param reserve The reserve price below which sERC20 tokens can be issued [expressed in sERC20 per ETH and 1e18 decimals].
      * @param allocation The pre-allocated percentage of sERC20s [expressed with 1e18 decimals].
@@ -77,23 +85,55 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     function register(
         sIERC20 sERC20,
         address guardian,
-        ISpectralizationBootstrappingPool pool,
+        uint256 sMaxNormalizedWeight,
+        uint256 sMinNormalizedWeight,
+        uint256 swapFeePercentage,
         uint256 reserve,
         uint256 allocation,
         uint256 fee,
         bool flash
     ) external override {
+        IFractionalizationBootstrappingPool pool;
         Issuances.Issuance storage issuance = _issuances[sERC20];
 
         require(hasRole(REGISTER_ROLE, _msgSender()), "Issuer: must have REGISTER_ROLE to register");
         require(guardian != address(0), "Issuer: guardian cannot be the zero address");
         require(reserve != 0, "Issuer: reserve price cannot be null");
+        require(allocation < HUNDRED, "Issuer: allocation must be inferior to 100%");
         require(fee < HUNDRED, "Issuer: minting fee must be inferior to 100%");
+
+        if (address(sERC20) <= _WETH) {
+            pool = IFractionalizationBootstrappingPool(
+                _poolFactory.create(
+                    "Fractionalization Bootstrapping Pool Token",
+                    "FBPT",
+                    address(sERC20),
+                    _WETH,
+                    sMaxNormalizedWeight,
+                    sMinNormalizedWeight,
+                    swapFeePercentage,
+                    true
+                )
+            );
+        } else {
+            pool = IFractionalizationBootstrappingPool(
+                _poolFactory.create(
+                    "Fractionalization Bootstrapping Pool Token",
+                    "FBPT",
+                    _WETH,
+                    address(sERC20),
+                    sMaxNormalizedWeight,
+                    sMinNormalizedWeight,
+                    swapFeePercentage,
+                    false
+                )
+            );
+        }
 
         issuance.state = Issuances.State.Opened;
         issuance.pool = pool;
         issuance.poolId = pool.getPoolId();
-        issuance.poolIsRegular = pool.sERC20IsToken0();
+        // issuance.poolIsRegular = pool.sERC20IsToken0();
         issuance.guardian = guardian;
         issuance.reserve = reserve;
         issuance.allocation = allocation;
@@ -101,7 +141,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
 
         if (flash) _enableFlashIssuance(sERC20, issuance);
 
-        emit Register(sERC20, guardian, pool, reserve, allocation, fee);
+        emit Register(sERC20, guardian, pool, sMaxNormalizedWeight, sMinNormalizedWeight, swapFeePercentage,reserve, allocation, fee);
     }
 
     /**
@@ -184,7 +224,6 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         // }
     }
 
-    /* #region setters */
     function setBank(address payable bank_) external override protected {
         require(bank_ != address(0), "Issuer: bank cannot be the zero address");
 
@@ -203,11 +242,12 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         _protocolFee = protocolFee_;
     }
 
-    /* #endregion*/
-
-    /* #region getters */
     function vault() public view override returns (IBVault) {
         return _vault;
+    }
+
+    function poolFactory() public view override returns (IFractionalizationBootstrappingPoolFactory) {
+        return _poolFactory;
     }
 
     function bank() public view override returns (address) {
@@ -232,8 +272,9 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         override
         returns (
             Issuances.State state,
-            ISpectralizationBootstrappingPool pool,
             address guardian,
+            IFractionalizationBootstrappingPool pool,
+            bytes32 poolId,
             uint256 reserve,
             uint256 allocation,
             uint256 fee,
@@ -244,18 +285,15 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         Issuances.Issuance storage issuance = _issuances[sERC20];
 
         state = issuance.state;
-        pool = issuance.pool;
         guardian = issuance.guardian;
+        pool = issuance.pool;
+        poolId = issuance.poolId;
         reserve = issuance.reserve;
         allocation = issuance.allocation;
         fee = issuance.fee;
         nbOfProposals = issuance.nbOfProposals;
         flash = issuance.flash;
     }
-
-    /* #endregion*/
-
-    /* #region private */
 
     function _mint(
         sIERC20 sERC20,
@@ -290,7 +328,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
 
     function _request(
         sIERC20 sERC20,
-        ISpectralizationBootstrappingPool pool,
+        IFractionalizationBootstrappingPool pool,
         uint256 amount,
         uint256 value,
         bool poolIsRegular
@@ -315,13 +353,13 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
                 ? IBVault.JoinPoolRequest({
                     assets: assets,
                     maxAmountsIn: amounts,
-                    userData: abi.encode(ISpectralizationBootstrappingPool.JoinKind.REWARD, amounts),
+                    userData: abi.encode(IFractionalizationBootstrappingPool.JoinKind.REWARD, amounts),
                     fromInternalBalance: false
                 })
                 : IBVault.JoinPoolRequest({
                     assets: assets,
                     maxAmountsIn: amounts,
-                    userData: abi.encode(ISpectralizationBootstrappingPool.JoinKind.INIT, amounts),
+                    userData: abi.encode(IFractionalizationBootstrappingPool.JoinKind.INIT, amounts),
                     fromInternalBalance: false
                 });
     }
@@ -377,7 +415,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
 
     function _doReward(
         address sERC20,
-        ISpectralizationBootstrappingPool pool,
+        IFractionalizationBootstrappingPool pool,
         bytes32 poolId,
         uint256 value,
         uint256 initialPrice,

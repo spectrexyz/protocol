@@ -1,7 +1,5 @@
-const chai = require("chai");
 const { expect } = require("chai");
 const { initialize, setup } = require("../helpers");
-const { near } = require("../helpers/chai");
 
 describe("FractionalizationBootstrappingPoolFactory", () => {
   before(async () => {

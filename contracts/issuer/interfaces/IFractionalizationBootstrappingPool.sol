@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./IBalancer.sol";
 
-interface ISpectralizationBootstrappingPool {
+interface IFractionalizationBootstrappingPool {
     enum JoinKind {
         INIT,
         EXACT_TOKENS_IN_FOR_BPT_OUT,

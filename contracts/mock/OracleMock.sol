@@ -10,7 +10,7 @@ contract OracleMock is WeightedOracleMath {
     }
 
     function fromLowResLog(int256 value) external pure returns (uint256) {
-       return LogCompression.fromLowResLog(value);
+        return LogCompression.fromLowResLog(value);
     }
 
     function calcLogSpotPrice(

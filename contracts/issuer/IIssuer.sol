@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/IBalancer.sol";
-import "./interfaces/ISpectralizationBootstrappingPool.sol";
+import "./interfaces/IFractionalizationBootstrappingPool.sol";
+import "./interfaces/IFractionalizationBootstrappingPoolFactory.sol";
 import "./libraries/Issuances.sol";
 import "../token/sIERC20.sol";
 
@@ -10,7 +11,17 @@ interface IIssuer {
     /**
      * @notice Emitted when an `sERC20`pit is registered.
      */
-    event Register(sIERC20 indexed sERC20, address indexed guardian, ISpectralizationBootstrappingPool pool, uint256 reserve, uint256 allocation, uint256 fee);
+    event Register(
+        sIERC20 indexed sERC20,
+        address indexed guardian,
+        IFractionalizationBootstrappingPool pool,
+        uint256 sMaxNormalizedWeight,
+        uint256 sMinNormalizedWeight,
+        uint256 swapFeePercentage,
+        uint256 reserve,
+        uint256 allocation,
+        uint256 fee
+    );
     event Mint(sIERC20 indexed sERC20, address indexed recipient, uint256 value, uint256 amount);
     event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 amount, uint256 expiration);
     event EnableFlashIssuance(sIERC20 indexed sERC20);
@@ -18,7 +29,9 @@ interface IIssuer {
     function register(
         sIERC20 sERC20,
         address guardian,
-        ISpectralizationBootstrappingPool pool,
+        uint256 sMaxNormalizedWeight,
+        uint256 sMinNormalizedWeight,
+        uint256 swapFeePercentage,
         uint256 reserve,
         uint256 allocation,
         uint256 fee,
@@ -80,6 +93,11 @@ interface IIssuer {
     function vault() external view returns (IBVault);
 
     /**
+     * @notice Returns the address of the issuer's FractionalizationBootstrappingPoolFactory.
+     */
+    function poolFactory() external view returns (IFractionalizationBootstrappingPoolFactory);
+
+    /**
      * @notice Returns the address of the sMinter's bank.
      */
     function bank() external view returns (address);
@@ -103,8 +121,9 @@ interface IIssuer {
         view
         returns (
             Issuances.State state,
-            ISpectralizationBootstrappingPool pool,
             address guardian,
+            IFractionalizationBootstrappingPool pool,
+            bytes32 poolId,
             uint256 reserve,
             uint256 allocation,
             uint256 fee,

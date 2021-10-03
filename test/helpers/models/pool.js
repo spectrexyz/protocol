@@ -4,7 +4,6 @@ const _OracleMock_ = require("../../../artifacts/contracts/mock/OracleMock.sol/O
 const _QueryProcessor_ = require("../../../artifacts/@balancer-labs/v2-pool-utils/contracts/oracle/QueryProcessor.sol/QueryProcessor.json");
 const _WETH_ = require("../../../artifacts/contracts/mock/WETH.sol/WETH.json");
 const _FractionalizationBootstrappingPool_ = require("../../../artifacts/contracts/pool/FractionalizationBootstrappingPool.sol/FractionalizationBootstrappingPool.json");
-
 const Decimal = require("decimal.js");
 
 class Pool {
