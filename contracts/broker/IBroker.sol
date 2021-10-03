@@ -17,6 +17,8 @@ interface IBroker {
     event EnableFlashBuyout(sIERC20 indexed sERC20);
     event EnableEscape(sIERC20 indexed sERC20);
     event DisableEscape(sIERC20 indexed sERC20);
+    event SetBank(address bank);
+    event SetProtocolFee(uint256 protocolFee);
     event Escape(sIERC20 indexed sERC20, address indexed beneficiary, bytes data);
 
     function register(
@@ -46,6 +48,10 @@ interface IBroker {
     function enableEscape(sIERC20 sERC20) external;
 
     function disableEscape(sIERC20 sERC20) external;
+
+    function setBank(address bank) external;
+
+    function setProtocolFee(uint256 protocolFee) external;
 
     function _escape_(
         sIERC20[] calldata sERC20s,

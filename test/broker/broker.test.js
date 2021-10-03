@@ -27,15 +27,32 @@ describe("Broker", () => {
               await setup.broker(this);
             });
 
-            it("it initializes broker", async () => {
+            it("it sets up the broker's vault", async () => {
               expect(await this.broker.vault()).to.equal(this.vault.address);
+            });
+
+            it("it sets up the broker's issuer", async () => {
               expect(await this.broker.issuer()).to.equal(this.contracts.issuerMock.address);
+            });
+
+            it("it sets up the broker's bank", async () => {
               expect(await this.broker.bank()).to.equal(this.signers.broker.bank.address);
+            });
+
+            it("it sets up the broker's protocolFee", async () => {
               expect(await this.broker.protocolFee()).to.equal(this.params.broker.protocolFee);
             });
 
-            it("it sets up permissions", async () => {
+            it("it sets up the broker's permissions", async () => {
               expect(await this.broker.hasRole(this.constants.broker.DEFAULT_ADMIN_ROLE, this.signers.broker.admin.address)).to.equal(true);
+            });
+
+            it("it emits a SetBank event", async () => {
+              await expect(this.broker.contract.deployTransaction).to.emit(this.broker.contract, "SetBank").withArgs(this.signers.broker.bank.address);
+            });
+
+            it("it emits a SetProtocolFee event", async () => {
+              await expect(this.broker.contract.deployTransaction).to.emit(this.broker.contract, "SetProtocolFee").withArgs(this.params.broker.protocolFee);
             });
           });
 
@@ -881,6 +898,94 @@ describe("Broker", () => {
 
       it("it reverts", async () => {
         await expect(this.broker.disableEscape({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must be sale's guardian to disable escape");
+      });
+    });
+  });
+
+  describe("# setBank", () => {
+    describe("» caller has DEFAULT_ADMIN_ROLE", () => {
+      describe("» and bank is not the zero address", () => {
+        before(async () => {
+          await setup.broker(this);
+          this.data.tx = await this.broker.contract.connect(this.signers.broker.admin).setBank(this.signers.others[0].address);
+          this.data.receipt = await this.data.tx.wait();
+        });
+
+        it("it sets the broker's bank", async () => {
+          expect(await this.broker.bank()).to.equal(this.signers.others[0].address);
+        });
+
+        it("it emits a SetBank event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "SetBank").withArgs(this.signers.others[0].address);
+        });
+      });
+
+      describe("» but bank is the zero address", () => {
+        before(async () => {
+          await setup.broker(this);
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.contract.connect(this.signers.broker.admin).setBank(ethers.constants.AddressZero)).to.be.revertedWith(
+            "Broker: bank cannot be the zero address"
+          );
+        });
+      });
+    });
+
+    describe("» caller does not have DEFAULT_ADMIN_ROLE", () => {
+      before(async () => {
+        await setup.broker(this);
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.contract.connect(this.signers.others[0]).setBank(this.signers.issuer.bank.address)).to.be.revertedWith(
+          "Broker: must have DEFAULT_ADMIN_ROLE to set bank"
+        );
+      });
+    });
+  });
+
+  describe("# setProtocolFee", () => {
+    describe("» caller has DEFAULT_ADMIN_ROLE", () => {
+      describe("» and protocol fee is inferior to 100%", () => {
+        before(async () => {
+          await setup.broker(this);
+          this.data.tx = await this.broker.contract.connect(this.signers.broker.admin).setProtocolFee(0);
+          this.data.receipt = await this.data.tx.wait();
+        });
+
+        it("it sets the broker's protocol fee", async () => {
+          expect(await this.broker.protocolFee()).to.equal(0);
+        });
+
+        it("it emits a SetProtocolFee event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "SetProtocolFee").withArgs(0);
+        });
+      });
+
+      describe("» but protocol fee is superior or equal to 100%", () => {
+        before(async () => {
+          await setup.broker(this);
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.contract.connect(this.signers.broker.admin).setProtocolFee(this.constants.broker.HUNDRED)).to.be.revertedWith(
+            "Broker: protocol fee must be inferior to 100%"
+          );
+        });
+      });
+    });
+
+    describe("» caller does not have DEFAULT_ADMIN_ROLE", () => {
+      before(async () => {
+        await setup.broker(this);
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.contract.connect(this.signers.others[0]).setProtocolFee(this.params.broker.protocolFee)).to.be.revertedWith(
+          "Broker: must have DEFAULT_ADMIN_ROLE to set protocol fee"
+        );
       });
     });
   });

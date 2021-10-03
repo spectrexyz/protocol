@@ -25,7 +25,6 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     uint256 public constant MINIMUM_TIMELOCK = 1 weeks;
     uint256 public constant DECIMALS = 1e18; // !IMPORTANT: is the same as Issuer.DECIMALS
     uint256 public constant HUNDRED = 1e20;
-    bytes32 private constant _MINT_ROLE = keccak256("MINT_ROLE");
 
     IVault private immutable _vault;
     IIssuer private immutable _issuer;
@@ -46,8 +45,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
 
         _vault = vault_;
         _issuer = issuer_;
-        _bank = bank_;
-        _protocolFee = protocolFee_;
+        _setBank(bank_);
+        _setProtocolFee(protocolFee_);
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
@@ -274,6 +273,20 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         _disableEscape(sERC20, sale);
     }
 
+    function setBank(address bank_) external override {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Broker: must have DEFAULT_ADMIN_ROLE to set bank");
+        require(bank_ != address(0), "Broker: bank cannot be the zero address");
+  
+        _setBank(bank_);
+    }
+
+    function setProtocolFee(uint256 protocolFee_) external override {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Broker: must have DEFAULT_ADMIN_ROLE to set protocol fee");
+        require(protocolFee_ < HUNDRED, "Broker: protocol fee must be inferior to 100%");
+
+        _setProtocolFee(protocolFee_);
+    }
+
     /**
      * @notice Transfer all the NFTs pegged to `sERC20s `to `beneficiaries` with `datas` as ERC721#safeTransferFrom callback datas.
      * @dev This function is only meant to be used in case of an emergency or upgrade to transfer NFTs to a safer or up-to-date place.
@@ -431,6 +444,18 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         sale.escape = false;
 
         emit DisableEscape(sERC20);
+    }
+
+    function _setBank(address bank_) private {
+        _bank = bank_;
+
+        emit SetBank(bank_);
+    }
+
+    function _setProtocolFee(uint256 protocolFee_) private {
+        _protocolFee = protocolFee_;
+
+        emit SetProtocolFee(protocolFee_);
     }
 
     function _priceOfFor(
