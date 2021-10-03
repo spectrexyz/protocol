@@ -276,7 +276,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     function setBank(address bank_) external override {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Broker: must have DEFAULT_ADMIN_ROLE to set bank");
         require(bank_ != address(0), "Broker: bank cannot be the zero address");
-  
+
         _setBank(bank_);
     }
 
