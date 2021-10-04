@@ -15,6 +15,10 @@ module.exports = {
     REGISTER_ROLE: ethers.BigNumber.from("0xd1f21ec03a6eb050fba156f5316dad461735df521fb446dd42c5a4728e9c70fe"),
     DECIMALS: ethers.utils.parseEther("1"),
     HUNDRED: ethers.utils.parseEther("100"),
+    TwapKind: {
+      ETH: 0,
+      sERC20: 1,
+    },
     issuances: {
       state: {
         Null: 0,

@@ -5,6 +5,7 @@ const _QueryProcessor_ = require("../../../artifacts/@balancer-labs/v2-pool-util
 const _WETH_ = require("../../../artifacts/contracts/mock/WETH.sol/WETH.json");
 const _FractionalizationBootstrappingPool_ = require("../../../artifacts/contracts/pool/FractionalizationBootstrappingPool.sol/FractionalizationBootstrappingPool.json");
 const Decimal = require("decimal.js");
+const { ethers } = require("ethers");
 
 class Pool {
   constructor(ctx, sERC20IsToken0) {
@@ -110,6 +111,38 @@ class Pool {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
+  async swap(opts = {}) {
+    opts.sERC20 ??= false;
+    opts.from ??= this.ctx.signers.others[0];
+    opts.value ??= this.ctx.params.pool.value;
+    opts.amount ??= this.ctx.params.pool.amount;
+
+    const singleSwap = {
+      poolId: this.ctx.data.poolId,
+      kind: 0,
+      assetIn: opts.sERC20 ? this.ctx.sERC20.address : ethers.constants.AddressZero,
+      assetOut: opts.sERC20 ? ethers.constants.AddressZero : this.ctx.sERC20.address,
+      amount: opts.sERC20 ? opts.amount : opts.value,
+      userData: ethers.constants.HashZero,
+    };
+
+    const funds = {
+      sender: opts.from.address,
+      fromInternalBalance: false,
+      recipient: opts.from.address,
+      toInternalBalance: false,
+    };
+
+    if (opts.sERC20) {
+      await this.ctx.sERC20.approve({ from: this.ctx.signers.others[0], amount: opts.amount, spender: this.ctx.contracts.bVault });
+    }
+
+    this.ctx.data.tx = await this.ctx.contracts.bVault.connect(opts.from).swap(singleSwap, funds, 0, Date.now(), {
+      value: opts.sERC20 ? 0 : opts.value,
+    });
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
   async join(opts = {}) {
     const JOIN_KIND_INIT = 0;
     const JOIN_EXACT_TOKENS = 1;
@@ -159,7 +192,21 @@ class Pool {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
-  async pairPrice() {
+  async latestSpotPrice(opts = {}) {
+    opts.ETH ??= false;
+    const DECIMALS = ethers.utils.parseEther("1");
+    if (opts.ETH) {
+      if (this.sERC20IsToken0) return DECIMALS.mul(DECIMALS).div(await this.getLatest(0));
+      else return await this.getLatest(0);
+    } else {
+      if (this.sERC20IsToken0) return await this.getLatest(0);
+      else return DECIMALS.mul(DECIMALS).div(await this.getLatest(0));
+    }
+  }
+
+  async pairPrice(opts = {}) {
+    opts.sERC20 ??= false;
+
     const BASE = new Decimal(10).pow(new Decimal(18));
     const { balances } = await this.ctx.contracts.bVault.getPoolTokens(this.ctx.data.poolId);
     const weights = await this.getNormalizedWeights();
@@ -167,7 +214,14 @@ class Pool {
     const numerator = this._decimal(balances[0]).div(this._decimal(weights[0]).div(BASE));
     const denominator = this._decimal(balances[1]).div(this._decimal(weights[1]).div(BASE));
 
-    return this._bn(numerator.mul(BASE).div(denominator));
+    const price = numerator.mul(BASE).div(denominator);
+
+    if (opts.sERC20) {
+      if (this.sERC20IsToken0) return this._bn(price);
+      else return this._bn(BASE.mul(BASE).div(price));
+    }
+
+    return this._bn(price);
   }
 
   async BTPPrice(opts = {}) {

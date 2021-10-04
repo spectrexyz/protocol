@@ -8,8 +8,11 @@ interface IFractionalizationBootstrappingPool {
         INIT,
         EXACT_TOKENS_IN_FOR_BPT_OUT,
         TOKEN_IN_FOR_EXACT_BPT_OUT,
+        ALL_TOKENS_IN_FOR_EXACT_BPT_OUT,
         REWARD
     }
+
+    function poke() external;
 
     function totalSupply() external view returns (uint256);
 

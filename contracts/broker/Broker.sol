@@ -465,7 +465,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     ) private view returns (uint256 value, uint256 collateral) {
         collateral = sERC20.balanceOf(buyer);
         uint256 supply = sERC20.totalSupply();
-        uint256 marketValue = (((_issuer.twapOf(sERC20) * supply) / DECIMALS) * sale.multiplier) / DECIMALS;
+        uint256 marketValue = (((_issuer.twapOf(sERC20, IIssuer.TwapKind.ETH) * supply) / DECIMALS) * sale.multiplier) / DECIMALS;
         uint256 reserve = sale.reserve;
         uint256 rawValue = reserve >= marketValue ? reserve : marketValue;
 

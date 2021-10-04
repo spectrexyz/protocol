@@ -49,9 +49,9 @@ interface IBroker {
 
     function disableEscape(sIERC20 sERC20) external;
 
-    function setBank(address bank) external;
+    function setBank(address bank_) external;
 
-    function setProtocolFee(uint256 protocolFee) external;
+    function setProtocolFee(uint256 protocolFee_) external;
 
     function _escape_(
         sIERC20[] calldata sERC20s,

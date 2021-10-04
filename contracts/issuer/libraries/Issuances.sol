@@ -13,15 +13,15 @@ library Issuances {
 
     struct Issuance {
         State state;
+        address guardian;
         IFractionalizationBootstrappingPool pool;
         bytes32 poolId;
-        address guardian;
         uint256 reserve;
         uint256 allocation;
         uint256 fee;
         uint256 nbOfProposals;
         mapping(uint256 => Proposals.Proposal) proposals;
         bool flash;
-        bool poolIsRegular;
+        bool sERC20IsToken0;
     }
 }

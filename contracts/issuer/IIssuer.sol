@@ -8,6 +8,8 @@ import "./libraries/Issuances.sol";
 import "../token/sIERC20.sol";
 
 interface IIssuer {
+    enum TwapKind { ETH, sERC20 }
+
     /**
      * @notice Emitted when an `sERC20`pit is registered.
      */
@@ -15,6 +17,7 @@ interface IIssuer {
         sIERC20 indexed sERC20,
         address indexed guardian,
         IFractionalizationBootstrappingPool pool,
+        bytes32 poolId,
         uint256 sMaxNormalizedWeight,
         uint256 sMinNormalizedWeight,
         uint256 swapFeePercentage,
@@ -22,9 +25,11 @@ interface IIssuer {
         uint256 allocation,
         uint256 fee
     );
-    event Mint(sIERC20 indexed sERC20, address indexed recipient, uint256 value, uint256 amount);
+    event Issue(sIERC20 indexed sERC20, address indexed recipient, uint256 value, uint256 amount);
     event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 amount, uint256 expiration);
     event EnableFlashIssuance(sIERC20 indexed sERC20);
+    event SetBank(address bank);
+    event SetProtocolFee(uint256 protocolFee);
 
     function register(
         sIERC20 sERC20,
@@ -44,7 +49,7 @@ interface IIssuer {
     //  * @param  expected  The amount of sERC20 tokens expected in return for the ETH sent [reverts otherwise].
     //  * @param  recipient The recipient of the sERC20 tokens to mint.
     //  */
-    function mint(sIERC20 sERC20, uint256 expected) external payable;
+    function issue(sIERC20 sERC20, uint256 expected) external payable;
 
     function createProposal(
         sIERC20 sERC20,
@@ -62,60 +67,22 @@ interface IIssuer {
      */
     function withdraw(address token) external;
 
-    /* #endregion */
+    function setBank(address bank_) external;
 
-    /* #region setters */
-    /**
-     * @notice Sets the address of the bank [to which protocol fees are transferred].
-     * @dev    This function is protected by the ADMIN_ROLE.
-     */
-    function setBank(address payable bank) external;
+    function setProtocolFee(uint256 protocolFee_) external;
 
-    /**
-     * @notice Sets the address of the allocation splitter contract [to which sERC20 allocations are transferred].
-     * @dev    This function is protected by the ADMIN_ROLE.
-     */
-    function setSplitter(address splitter) external;
-
-    /**
-     * @notice Sets the protocol fee [expressed with 18 decimals so that 100% = 1e20 and 1% = 1e18].
-     * @dev    This function is protected by the ADMIN_ROLE.
-     * @param  protocolFee The protocol fee to set.
-     */
-    function setProtocolFee(uint256 protocolFee) external;
-
-    /* #endregion*/
-
-    /* #region getters */
-    /**
-     * @notice Returns the address of Balancer V2's Vault.
-     */
     function vault() external view returns (IBVault);
 
-    /**
-     * @notice Returns the address of the issuer's FractionalizationBootstrappingPoolFactory.
-     */
     function poolFactory() external view returns (IFractionalizationBootstrappingPoolFactory);
 
-    /**
-     * @notice Returns the address of the sMinter's bank.
-     */
-    function bank() external view returns (address);
-
-    /**
-     * @notice Returns the address of the allocation splitter contract.
-     */
     function splitter() external view returns (address);
 
-    /**
-     * @notice Returns the current protocol fee.
-     */
+    function WETH() external view returns (address);
+
+    function bank() external view returns (address);
+
     function protocolFee() external view returns (uint256);
 
-    /**
-     * @notice Returns pit associated to an `sERC20`.
-     * @param  sERC20 The address of the sERC20 whose pit is queried.
-     */
     function issuanceOf(sIERC20 sERC20)
         external
         view
@@ -128,8 +95,9 @@ interface IIssuer {
             uint256 allocation,
             uint256 fee,
             uint256 nbOfProposals,
-            bool flash
+            bool flash,
+            bool sERC20IsToken0
         );
 
-    function twapOf(sIERC20 sERC20) external view returns (uint256);
+    function twapOf(sIERC20 sERC20, TwapKind Kind) external view returns (uint256);
 }

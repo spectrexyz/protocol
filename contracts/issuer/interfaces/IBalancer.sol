@@ -55,4 +55,6 @@ interface IBVault {
         address recipient,
         JoinPoolRequest memory request
     ) external payable;
+
+    function WETH() external view returns (address);
 }

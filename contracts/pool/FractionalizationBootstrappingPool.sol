@@ -201,6 +201,10 @@ contract FractionalizationBootstrappingPool is
 
     // Getters / Setters
 
+    function sERC20IsToken0() public view returns (bool) {
+        return _sERC20IsToken0;
+    }
+
     function getVault() public view returns (IVault) {
         return _vault;
     }

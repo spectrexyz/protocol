@@ -9,6 +9,8 @@ module.exports = {
     swapFeePercentage: ethers.BigNumber.from("10000000000000000"),
     pauseWindowDuration: ethers.BigNumber.from("3000"),
     bufferPeriodDuration: ethers.BigNumber.from("1000"),
+    value: ethers.utils.parseEther("0.05"),
+    amount: ethers.utils.parseEther("0.001"),
     pooled: {
       ETH: ethers.utils.parseEther("1"),
       sERC20: ethers.utils.parseEther("4"),

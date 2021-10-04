@@ -14,7 +14,9 @@ class Issuer {
     this.bank = this.contract.bank;
     this.splitter = this.contract.splitter;
     this.protocolFee = this.contract.protocolFee;
+    this.WETH = this.contract.WETH;
     this.issuanceOf = this.contract.issuanceOf;
+    this.twapOf = this.contract.twapOf;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.hasRole = this.contract.hasRole;
     this.DEFAULT_ADMIN_ROLE = this.contract.DEFAULT_ADMIN_ROLE;
@@ -24,7 +26,6 @@ class Issuer {
   static async deploy(ctx, opts = {}) {
     opts.vault ??= ctx.contracts.bVault;
     opts.poolFactory ??= ctx.contracts.poolFactory;
-    opts.WETH ??= ctx.contracts.WETH;
     opts.bank ??= ctx.signers.issuer.bank;
     opts.splitter ??= ctx.signers.issuer.splitter;
     opts.protocolFee ??= ctx.params.issuer.protocolFee;
@@ -32,15 +33,15 @@ class Issuer {
     ctx.contracts.issuer = await waffle.deployContract(ctx.signers.issuer.admin, _Issuer_, [
       opts.vault.address,
       opts.poolFactory.address,
-      opts.WETH.address,
-      opts.bank.address,
       opts.splitter.address,
+      opts.bank.address,
       opts.protocolFee,
     ]);
 
     ctx.issuer = new Issuer(ctx);
 
     await ctx.issuer.grantRole({ role: ctx.constants.issuer.REGISTER_ROLE, account: ctx.signers.issuer.registerer });
+    await ctx.sERC20.grantRole({ role: ctx.constants.sERC20.MINT_ROLE, account: ctx.issuer });
   }
 
   async grantRole(opts = {}) {
@@ -81,15 +82,19 @@ class Issuer {
     this.ctx.pool.sERC20IsToken0 = ethers.BigNumber.from(this.ctx.sERC20.address).lte(ethers.BigNumber.from(this.ctx.contracts.WETH.address));
   }
 
-  async mint(opts = {}) {
-    opts.from ??= this.ctx.signers.holders[0];
+  async close(opts = {}) {
+    opts.from ??= this.ctx.signers.issuer.guardian;
+    opts.sERC20 ??= this.ctx.sERC20;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).close(opts.sERC20.address);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+  async issue(opts = {}) {
+    opts.from ??= this.ctx.signers.others[0];
     opts.value ??= this.ctx.params.issuer.value;
     opts.expected ??= ethers.BigNumber.from("0");
-    opts.recipient ??= this.ctx.signers.issuer.recipient;
 
-    this.ctx.data.tx = await this.contract
-      .connect(opts.from)
-      .mint(this.ctx.sERC20.contract.address, opts.expected, opts.recipient.address, { value: opts.value });
+    this.ctx.data.tx = await this.contract.connect(opts.from).issue(this.ctx.sERC20.contract.address, opts.expected, { value: opts.value });
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }
