@@ -1104,7 +1104,7 @@ describe("Broker", () => {
       it("it returns valid data based on market value", async () => {
         expect(this.data.price.value).to.equal(
           (await this.sERC20.totalSupply()) // supply
-            .mul(await this.broker.twapOf(this.sERC20.address)) // price
+            .mul(await this.broker.twapOf(this.sERC20.address, this.constants.issuer.TwapKind.ETH)) // price
             .mul(this.params.broker.multiplier)
             .div(this.constants.broker.DECIMALS) // DECIMALS for TWAP
             .div(this.constants.broker.DECIMALS) // DECIMALS for multiplier

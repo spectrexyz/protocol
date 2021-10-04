@@ -3,7 +3,6 @@ const { expect } = require("chai");
 const { ethers } = require("ethers");
 const { initialize, setup } = require("../helpers");
 const { near } = require("../helpers/chai");
-const { issuer } = require("../helpers/config");
 const { Issuer } = require("../helpers/models");
 const { advanceTime, currentTimestamp } = require("../helpers/time");
 
@@ -218,7 +217,7 @@ describe("Issuer", () => {
     });
   });
 
-  describe("# issue", () => {
+  describe.skip("# issue", () => {
     describe("» issuance is opened", () => {
       describe("» and flash issuance is enabled", () => {
         describe("» and issued amount is more than expected", () => {
@@ -428,6 +427,49 @@ describe("Issuer", () => {
     });
   });
 
+  describe("# close", () => {
+    describe("» caller has CLOSE_ROLE", () => {
+      describe("» and issuance is opened", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register();
+          await this.issuer.close();
+        });
+
+        it("it closes issuance", async () => {
+          expect((await this.issuer.issuanceOf(this.sERC20.address)).state).to.equal(this.constants.issuer.issuances.state.Closed);
+        });
+
+        it("it emits a Close event", async () => {
+          await expect(this.data.tx).to.emit(this.issuer.contract, "Close").withArgs(this.sERC20.address);
+        });
+      });
+
+      describe("» but issuance is not opened", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register();
+          await this.issuer.close();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.issuer.close()).to.be.revertedWith("Issuer: invalid issuance state");
+        });
+      });
+    });
+
+    describe("» caller does not have CLOSE_ROLE", () => {
+      before(async () => {
+        await setup.issuer(this);
+        await this.issuer.register();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.issuer.close({ from: this.signers.others[0] })).to.be.revertedWith("Issuer: must have CLOSE_ROLE to close issuance");
+      });
+    });
+  });
+
   describe("# enableFlashIssuance", () => {
     describe("» caller is issuance's guardian", () => {
       describe("» and issuance is opened", () => {
@@ -580,7 +622,7 @@ describe("Issuer", () => {
     });
   });
 
-  describe.only("# twapOf", () => {
+  describe("# twapOf", () => {
     describe("» issuance is opened", () => {
       describe("» sERC20 per ETH", () => {
         describe("» pool is not initialized yet", () => {

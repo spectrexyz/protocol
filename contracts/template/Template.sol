@@ -14,6 +14,9 @@ import "@openzeppelin/contracts-0.7/utils/Context.sol";
  * @title Template
  * @notice Split sERC20s between registered beneficiaries when received.
  */
+
+// WE NEED TO MAKE THIS ONE PAUSABLE
+
 contract Template is Context, AccessControl {
     // bytes32 private constant BURN_ROLE = keccak256("BURN_ROLE");
     // bytes32 private constant MINT_ROLE = keccak256("MINT_ROLE");

@@ -1,3 +1,5 @@
+const { ethers } = require("ethers");
+
 module.exports = {
   params: {
     reserve: ethers.utils.parseEther("0.1"),
@@ -12,6 +14,7 @@ module.exports = {
   },
   constants: {
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
+    CLOSE_ROLE: ethers.BigNumber.from("0x78844962b347caf400e109846dc948d8df0fc5b2f795edb688517fc687580cd4"),
     REGISTER_ROLE: ethers.BigNumber.from("0xd1f21ec03a6eb050fba156f5316dad461735df521fb446dd42c5a4728e9c70fe"),
     DECIMALS: ethers.utils.parseEther("1"),
     HUNDRED: ethers.utils.parseEther("100"),

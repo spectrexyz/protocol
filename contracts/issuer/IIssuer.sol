@@ -8,7 +8,10 @@ import "./libraries/Issuances.sol";
 import "../token/sIERC20.sol";
 
 interface IIssuer {
-    enum TwapKind { ETH, sERC20 }
+    enum TwapKind {
+        ETH,
+        sERC20
+    }
 
     /**
      * @notice Emitted when an `sERC20`pit is registered.
@@ -27,6 +30,7 @@ interface IIssuer {
     );
     event Issue(sIERC20 indexed sERC20, address indexed recipient, uint256 value, uint256 amount);
     event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 amount, uint256 expiration);
+    event Close(sIERC20);
     event EnableFlashIssuance(sIERC20 indexed sERC20);
     event SetBank(address bank);
     event SetProtocolFee(uint256 protocolFee);

@@ -191,9 +191,13 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
 
     function close(sIERC20 sERC20) external override {
         Issuances.Issuance storage issuance = _issuances[sERC20];
-      
+
+        require(hasRole(CLOSE_ROLE, _msgSender()), "Issuer: must have CLOSE_ROLE to close issuance");
+        require(issuance.state == Issuances.State.Opened, "Issuer: invalid issuance state");
+
         issuance.state = Issuances.State.Closed;
 
+        emit Close(sERC20);
     }
 
     /**
@@ -317,7 +321,9 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     }
 
     /**
-     * @notice Return the daily time-weighted average price of `sERC20` [in sERC20 per ETH].
+     * @notice Return the 24h time-weighted average price of `sERC20`.
+     * @param sERC20 The sERC20 whose TWAP is to be returned.
+     * @param kind TwapKind.ETH to return the TWAP in ETH per sERC20, TwapKind.sERC20 to return the TWAP in sERC20 per ETH.
      */
     function twapOf(sIERC20 sERC20, TwapKind kind) public view override returns (uint256) {
         Issuances.Issuance storage issuance = _issuances[sERC20];
@@ -426,29 +432,31 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     }
 
     /**
-     * @notice Return the daily time-weighted average price of `issuance`'s sERC20 [in sERC20 per ETH].
+     * @notice Return the 24h time-weighted average price of `issuance`'s sERC20.
      * @dev - We do not care about decimals for both ETH and sERC20s have 18 decimals.
      *      - See PriceOracle.sol for details.
+     * @param issuance The issuance whose sERC20 TWAP is to be returned.
+     * @param kind TwapKind.ETH to return the TWAP in ETH per sERC20, TwapKind.sERC20 to return the TWAP in sERC20 per ETH.
      */
     function _twapOf(Issuances.Issuance storage issuance, TwapKind kind) private view returns (uint256) {
         IFractionalizationBootstrappingPool pool = issuance.pool;
 
         if (pool.totalSupply() == 0) {
-          if (kind == TwapKind.ETH) return (DECIMALS * DECIMALS) / issuance.reserve;
-          else if (kind == TwapKind.sERC20) return issuance.reserve;
-          else revert("Issuer: invalid twap kind");
-        } 
+            if (kind == TwapKind.ETH) return (DECIMALS * DECIMALS) / issuance.reserve;
+            else if (kind == TwapKind.sERC20) return issuance.reserve;
+            else revert("Issuer: invalid twap kind");
+        }
 
         IPriceOracle.OracleAverageQuery[] memory query = new IPriceOracle.OracleAverageQuery[](1);
         query[0] = IPriceOracle.OracleAverageQuery({variable: IPriceOracle.Variable.PAIR_PRICE, secs: 1 days, ago: 0});
         uint256[] memory prices = issuance.pool.getTimeWeightedAverage(query);
 
         if (kind == TwapKind.ETH) {
-           return !issuance.sERC20IsToken0 ? prices[0] : (DECIMALS * DECIMALS) / prices[0];
+            return !issuance.sERC20IsToken0 ? prices[0] : (DECIMALS * DECIMALS) / prices[0];
         } else if (kind == TwapKind.sERC20) {
-           return issuance.sERC20IsToken0 ? prices[0] : (DECIMALS * DECIMALS) / prices[0];
+            return issuance.sERC20IsToken0 ? prices[0] : (DECIMALS * DECIMALS) / prices[0];
         } else {
-          revert("Issuer: invalid twap kind");
+            revert("Issuer: invalid twap kind");
         }
     }
 
@@ -478,13 +486,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         if (pool.totalSupply() > 0) kind = IFractionalizationBootstrappingPool.JoinKind.REWARD;
         else kind = IFractionalizationBootstrappingPool.JoinKind.INIT;
 
-        return
-            IBVault.JoinPoolRequest({
-                assets: assets,
-                maxAmountsIn: amounts,
-                userData: abi.encode(kind, amounts),
-                fromInternalBalance: false
-            });
+        return IBVault.JoinPoolRequest({assets: assets, maxAmountsIn: amounts, userData: abi.encode(kind, amounts), fromInternalBalance: false});
     }
 
     /**

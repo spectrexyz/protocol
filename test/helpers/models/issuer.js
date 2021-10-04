@@ -29,6 +29,7 @@ class Issuer {
     opts.bank ??= ctx.signers.issuer.bank;
     opts.splitter ??= ctx.signers.issuer.splitter;
     opts.protocolFee ??= ctx.params.issuer.protocolFee;
+    opts.closer ??= ctx.signers.issuer.closer;
 
     ctx.contracts.issuer = await waffle.deployContract(ctx.signers.issuer.admin, _Issuer_, [
       opts.vault.address,
@@ -40,6 +41,7 @@ class Issuer {
 
     ctx.issuer = new Issuer(ctx);
 
+    await ctx.issuer.grantRole({ role: ctx.constants.issuer.CLOSE_ROLE, account: ctx.signers.issuer.closer });
     await ctx.issuer.grantRole({ role: ctx.constants.issuer.REGISTER_ROLE, account: ctx.signers.issuer.registerer });
     await ctx.sERC20.grantRole({ role: ctx.constants.sERC20.MINT_ROLE, account: ctx.issuer });
   }
@@ -83,12 +85,13 @@ class Issuer {
   }
 
   async close(opts = {}) {
-    opts.from ??= this.ctx.signers.issuer.guardian;
+    opts.from ??= this.ctx.signers.issuer.closer;
     opts.sERC20 ??= this.ctx.sERC20;
 
     this.ctx.data.tx = await this.contract.connect(opts.from).close(opts.sERC20.address);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
+
   async issue(opts = {}) {
     opts.from ??= this.ctx.signers.others[0];
     opts.value ??= this.ctx.params.issuer.value;
