@@ -9,8 +9,8 @@ module.exports = {
     balance: ethers.utils.parseEther("1"),
     lifespan: ethers.BigNumber.from("3600"),
     protocolFee: ethers.utils.parseEther("10"),
-    fee: ethers.utils.parseEther("2"),
-    allocation: ethers.utils.parseEther("2"),
+    fee: ethers.utils.parseEther("5"),
+    allocation: ethers.utils.parseEther("15"),
   },
   constants: {
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,

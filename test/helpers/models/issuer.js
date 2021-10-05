@@ -16,6 +16,7 @@ class Issuer {
     this.protocolFee = this.contract.protocolFee;
     this.WETH = this.contract.WETH;
     this.issuanceOf = this.contract.issuanceOf;
+    this.priceOf = this.contract.priceOf;
     this.twapOf = this.contract.twapOf;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.hasRole = this.contract.hasRole;
@@ -93,7 +94,7 @@ class Issuer {
   }
 
   async issue(opts = {}) {
-    opts.from ??= this.ctx.signers.others[0];
+    opts.from ??= this.ctx.signers.issuer.recipient;
     opts.value ??= this.ctx.params.issuer.value;
     opts.expected ??= ethers.BigNumber.from("0");
 

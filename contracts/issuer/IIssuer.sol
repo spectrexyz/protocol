@@ -65,12 +65,6 @@ interface IIssuer {
 
     function enableFlashIssuance(sIERC20 sERC20) external;
 
-    /**
-     * @notice Transfers any ERC20 or ETH owned by this contract to the bank.
-     * @param  token The address of the ERC20 token to withdraw [address(0) for ETH].
-     */
-    function withdraw(address token) external;
-
     function setBank(address bank_) external;
 
     function setProtocolFee(uint256 protocolFee_) external;
@@ -102,6 +96,8 @@ interface IIssuer {
             bool flash,
             bool sERC20IsToken0
         );
+
+    function priceOf(sIERC20 sERC20) external view returns (uint256);
 
     function twapOf(sIERC20 sERC20, TwapKind Kind) external view returns (uint256);
 }
