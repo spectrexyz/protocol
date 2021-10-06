@@ -56,9 +56,11 @@ const itIssuesLikeExpected = (ctx, opts = {}) => {
   });
 
   it("it emits a Issue event", async () => {
+    opts.value = opts.excess ? ctx.data.effectiveValue : ctx.params.issuer.value;
+
     await expect(ctx.data.tx)
       .to.emit(ctx.issuer.contract, "Issue")
-      .withArgs(ctx.sERC20.contract.address, ctx.signers.issuer.recipient.address, ctx.params.issuer.value, ctx.data.expectedAmount);
+      .withArgs(ctx.sERC20.contract.address, ctx.signers.issuer.recipient.address, opts.value, ctx.data.expectedAmount);
   });
 };
 

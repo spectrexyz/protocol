@@ -4,7 +4,6 @@ pragma experimental ABIEncoderV2;
 
 import "./FractionalizationBootstrappingPoolMiscData.sol";
 import "./FractionalizationBootstrappingPoolUserDataHelpers.sol";
-
 import "./interfaces/sIERC20.sol";
 
 import "@balancer-labs/v2-solidity-utils/contracts/math/FixedPoint.sol";
@@ -22,8 +21,6 @@ import "@balancer-labs/v2-pool-utils/contracts/oracle/Buffer.sol";
 
 import "@balancer-labs/v2-pool-weighted/contracts/WeightedMath.sol";
 import "@balancer-labs/v2-pool-weighted/contracts/WeightedOracleMath.sol";
-
-import "hardhat/console.sol";
 
 contract FractionalizationBootstrappingPool is
     IMinimalSwapInfoPool,
@@ -71,7 +68,7 @@ contract FractionalizationBootstrappingPool is
     uint256 internal immutable _scalingFactor0;
     uint256 internal immutable _scalingFactor1;
 
-    // We store sERC20's maximum weight and sERC20's maximum weight - minimum weight delta to optimize computation.
+    // We store sERC20's maximum weight and sERC20's (maximum weight - minimum weight) delta to optimize computations.
     sIERC20 private immutable _sERC20;
     uint256 private immutable _cap;
     uint256 private immutable _sMaxNormalizedWeight;

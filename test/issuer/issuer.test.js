@@ -1,5 +1,6 @@
 const chai = require("chai");
 const { expect } = require("chai");
+const { ethers } = require("ethers");
 const { initialize, setup } = require("../helpers");
 const { near } = require("../helpers/chai");
 const { Issuer } = require("../helpers/models");

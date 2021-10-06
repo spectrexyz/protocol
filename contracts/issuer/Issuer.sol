@@ -145,7 +145,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     /**
      * @notice Issue at least `expected` `sERC20` tokens.
      * @param sERC20 The sERC20 to issue.
-     * @param expected The minimum amount of sERC20 to issue [reverts otherwise]. 
+     * @param expected The minimum amount of sERC20 to issue [reverts otherwise].
      */
     function issue(sIERC20 sERC20, uint256 expected) external payable override {
         Issuances.Issuance storage issuance = _issuances[sERC20];
@@ -364,14 +364,14 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         bool poolIsInitialized,
         bool sERC20IsToken0
     ) private returns (uint256) {
+        // clip value
+        // value = _clipValue(sERC20, issuance.pool, buyer, value, price, poolIsInitialized, sERC20IsToken0);
+
         uint256 fee = (value * issuance.fee) / HUNDRED;
         uint256 protocolFee_ = ((value - fee) * _protocolFee) / HUNDRED;
         uint256 remaining = value - fee - protocolFee_;
         uint256 amount = (remaining * price) / DECIMALS;
-        uint256 maxValue = ((sERC20.cap() - sERC20.totalSupply()) * DECIMALS) / price;
 
-        // on vérifie qu'on reach pas le cap ?
-       
         // pool LP reward
         uint256 reward = _doReward(sERC20, issuance, fee, poolIsInitialized, sERC20IsToken0);
         // mint recipient tokens
@@ -409,6 +409,37 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         emit SetProtocolFee(protocolFee_);
     }
 
+    /**
+     * @dev This function opens `issue` to re-entrancy for it would cause no harm.
+     */
+    function _clipValue(
+        sIERC20 sERC20,
+        IFractionalizationBootstrappingPool pool,
+        address buyer,
+        uint256 origin,
+        uint256 price,
+        bool poolIsInitialized,
+        bool sERC20IsToken0
+    ) private returns (uint256) {
+        // uint256 max = ((sERC20.cap() - sERC20.totalSupply()) * DECIMALS) / price;
+        // uint256 numerator = DECIMALS * (sERC20.cap() - sERC20.totalSupply());
+
+        // if (!poolIsInitialized) {
+        //     uint256[] memory weights = pool.getNormalizedWeights();
+        //     if (sERC20IsToken0) reward = (value * reserve * weights[0]) / (DECIMALS * weights[1]);
+        //     else reward = (value * reserve * weights[1]) / (DECIMALS * weights[0]);
+        // }
+
+        // uint256 value = max < origin ? max : origin;
+        // uint256 excess = origin - value;
+
+        // if (excess > 0) payable(buyer).sendValue(excess);
+
+        // return value;
+
+        return 0;
+    }
+
     function _doReward(
         sIERC20 sERC20,
         Issuances.Issuance storage issuance,
@@ -418,7 +449,6 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     ) private returns (uint256) {
         IBVault vault_ = _vault;
         bytes32 poolId = issuance.poolId;
- 
         uint256 reward = _reward(vault_, issuance.pool, poolId, issuance.reserve, value, poolIsInitialized, sERC20IsToken0);
 
         if (reward > 0) {
@@ -426,11 +456,19 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
             sERC20.approve(address(vault_), reward);
             vault_.joinPool{value: value}(poolId, address(this), _bank, _request(sERC20, reward, value, poolIsInitialized, sERC20IsToken0));
         }
-        
+
         return reward;
     }
 
-    function _reward(IBVault vault_, IFractionalizationBootstrappingPool pool, bytes32 poolId, uint256 reserve,  uint256 value, bool poolIsInitialized, bool sERC20IsToken0) private view returns (uint256) {
+    function _reward(
+        IBVault vault_,
+        IFractionalizationBootstrappingPool pool,
+        bytes32 poolId,
+        uint256 reserve,
+        uint256 value,
+        bool poolIsInitialized,
+        bool sERC20IsToken0
+    ) private view returns (uint256) {
         uint256 reward;
 
         if (!poolIsInitialized) {
@@ -496,7 +534,11 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     /**
      * @dev Return [sERC20, WETH] pool's balances.
      */
-    function _balances(IBVault vault_, bytes32 poolId, bool sERC20IsToken0) private view returns (uint256[2] memory) {
+    function _balances(
+        IBVault vault_,
+        bytes32 poolId,
+        bool sERC20IsToken0
+    ) private view returns (uint256[2] memory) {
         (, uint256[] memory balances, ) = vault_.getPoolTokens(poolId);
 
         if (sERC20IsToken0) return [balances[0], balances[1]];

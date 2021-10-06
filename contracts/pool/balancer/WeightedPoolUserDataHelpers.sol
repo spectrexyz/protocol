@@ -1,40 +1,48 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 pragma solidity ^0.7.0;
 
-import "./FractionalizationBootstrappingPool.sol";
-import "@balancer-labs/v2-pool-weighted/contracts/BaseWeightedPool.sol";
 import "@balancer-labs/v2-solidity-utils/contracts/openzeppelin/IERC20.sol";
 
-library FractionalizationBootstrappingPoolUserDataHelpers {
-    function joinKind(bytes memory self) internal pure returns (FractionalizationBootstrappingPool.JoinKind) {
-        return abi.decode(self, (FractionalizationBootstrappingPool.JoinKind));
+import "./BaseWeightedPool.sol";
+
+library WeightedPoolUserDataHelpers {
+    function joinKind(bytes memory self) internal pure returns (BaseWeightedPool.JoinKind) {
+        return abi.decode(self, (BaseWeightedPool.JoinKind));
     }
 
     function exitKind(bytes memory self) internal pure returns (BaseWeightedPool.ExitKind) {
-        return abi.decode(self, (FractionalizationBootstrappingPool.ExitKind));
+        return abi.decode(self, (BaseWeightedPool.ExitKind));
     }
 
     // Joins
 
-    function rewardIn(bytes memory self) internal pure returns (uint256 bptAmountOut, uint256[] memory amountsIn) {
-        bptAmountOut = 0;
-        (, amountsIn) = abi.decode(self, (FractionalizationBootstrappingPool.JoinKind, uint256[]));
-    }
-
     function initialAmountsIn(bytes memory self) internal pure returns (uint256[] memory amountsIn) {
-        (, amountsIn) = abi.decode(self, (FractionalizationBootstrappingPool.JoinKind, uint256[]));
+        (, amountsIn) = abi.decode(self, (BaseWeightedPool.JoinKind, uint256[]));
     }
 
     function exactTokensInForBptOut(bytes memory self) internal pure returns (uint256[] memory amountsIn, uint256 minBPTAmountOut) {
-        (, amountsIn, minBPTAmountOut) = abi.decode(self, (FractionalizationBootstrappingPool.JoinKind, uint256[], uint256));
+        (, amountsIn, minBPTAmountOut) = abi.decode(self, (BaseWeightedPool.JoinKind, uint256[], uint256));
     }
 
     function tokenInForExactBptOut(bytes memory self) internal pure returns (uint256 bptAmountOut, uint256 tokenIndex) {
-        (, bptAmountOut, tokenIndex) = abi.decode(self, (FractionalizationBootstrappingPool.JoinKind, uint256, uint256));
+        (, bptAmountOut, tokenIndex) = abi.decode(self, (BaseWeightedPool.JoinKind, uint256, uint256));
     }
 
     function allTokensInForExactBptOut(bytes memory self) internal pure returns (uint256 bptAmountOut) {
-        (, bptAmountOut) = abi.decode(self, (FractionalizationBootstrappingPool.JoinKind, uint256));
+        (, bptAmountOut) = abi.decode(self, (BaseWeightedPool.JoinKind, uint256));
     }
 
     // Exits
