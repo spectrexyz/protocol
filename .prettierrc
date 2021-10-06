@@ -1,0 +1,9 @@
+{
+  "overrides": [
+    {
+      "files": "*.sol",
+      "options": { "printWidth": 160, "explicitTypes": "always" }
+    },
+    { "files": "*.js", "options": { "printWidth": 160 } }
+  ]
+}
