@@ -11,7 +11,7 @@ library FractionalizationBootstrappingPoolUserDataHelpers {
     }
 
     function exitKind(bytes memory self) internal pure returns (BaseWeightedPool.ExitKind) {
-        return abi.decode(self, (FractionalizationBootstrappingPool.ExitKind));
+        return abi.decode(self, (BaseWeightedPool.ExitKind));
     }
 
     // Joins
