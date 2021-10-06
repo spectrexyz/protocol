@@ -9,16 +9,14 @@ contract ERC721Mock {
     }
 
     function transferFrom(
-        address, /*from*/
-        address, /*to*/
-        uint256 /*tokenId*/
+        address,
+        address,
+        uint256
     ) public pure {
         // do nothing
     }
 
-    function ownerOf(
-        uint256 /*tokenId*/
-    ) public view returns (address) {
+    function ownerOf(uint256) public view returns (address) {
         return address(this);
     }
 }

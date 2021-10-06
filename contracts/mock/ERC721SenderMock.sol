@@ -4,9 +4,7 @@ pragma solidity >=0.8.0;
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 contract ERC721SenderMock {
-    function supportsInterface(
-        bytes4 /*interfaceId*/
-    ) public pure returns (bool) {
+    function supportsInterface(bytes4) public pure returns (bool) {
         return false;
     }
 
