@@ -5,7 +5,6 @@ const _QueryProcessor_ = require("../../../artifacts/@balancer-labs/v2-pool-util
 const _WETH_ = require("../../../artifacts/contracts/mock/WETH.sol/WETH.json");
 const _FractionalizationBootstrappingPool_ = require("../../../artifacts/contracts/pool/FractionalizationBootstrappingPool.sol/FractionalizationBootstrappingPool.json");
 const Decimal = require("decimal.js");
-const { ethers } = require("ethers");
 
 class Pool {
   constructor(ctx, sERC20IsToken0) {

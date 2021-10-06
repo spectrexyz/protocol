@@ -275,13 +275,14 @@ describe("FractionalizationBootstrappingPool", () => {
 
       this.data.previousTotalSupply = await this.pool.totalSupply();
       this.data.previousBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
-      this.data.previousBTPPrice = await this.pool.BTPPrice({ sERC20: true });
+      this.data.previousBTPPrice = await this.pool.getLatest(1);
 
+      await this.pool.join({ reward: true });
       await this.pool.join({ reward: true });
 
       this.data.latestTotalSupply = await this.pool.totalSupply();
       this.data.latestBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
-      this.data.latestBTPPrice = await this.pool.BTPPrice({ sERC20: true });
+      this.data.latestBTPPrice = await this.pool.getLatest(1);
     });
 
     it("it mints no BPT", async () => {
@@ -291,13 +292,13 @@ describe("FractionalizationBootstrappingPool", () => {
     it("it updates the pool's balances", async () => {
       expect(this.data.latestBalances[0]).to.equal(
         this.pool.sERC20IsToken0
-          ? this.data.previousBalances[0].add(this.params.pool.pooled.sERC20)
-          : this.data.previousBalances[0].add(this.params.pool.pooled.ETH)
+          ? this.data.previousBalances[0].add(this.params.pool.pooled.sERC20).add(this.params.pool.pooled.sERC20)
+          : this.data.previousBalances[0].add(this.params.pool.pooled.ETH).add(this.params.pool.pooled.ETH)
       );
       expect(this.data.latestBalances[1]).to.equal(
         this.pool.sERC20IsToken0
-          ? this.data.previousBalances[1].add(this.params.pool.pooled.ETH)
-          : this.data.previousBalances[1].add(this.params.pool.pooled.sERC20)
+          ? this.data.previousBalances[1].add(this.params.pool.pooled.ETH).add(this.params.pool.pooled.ETH)
+          : this.data.previousBalances[1].add(this.params.pool.pooled.sERC20).add(this.params.pool.pooled.sERC20)
       );
     });
 

@@ -88,7 +88,7 @@ describe("FractionalizationBootstrappingPoolFactory", () => {
       }
     });
 
-    it("it registers the pool's tokens asset managers as the zero address", async () => {
+    it("it registers the pool's tokens asset managers as zero addresses", async () => {
       expect((await this.contracts.bVault.getPoolTokenInfo(this.data.poolId, this.contracts.WETH.address)).assetManager).to.equal(ethers.constants.AddressZero);
       expect((await this.contracts.bVault.getPoolTokenInfo(this.data.poolId, this.contracts.sERC20.address)).assetManager).to.equal(
         ethers.constants.AddressZero
