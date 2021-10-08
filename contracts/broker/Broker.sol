@@ -151,7 +151,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         Sales.Sale storage sale = _sales[sERC20];
         Proposals.Proposal storage proposal = sale.proposals[proposalId];
 
-        require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to accept proposals");
+        require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to accept proposal");
         require(sale.state() == Sales.State.Opened, "Broker: invalid sale state");
         require(proposal.state() == Proposals.State.Pending, "Broker: invalid proposal state");
         require(!sale.flash, "Broker: flash buyout is enabled");
