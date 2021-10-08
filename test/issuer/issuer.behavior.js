@@ -1,5 +1,4 @@
 const { expect } = require("chai");
-const { ethers } = require("ethers");
 
 const itRegistersLikeExpected = (ctx, opts = {}) => {
   it("it deploys FractionalizationBootstrappingPool", async () => {
@@ -68,7 +67,37 @@ const itIssuesLikeExpected = (ctx, opts = {}) => {
   });
 };
 
+const itRejectsProposalLikeExpected = (ctx, opts = {}) => {
+  it("it updates proposal's state", async () => {
+    expect(ctx.data.proposal.state).to.equal(ctx.constants.issuer.proposals.state.Rejected);
+  });
+
+  it("it pays back proposal's buyer", async () => {
+    expect(ctx.data.latestBuyerBalance.sub(ctx.data.previousBuyerBalance)).to.equal(ctx.params.issuer.value);
+  });
+
+  it("it emits a RejectProposal event", async () => {
+    await expect(ctx.data.tx).to.emit(ctx.issuer.contract, "RejectProposal").withArgs(ctx.sERC20.address, ctx.data.proposalId);
+  });
+};
+
+const itWithdrawsProposalLikeExpected = (ctx) => {
+  it("it updates proposal's state", async () => {
+    expect(ctx.data.proposal.state).to.equal(ctx.constants.issuer.proposals.state.Withdrawn);
+  });
+
+  it("it pays back proposal's buyer", async () => {
+    expect(ctx.data.latestBuyerBalance.sub(ctx.data.previousBuyerBalance)).to.equal(ctx.params.issuer.value.sub(ctx.data.gasSpent));
+  });
+
+  it("it emits a WithdrawProposal event", async () => {
+    await expect(ctx.data.tx).to.emit(ctx.issuer.contract, "WithdrawProposal").withArgs(ctx.sERC20.address, ctx.data.proposalId);
+  });
+};
+
 module.exports = {
   itIssuesLikeExpected,
   itRegistersLikeExpected,
+  itRejectsProposalLikeExpected,
+  itWithdrawsProposalLikeExpected,
 };

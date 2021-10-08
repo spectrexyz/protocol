@@ -107,6 +107,25 @@ class Issuer {
     this.ctx.data.gasSpent = this.ctx.data.receipt.gasUsed.mul(this.ctx.data.tx.gasPrice);
   }
 
+  async rejectProposal(opts = {}) {
+    opts.from ??= this.ctx.signers.issuer.guardian;
+    opts.proposalId ??= this.ctx.data.proposalId;
+    opts.sERC20 ??= this.ctx.sERC20;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).rejectProposal(opts.sERC20.address, opts.proposalId);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async withdrawProposal(opts = {}) {
+    opts.from ??= this.ctx.signers.issuer.buyer;
+    opts.proposalId ??= this.ctx.data.proposalId;
+    opts.sERC20 ??= this.ctx.sERC20;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).withdrawProposal(opts.sERC20.address, opts.proposalId);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+    this.ctx.data.gasSpent = this.ctx.data.receipt.gasUsed.mul(this.ctx.data.tx.gasPrice);
+  }
+
   async close(opts = {}) {
     opts.from ??= this.ctx.signers.issuer.closer;
     opts.sERC20 ??= this.ctx.sERC20;

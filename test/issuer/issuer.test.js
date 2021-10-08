@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { initialize, setup } = require("../helpers");
 const { Issuer } = require("../helpers/models");
 const { advanceTime } = require("../helpers/time");
-const { itRegistersLikeExpected, itIssuesLikeExpected } = require("./issuer.behavior");
+const { itRegistersLikeExpected, itIssuesLikeExpected, itRejectsProposalLikeExpected, itWithdrawsProposalLikeExpected } = require("./issuer.behavior");
 
 describe("Issuer", () => {
   before(async () => {
@@ -592,6 +592,136 @@ describe("Issuer", () => {
 
       it("it reverts", async () => {
         await expect(this.issuer.acceptProposal({ from: this.signers.others[0] })).to.be.revertedWith("Issuer: must be issuance's guardian to accept proposal");
+      });
+    });
+  });
+
+  describe("# rejectProposal", () => {
+    describe("» caller is issuance's guardian", () => {
+      describe("» and proposal is pending", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register({ flash: false });
+          await this.issuer.createProposal();
+
+          this.data.previousBuyerBalance = await this.signers.issuer.buyer.getBalance();
+
+          await this.issuer.rejectProposal();
+
+          this.data.proposal = await this.issuer.proposalFor(this.sERC20.address, this.data.proposalId);
+          this.data.latestBuyerBalance = await this.signers.issuer.buyer.getBalance();
+        });
+
+        itRejectsProposalLikeExpected(this);
+      });
+
+      describe("» and proposal is lapsed", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register({ flash: false });
+          await this.issuer.createProposal();
+          await advanceTime(this.params.broker.lifespan.add(this.constants.ONE));
+
+          this.data.previousBuyerBalance = await this.signers.issuer.buyer.getBalance();
+
+          await this.issuer.rejectProposal();
+
+          this.data.proposal = await this.issuer.proposalFor(this.sERC20.address, this.data.proposalId);
+          this.data.latestBuyerBalance = await this.signers.issuer.buyer.getBalance();
+        });
+
+        itRejectsProposalLikeExpected(this);
+      });
+
+      describe("» but proposal is neither pending nor lapsed", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register({ flash: false });
+          await this.issuer.createProposal();
+          await this.issuer.acceptProposal();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.issuer.rejectProposal()).to.be.revertedWith("Issuer: invalid proposal state");
+        });
+      });
+    });
+
+    describe("» caller is not issuance's guardian", () => {
+      before(async () => {
+        await setup.issuer(this);
+        await this.issuer.register({ flash: false });
+        await this.issuer.createProposal();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.issuer.rejectProposal({ from: this.signers.others[0] })).to.be.revertedWith("Issuer: must be issuance's guardian to reject proposal");
+      });
+    });
+  });
+
+  describe("# withdrawProposal", () => {
+    describe("» caller is proposal's buyer", () => {
+      describe("» and proposal is pending", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register({ flash: false });
+          await this.issuer.createProposal();
+
+          this.data.previousBuyerBalance = await this.signers.issuer.buyer.getBalance();
+
+          await this.issuer.withdrawProposal();
+
+          this.data.proposal = await this.issuer.proposalFor(this.sERC20.address, this.data.proposalId);
+          this.data.latestBuyerBalance = await this.signers.issuer.buyer.getBalance();
+        });
+
+        itWithdrawsProposalLikeExpected(this);
+      });
+
+      describe("» and proposal is lapsed", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register({ flash: false });
+          await this.issuer.createProposal();
+          await advanceTime(this.params.broker.lifespan.add(this.constants.ONE));
+
+          this.data.previousBuyerBalance = await this.signers.issuer.buyer.getBalance();
+
+          await this.issuer.withdrawProposal();
+
+          this.data.proposal = await this.issuer.proposalFor(this.sERC20.address, this.data.proposalId);
+          this.data.latestBuyerBalance = await this.signers.issuer.buyer.getBalance();
+        });
+
+        itWithdrawsProposalLikeExpected(this);
+      });
+
+      describe("» but proposal is neither pending nor lapsed", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register({ flash: false });
+          await this.issuer.createProposal();
+          await this.issuer.acceptProposal();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.issuer.withdrawProposal()).to.be.revertedWith("Issuer: invalid proposal state");
+        });
+      });
+    });
+
+    describe("» caller is not proposal's buyer", () => {
+      before(async () => {
+        await setup.issuer(this);
+        await this.issuer.register({ flash: false });
+        await this.issuer.createProposal();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.issuer.withdrawProposal({ from: this.signers.others[0] })).to.be.revertedWith(
+          "Issuer: must be proposal's buyer to withdraw proposal"
+        );
       });
     });
   });
