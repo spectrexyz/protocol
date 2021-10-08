@@ -212,7 +212,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         Issuances.Issuance storage issuance = _issuances[sERC20];
         Proposals.Proposal storage proposal = issuance.proposals[proposalId];
 
-        require(_msgSender() == issuance.guardian, "Issuer: must be issuance's guardian to accept proposals");
+        require(_msgSender() == issuance.guardian, "Issuer: must be issuance's guardian to accept proposal");
         require(issuance.state == Issuances.State.Opened, "Issuer: invalid issuance state");
         require(proposal.state() == Proposals.State.Pending, "Issuer: invalid proposal state");
         require(!issuance.flash, "Issuer: flash issuance is enabled");
@@ -222,6 +222,45 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         emit AcceptProposal(sERC20, proposalId);
 
         _issue(sERC20, issuance, proposal.buyer, proposal.value, proposal.price, issuance.pool.totalSupply() > 0, issuance.sERC20IsToken0);
+    }
+
+    /**
+     * @notice Reject proposal #`proposalId` to issue `sERC20` tokens.
+     * @dev This function is open to re-entrancy for it would be harmless.
+     * @param sERC20 The sERC20 which was proposed to be issued.
+     * @param proposalId The id of the issuance proposal.
+     */
+    function rejectProposal(sIERC20 sERC20, uint256 proposalId) external override {
+        Issuances.Issuance storage issuance = _issuances[sERC20];
+        Proposals.Proposal storage proposal = issuance.proposals[proposalId];
+        Proposals.State state = proposal.state();
+
+        require(_msgSender() == issuance.guardian, "Issuer: must be issuance's guardian to reject proposal");
+        require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Issuer: invalid proposal state");
+
+        proposal._state = Proposals.State.Rejected;
+        payable(proposal.buyer).sendValue(proposal.value);
+
+        emit RejectProposal(sERC20, proposalId);
+    }
+
+    /**
+     * @notice Withdraw proposal #`proposalId` to issue `sERC20` tokens..
+     * @dev This function is open to re-entrancy for it would be harmless.
+     * @param sERC20 The sERC20 which was proposed to be issued.
+     * @param proposalId The id of the issuance proposal.
+     */
+    function withdrawProposal(sIERC20 sERC20, uint256 proposalId) external override {
+        Proposals.Proposal storage proposal = _issuances[sERC20].proposals[proposalId];
+        Proposals.State state = proposal.state();
+
+        require(_msgSender() == proposal.buyer, "Issuer: must be proposal's buyer to withdraw proposal");
+        require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Issuer: invalid proposal state");
+
+        proposal._state = Proposals.State.Withdrawn;
+        payable(proposal.buyer).sendValue(proposal.value);
+
+        emit WithdrawProposal(sERC20, proposalId);
     }
 
     /**

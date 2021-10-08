@@ -50,12 +50,6 @@ interface IIssuer {
         bool flash
     ) external;
 
-    // /**
-    //  * @notice Mints sERC20s against sent ETH.
-    //  * @param  sERC20    The sERC20 to mint.
-    //  * @param  expected  The amount of sERC20 tokens expected in return for the ETH sent [reverts otherwise].
-    //  * @param  recipient The recipient of the sERC20 tokens to mint.
-    //  */
     function issue(sIERC20 sERC20, uint256 expected) external payable;
 
     function createProposal(
@@ -66,9 +60,9 @@ interface IIssuer {
 
     function acceptProposal(sIERC20 sERC20, uint256 proposalId) external;
 
-    // function rejectProposal(sIERC20 sERC20, uint256 proposalId) external;
+    function rejectProposal(sIERC20 sERC20, uint256 proposalId) external;
 
-    // function withdrawProposal(sIERC20 sERC20, uint256 proposalId) external;
+    function withdrawProposal(sIERC20 sERC20, uint256 proposalId) external;
 
     function close(sIERC20 sERC20) external;
 
