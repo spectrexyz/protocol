@@ -112,7 +112,7 @@ class Pool {
 
   async swap(opts = {}) {
     opts.sERC20 ??= false;
-    opts.from ??= this.ctx.signers.issuer.recipient;
+    opts.from ??= this.ctx.signers.issuer.buyer;
     opts.value ??= this.ctx.params.pool.value;
     opts.amount ??= this.ctx.params.pool.amount;
 
@@ -133,7 +133,7 @@ class Pool {
     };
 
     if (opts.sERC20) {
-      await this.ctx.sERC20.approve({ from: this.ctx.signers.issuer.recipient, amount: opts.amount, spender: this.ctx.contracts.bVault });
+      await this.ctx.sERC20.approve({ from: this.ctx.signers.issuer.buyer, amount: opts.amount, spender: this.ctx.contracts.bVault });
     }
 
     this.ctx.data.tx = await this.ctx.contracts.bVault.connect(opts.from).swap(singleSwap, funds, 0, Date.now(), {

@@ -29,7 +29,10 @@ interface IIssuer {
         uint256 fee
     );
     event Issue(sIERC20 indexed sERC20, address indexed recipient, uint256 value, uint256 amount);
-    event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 amount, uint256 expiration);
+    event CreateProposal(sIERC20 indexed sERC20, uint256 indexed proposalId, address indexed buyer, uint256 value, uint256 price, uint256 expiration);
+    event AcceptProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
+    event RejectProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
+    event WithdrawProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event Close(sIERC20);
     event EnableFlashIssuance(sIERC20 indexed sERC20);
     event SetBank(address bank);
@@ -60,6 +63,12 @@ interface IIssuer {
         uint256 amount,
         uint256 lifespan
     ) external payable returns (uint256);
+
+    function acceptProposal(sIERC20 sERC20, uint256 proposalId) external;
+
+    // function rejectProposal(sIERC20 sERC20, uint256 proposalId) external;
+
+    // function withdrawProposal(sIERC20 sERC20, uint256 proposalId) external;
 
     function close(sIERC20 sERC20) external;
 
@@ -95,6 +104,17 @@ interface IIssuer {
             uint256 nbOfProposals,
             bool flash,
             bool sERC20IsToken0
+        );
+
+    function proposalFor(sIERC20 sERC20, uint256 proposalId)
+        external
+        view
+        returns (
+            Proposals.State state,
+            address buyer,
+            uint256 value,
+            uint256 price,
+            uint256 expiration
         );
 
     function priceOf(sIERC20 sERC20) external view returns (uint256);

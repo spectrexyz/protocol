@@ -15,7 +15,7 @@ library Proposals {
         State _state;
         address buyer;
         uint256 value;
-        uint256 amount;
+        uint256 price;
         uint256 expiration;
     }
 

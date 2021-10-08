@@ -1,4 +1,5 @@
 const { expect } = require("chai");
+const { ethers } = require("ethers");
 
 const itRegistersLikeExpected = (ctx, opts = {}) => {
   it("it deploys FractionalizationBootstrappingPool", async () => {
@@ -37,10 +38,13 @@ const itIssuesLikeExpected = (ctx, opts = {}) => {
   });
 
   it("it collects proceeds towards issuance's guardian", async () => {
-    expect(ctx.data.latestGuardianBalance.sub(ctx.data.previousGuardianBalance)).to.equal(ctx.data.expectedGuardianProceeds);
+    opts.gas ??= false;
+
+    const gasCost = opts.gas ? ctx.data.gasSpent : ethers.BigNumber.from("0");
+    expect(ctx.data.latestGuardianBalance.sub(ctx.data.previousGuardianBalance)).to.equal(ctx.data.expectedGuardianProceeds.sub(gasCost));
   });
 
-  it("it mints sERC20 issuance towards recipient", async () => {
+  it("it mints sERC20 issuance towards buyer", async () => {
     expect(ctx.data.latestRecipientBalance.sub(ctx.data.previousRecipientBalance)).to.equal(ctx.data.expectedAmount);
   });
 
@@ -60,7 +64,7 @@ const itIssuesLikeExpected = (ctx, opts = {}) => {
 
     await expect(ctx.data.tx)
       .to.emit(ctx.issuer.contract, "Issue")
-      .withArgs(ctx.sERC20.contract.address, ctx.signers.issuer.recipient.address, opts.value, ctx.data.expectedAmount);
+      .withArgs(ctx.sERC20.contract.address, ctx.signers.issuer.buyer.address, opts.value, ctx.data.expectedAmount);
   });
 };
 

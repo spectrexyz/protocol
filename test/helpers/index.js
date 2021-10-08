@@ -47,7 +47,7 @@ const _signers = async (ctx) => {
     signers.issuer.bank,
     signers.issuer.splitter,
     signers.issuer.guardian,
-    signers.issuer.recipient,
+    signers.issuer.buyer,
     signers.issuer.registerer,
     signers.issuer.closer,
     signers.pool.owner,

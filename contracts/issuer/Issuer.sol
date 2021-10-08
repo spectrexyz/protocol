@@ -19,6 +19,7 @@ import "hardhat/console.sol";
  */
 contract Issuer is Context, AccessControlEnumerable, IIssuer {
     using Address for address payable;
+    using Proposals for Proposals.Proposal;
 
     bytes32 public constant CLOSE_ROLE = keccak256("CLOSE_ROLE");
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
@@ -144,7 +145,9 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
 
     /**
      * @notice Issue at least `expected` `sERC20` tokens.
-     * @param sERC20 The sERC20 to issue.
+     * @dev - We do not check that sERC20.cap() > sERC20.totalSupply().
+     *      - Indeed, to make sure the transaction does not revert, we would need to take both the price, LP reward and allocation into consideration.
+     *      - That would involve a lot of un-necessary computations as the sERC20 reverts in such a situation anyhow.
      * @param expected The minimum amount of sERC20 to issue [reverts otherwise].
      */
     function issue(sIERC20 sERC20, uint256 expected) external payable override {
@@ -153,11 +156,6 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         require(issuance.state == Issuances.State.Opened, "Issuer: invalid issuance state");
         require(issuance.flash, "Issuer: flash issuance is disabled");
         require(msg.value != 0, "Issuer: issuance value cannot be null");
-
-        uint256 cap = sERC20.cap();
-        uint256 totalSupply = sERC20.totalSupply();
-
-        require(cap > totalSupply, "Issuer: nothing left to issue");
 
         bool poolIsInitialized = issuance.pool.totalSupply() > 0;
         bool sERC20IsToken0 = issuance.sERC20IsToken0;
@@ -169,14 +167,17 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     }
 
     /**
-     * @notice Create a proposal to mint `amount` tokens of `sERC20`.
-     * @param sERC20 The sERC20 to mint.
-     * @param amount The amount of tokens to mint.
+     * @notice Create a proposal to issue `sERC20` tokens at a price of `price` sERC20 per ETH.
+     * @dev - We do not check that sERC20.cap() > sERC20.totalSupply().
+     *      - Indeed, to make sure the transaction does not revert, we would need to take both the price, LP reward and allocation into consideration.
+     *      - That would involve a lot of un-necessary computations as the sERC20 reverts in such a situation anyhow.
+     * @param sERC20 The sERC20 to issue.
+     * @param price The price at which sERC20s are proposed to be issued [in sERC20 per ETH].
      * @param lifespan The lifespan of the proposal [in seconds].
      */
     function createProposal(
         sIERC20 sERC20,
-        uint256 amount,
+        uint256 price,
         uint256 lifespan
     ) external payable override returns (uint256) {
         Issuances.Issuance storage issuance = _issuances[sERC20];
@@ -184,10 +185,8 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
 
         require(issuance.state == Issuances.State.Opened, "Issuer: invalid issuance state");
         require(!issuance.flash, "Issuer: flash issuance is enabled");
-
-        // uint256 price = _twapOf(issuance, TwapKind.sERC20);
-        uint256 price = 0;
-        require(amount <= price * msg.value, "Broker: insufficient value");
+        require(msg.value > 0, "Issuer: issuance value cannot be null");
+        require(price > 0 && price <= _priceOf(issuance.pool, issuance.reserve, issuance.pool.totalSupply() > 0, issuance.sERC20IsToken0), "Issuer: invalid issuance price");
 
         uint256 proposalId = issuance.nbOfProposals++;
         uint256 expiration = lifespan == 0 ? 0 : block.timestamp + lifespan;
@@ -195,13 +194,34 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
             _state: Proposals.State.Pending,
             buyer: buyer,
             value: msg.value,
-            amount: amount,
+            price: price,
             expiration: expiration
         });
 
-        emit CreateProposal(sERC20, proposalId, buyer, msg.value, amount, expiration);
+        emit CreateProposal(sERC20, proposalId, buyer, msg.value, price, expiration);
 
         return proposalId;
+    }
+
+    /**
+     * @notice Accept proposal #`proposalId` to issue `sERC20` tokens.
+     * @param sERC20 The sERC20 which was proposed to be issued.
+     * @param proposalId The id of the issuance proposal.
+     */
+    function acceptProposal(sIERC20 sERC20, uint256 proposalId) external override {
+        Issuances.Issuance storage issuance = _issuances[sERC20];
+        Proposals.Proposal storage proposal = issuance.proposals[proposalId];
+
+        require(_msgSender() == issuance.guardian, "Issuer: must be issuance's guardian to accept proposals");
+        require(issuance.state == Issuances.State.Opened, "Issuer: invalid issuance state");
+        require(proposal.state() == Proposals.State.Pending, "Issuer: invalid proposal state");
+        require(!issuance.flash, "Issuer: flash issuance is enabled");
+
+        proposal._state = Proposals.State.Accepted;
+
+        emit AcceptProposal(sERC20, proposalId);
+
+        _issue(sERC20, issuance, proposal.buyer, proposal.value, proposal.price, issuance.pool.totalSupply() > 0, issuance.sERC20IsToken0);
     }
 
     /**
@@ -331,6 +351,30 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     }
 
     /**
+     * @notice Return the proposal #`proposalId` to issue `sERC20` tokens.
+     */
+    function proposalFor(sIERC20 sERC20, uint256 proposalId)
+        public
+        view
+        override
+        returns (
+            Proposals.State state,
+            address buyer,
+            uint256 value,
+            uint256 price,
+            uint256 expiration
+        )
+    {
+        Proposals.Proposal storage proposal = _issuances[sERC20].proposals[proposalId];
+
+        state = proposal.state();
+        buyer = proposal.buyer;
+        value = proposal.value;
+        price = proposal.price;
+        expiration = proposal.expiration;
+    }
+
+    /**
      * @notice Return the current issuance price of `sERC20` [in sERC20 per ETH].
      * @param sERC20 The sERC20 whose current issuance price is to be returned.
      */
@@ -364,16 +408,13 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         bool poolIsInitialized,
         bool sERC20IsToken0
     ) private returns (uint256) {
-        // clip value
-        // value = _clipValue(sERC20, issuance.pool, buyer, value, price, poolIsInitialized, sERC20IsToken0);
-
         uint256 fee = (value * issuance.fee) / HUNDRED;
         uint256 protocolFee_ = ((value - fee) * _protocolFee) / HUNDRED;
         uint256 remaining = value - fee - protocolFee_;
         uint256 amount = (remaining * price) / DECIMALS;
-
+ 
         // pool LP reward
-        uint256 reward = _doReward(sERC20, issuance, fee, poolIsInitialized, sERC20IsToken0);
+        uint256 reward = _doReward(sERC20, issuance, fee, price, poolIsInitialized, sERC20IsToken0);
         // mint recipient tokens
         sERC20.mint(buyer, amount);
         // mint allocation tokens
@@ -409,52 +450,21 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         emit SetProtocolFee(protocolFee_);
     }
 
-    /**
-     * @dev This function opens `issue` to re-entrancy for it would cause no harm.
-     */
-    function _clipValue(
-        sIERC20 sERC20,
-        IFractionalizationBootstrappingPool pool,
-        address buyer,
-        uint256 origin,
-        uint256 price,
-        bool poolIsInitialized,
-        bool sERC20IsToken0
-    ) private returns (uint256) {
-        // uint256 max = ((sERC20.cap() - sERC20.totalSupply()) * DECIMALS) / price;
-        // uint256 numerator = DECIMALS * (sERC20.cap() - sERC20.totalSupply());
-
-        // if (!poolIsInitialized) {
-        //     uint256[] memory weights = pool.getNormalizedWeights();
-        //     if (sERC20IsToken0) reward = (value * reserve * weights[0]) / (DECIMALS * weights[1]);
-        //     else reward = (value * reserve * weights[1]) / (DECIMALS * weights[0]);
-        // }
-
-        // uint256 value = max < origin ? max : origin;
-        // uint256 excess = origin - value;
-
-        // if (excess > 0) payable(buyer).sendValue(excess);
-
-        // return value;
-
-        return 0;
-    }
-
     function _doReward(
         sIERC20 sERC20,
         Issuances.Issuance storage issuance,
         uint256 value,
+        uint256 price,
         bool poolIsInitialized,
         bool sERC20IsToken0
     ) private returns (uint256) {
         IBVault vault_ = _vault;
-        bytes32 poolId = issuance.poolId;
-        uint256 reward = _reward(vault_, issuance.pool, poolId, issuance.reserve, value, poolIsInitialized, sERC20IsToken0);
-
-        if (reward > 0) {
+        uint256 reward = _reward(vault_, issuance.pool, issuance.poolId, price, value, poolIsInitialized, sERC20IsToken0);
+        
+        if (value > 0 || reward > 0) {
             sERC20.mint(address(this), reward);
             sERC20.approve(address(vault_), reward);
-            vault_.joinPool{value: value}(poolId, address(this), _bank, _request(sERC20, reward, value, poolIsInitialized, sERC20IsToken0));
+            vault_.joinPool{value: value}(issuance.poolId, address(this), _bank, _request(sERC20, reward, value, poolIsInitialized, sERC20IsToken0));
         }
 
         return reward;
@@ -464,7 +474,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         IBVault vault_,
         IFractionalizationBootstrappingPool pool,
         bytes32 poolId,
-        uint256 reserve,
+        uint256 price,
         uint256 value,
         bool poolIsInitialized,
         bool sERC20IsToken0
@@ -473,8 +483,8 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
 
         if (!poolIsInitialized) {
             uint256[] memory weights = pool.getNormalizedWeights();
-            if (sERC20IsToken0) reward = (value * reserve * weights[0]) / (DECIMALS * weights[1]);
-            else reward = (value * reserve * weights[1]) / (DECIMALS * weights[0]);
+            if (sERC20IsToken0) reward = (value * price * weights[0]) / (DECIMALS * weights[1]);
+            else reward = (value * price * weights[1]) / (DECIMALS * weights[0]);
         } else {
             uint256[2] memory balances = _balances(vault_, poolId, sERC20IsToken0);
             reward = (value * balances[0]) / balances[1];

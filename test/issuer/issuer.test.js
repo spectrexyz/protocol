@@ -1,15 +1,8 @@
-const chai = require("chai");
 const { expect } = require("chai");
-const { ethers } = require("ethers");
 const { initialize, setup } = require("../helpers");
-const { near } = require("../helpers/chai");
 const { Issuer } = require("../helpers/models");
-const { advanceTime, currentTimestamp } = require("../helpers/time");
+const { advanceTime } = require("../helpers/time");
 const { itRegistersLikeExpected, itIssuesLikeExpected } = require("./issuer.behavior");
-
-const MAX_RELATIVE_ERROR = 0.00005;
-
-chai.use(near);
 
 describe("Issuer", () => {
   before(async () => {
@@ -218,137 +211,122 @@ describe("Issuer", () => {
     describe("» issuance is opened", () => {
       describe("» and flash issuance is enabled", () => {
         describe("» and issuance value is not null", () => {
-          describe("» and there is something left to issue", () => {
-            describe("» and issued amount is more than expected", () => {
-              describe("» and pool is not initialized yet", () => {
-                before(async () => {
-                  await setup.issuer(this);
-                  await this.issuer.register();
-
-                  this.data.previousWeights = await this.pool.getNormalizedWeights();
-                  this.data.previousPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
-                  this.data.previousBankBalance = await this.signers.issuer.bank.getBalance();
-                  this.data.previousBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
-                  this.data.previousGuardianBalance = await this.signers.issuer.guardian.getBalance();
-                  this.data.previousRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.recipient.address);
-
-                  await this.issuer.issue();
-
-                  this.data.latestTotalSupply = await this.sERC20.totalSupply();
-                  this.data.latestPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
-                  this.data.latestWeights = await this.pool.getNormalizedWeights();
-                  this.data.latestBankBalance = await this.signers.issuer.bank.getBalance();
-                  this.data.latestBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
-                  this.data.latestGuardianBalance = await this.signers.issuer.guardian.getBalance();
-                  this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.recipient.address);
-                  this.data.expectedFee = this.params.issuer.value.mul(this.params.issuer.fee).div(this.constants.issuer.HUNDRED);
-                  this.data.expectedProtocolFee = this.params.issuer.value
-                    .sub(this.data.expectedFee)
-                    .mul(this.params.issuer.protocolFee)
-                    .div(this.constants.issuer.HUNDRED);
-                  this.data.expectedAmount = this.params.issuer.value
-                    .sub(this.data.expectedProtocolFee)
-                    .sub(this.data.expectedFee)
-                    .mul(this.params.issuer.reserve)
-                    .div(this.constants.issuer.DECIMALS);
-                  this.data.expectedReward = this.data.expectedFee
-                    .mul(this.params.issuer.reserve)
-                    .mul(this.params.pool.sMaxNormalizedWeight)
-                    .div(this.constants.pool.ONE.sub(this.params.pool.sMaxNormalizedWeight))
-                    .div(this.constants.issuer.DECIMALS);
-                  this.data.expectedGuardianProceeds = this.params.issuer.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
-                });
-
-                itIssuesLikeExpected(this);
-
-                it("it collects issuance fee BTPs towards issuer's bank", async () => {
-                  expect(this.data.latestBankBTPBalance).to.be.gt(this.data.previousBankBTPBalance);
-                });
-              });
-
-              describe("» and pool is already initialized", () => {
-                before(async () => {
-                  await setup.issuer(this);
-                  await this.issuer.register();
-
-                  await this.issuer.issue();
-                  await this.issuer.issue();
-
-                  // let's leave time for the twap to stablize
-                  await advanceTime(86400);
-
-                  this.data.previousIssuancePrice = await this.issuer.priceOf(this.sERC20.address);
-                  this.data.previousSpotPrice = await this.pool.latestSpotPrice();
-                  this.data.previousBPTSupply = await this.pool.totalSupply();
-                  this.data.previousWeights = await this.pool.getNormalizedWeights();
-                  this.data.previousPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
-                  this.data.previousBankBalance = await this.signers.issuer.bank.getBalance();
-                  this.data.previousBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
-                  this.data.previousGuardianBalance = await this.signers.issuer.guardian.getBalance();
-                  this.data.previousRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.recipient.address);
-                  this.data.previousPoolBalance = {
-                    sERC20: this.pool.sERC20IsToken0 ? this.data.previousPoolBalances[0] : this.data.previousPoolBalances[1],
-                    ETH: this.pool.sERC20IsToken0 ? this.data.previousPoolBalances[1] : this.data.previousPoolBalances[0],
-                  };
-                  await this.issuer.issue();
-
-                  this.data.latestSpotPrice = await this.pool.latestSpotPrice();
-                  this.data.latestTotalSupply = await this.sERC20.totalSupply();
-                  this.data.latestBPTSupply = await this.pool.totalSupply();
-                  this.data.latestPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
-                  this.data.latestWeights = await this.pool.getNormalizedWeights();
-                  this.data.latestBankBalance = await this.signers.issuer.bank.getBalance();
-                  this.data.latestBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
-                  this.data.latestGuardianBalance = await this.signers.issuer.guardian.getBalance();
-                  this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.recipient.address);
-                  this.data.expectedFee = this.params.issuer.value.mul(this.params.issuer.fee).div(this.constants.issuer.HUNDRED);
-                  this.data.expectedProtocolFee = this.params.issuer.value
-                    .sub(this.data.expectedFee)
-                    .mul(this.params.issuer.protocolFee)
-                    .div(this.constants.issuer.HUNDRED);
-                  this.data.expectedAmount = this.params.issuer.value
-                    .sub(this.data.expectedProtocolFee)
-                    .sub(this.data.expectedFee)
-                    .mul(this.data.previousIssuancePrice)
-                    .div(this.constants.issuer.DECIMALS);
-                  this.data.expectedReward = this.data.expectedFee.mul(this.data.previousPoolBalance.sERC20).div(this.data.previousPoolBalance.ETH);
-                  this.data.expectedGuardianProceeds = this.params.issuer.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
-                });
-
-                itIssuesLikeExpected(this);
-
-                it("it mints no BPT", async () => {
-                  expect(this.data.latestBPTSupply).to.equal(this.data.previousBPTSupply);
-                });
-
-                it("it creates a downward price pressure", async () => {
-                  expect(this.data.latestSpotPrice).to.gt(this.data.previousSpotPrice);
-                });
-              });
-            });
-
-            describe("» but issued amount is less than expected", () => {
+          describe("» and issued amount is more than expected", () => {
+            describe("» and pool is not initialized yet", () => {
               before(async () => {
                 await setup.issuer(this);
                 await this.issuer.register();
+
+                this.data.previousWeights = await this.pool.getNormalizedWeights();
+                this.data.previousPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
+                this.data.previousBankBalance = await this.signers.issuer.bank.getBalance();
+                this.data.previousBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
+                this.data.previousGuardianBalance = await this.signers.issuer.guardian.getBalance();
+                this.data.previousRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.buyer.address);
+
+                await this.issuer.issue();
+
+                this.data.latestTotalSupply = await this.sERC20.totalSupply();
+                this.data.latestPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
+                this.data.latestWeights = await this.pool.getNormalizedWeights();
+                this.data.latestBankBalance = await this.signers.issuer.bank.getBalance();
+                this.data.latestBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
+                this.data.latestGuardianBalance = await this.signers.issuer.guardian.getBalance();
+                this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.buyer.address);
+                this.data.expectedFee = this.params.issuer.value.mul(this.params.issuer.fee).div(this.constants.issuer.HUNDRED);
+                this.data.expectedProtocolFee = this.params.issuer.value
+                  .sub(this.data.expectedFee)
+                  .mul(this.params.issuer.protocolFee)
+                  .div(this.constants.issuer.HUNDRED);
+                this.data.expectedAmount = this.params.issuer.value
+                  .sub(this.data.expectedProtocolFee)
+                  .sub(this.data.expectedFee)
+                  .mul(this.params.issuer.reserve)
+                  .div(this.constants.issuer.DECIMALS);
+                this.data.expectedReward = this.data.expectedFee
+                  .mul(this.params.issuer.reserve)
+                  .mul(this.params.pool.sMaxNormalizedWeight)
+                  .div(this.constants.pool.ONE.sub(this.params.pool.sMaxNormalizedWeight))
+                  .div(this.constants.issuer.DECIMALS);
+                this.data.expectedGuardianProceeds = this.params.issuer.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
               });
 
-              it("it reverts", async () => {
-                await expect(this.issuer.issue({ expected: ethers.utils.parseEther("1000") })).to.be.revertedWith("Issuer: insufficient issuance return");
+              itIssuesLikeExpected(this);
+
+              it("it collects issuance fee BTPs towards issuer's bank", async () => {
+                expect(this.data.latestBankBTPBalance).to.be.gt(this.data.previousBankBTPBalance);
+              });
+            });
+
+            describe("» and pool is already initialized", () => {
+              before(async () => {
+                await setup.issuer(this);
+                await this.issuer.register();
+
+                await this.issuer.issue();
+                await this.issuer.issue();
+
+                // let's leave time for the twap to stablize
+                await advanceTime(86400);
+
+                this.data.previousIssuancePrice = await this.issuer.priceOf(this.sERC20.address);
+                this.data.previousSpotPrice = await this.pool.latestSpotPrice();
+                this.data.previousBPTSupply = await this.pool.totalSupply();
+                this.data.previousWeights = await this.pool.getNormalizedWeights();
+                this.data.previousPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
+                this.data.previousBankBalance = await this.signers.issuer.bank.getBalance();
+                this.data.previousBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
+                this.data.previousGuardianBalance = await this.signers.issuer.guardian.getBalance();
+                this.data.previousRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.buyer.address);
+                this.data.previousPoolBalance = {
+                  sERC20: this.pool.sERC20IsToken0 ? this.data.previousPoolBalances[0] : this.data.previousPoolBalances[1],
+                  ETH: this.pool.sERC20IsToken0 ? this.data.previousPoolBalances[1] : this.data.previousPoolBalances[0],
+                };
+                await this.issuer.issue();
+
+                this.data.latestSpotPrice = await this.pool.latestSpotPrice();
+                this.data.latestTotalSupply = await this.sERC20.totalSupply();
+                this.data.latestBPTSupply = await this.pool.totalSupply();
+                this.data.latestPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
+                this.data.latestWeights = await this.pool.getNormalizedWeights();
+                this.data.latestBankBalance = await this.signers.issuer.bank.getBalance();
+                this.data.latestBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
+                this.data.latestGuardianBalance = await this.signers.issuer.guardian.getBalance();
+                this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.buyer.address);
+                this.data.expectedFee = this.params.issuer.value.mul(this.params.issuer.fee).div(this.constants.issuer.HUNDRED);
+                this.data.expectedProtocolFee = this.params.issuer.value
+                  .sub(this.data.expectedFee)
+                  .mul(this.params.issuer.protocolFee)
+                  .div(this.constants.issuer.HUNDRED);
+                this.data.expectedAmount = this.params.issuer.value
+                  .sub(this.data.expectedProtocolFee)
+                  .sub(this.data.expectedFee)
+                  .mul(this.data.previousIssuancePrice)
+                  .div(this.constants.issuer.DECIMALS);
+                this.data.expectedReward = this.data.expectedFee.mul(this.data.previousPoolBalance.sERC20).div(this.data.previousPoolBalance.ETH);
+                this.data.expectedGuardianProceeds = this.params.issuer.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
+              });
+
+              itIssuesLikeExpected(this);
+
+              it("it mints no BPT", async () => {
+                expect(this.data.latestBPTSupply).to.equal(this.data.previousBPTSupply);
+              });
+
+              it("it creates a downward price pressure", async () => {
+                expect(this.data.latestSpotPrice).to.gt(this.data.previousSpotPrice);
               });
             });
           });
 
-          describe("» but there is nothing left to issue", () => {
+          describe("» but issued amount is less than expected", () => {
             before(async () => {
               await setup.issuer(this);
               await this.issuer.register();
-              await this.sERC20.grantRole({ role: this.constants.sERC20.MINT_ROLE, account: this.signers.sERC20.minter });
-              await this.sERC20.mint({ amount: this.params.sERC20.cap });
             });
 
             it("it reverts", async () => {
-              await expect(this.issuer.issue()).to.be.revertedWith("Issuer: nothing left to issue");
+              await expect(this.issuer.issue({ expected: ethers.utils.parseEther("1000") })).to.be.revertedWith("Issuer: insufficient issuance return");
             });
           });
         });
@@ -384,6 +362,236 @@ describe("Issuer", () => {
 
       it("it reverts", async () => {
         await expect(this.issuer.issue()).to.be.revertedWith("Issuer: invalid issuance state");
+      });
+    });
+  });
+
+  describe("# createProposal", () => {
+    describe("» issuance is opened", () => {
+      describe("» and flash issuance is disabled", () => {
+        describe("» and issuance value is not null", () => {
+          describe("» and issuance price is valid", () => {
+            before(async () => {
+              await setup.issuer(this);
+              await this.issuer.register({ flash: false });
+              await this.issuer.createProposal();
+
+              this.data.issuance = await this.issuer.issuanceOf(this.sERC20.address);
+              this.data.proposal = await this.issuer.proposalFor(this.sERC20.address, this.data.proposalId);
+              this.data.expectedExpiration = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+                this.params.issuer.lifespan
+              );
+            });
+
+            it("it creates a new proposal", async () => {
+              expect(this.data.issuance.nbOfProposals).to.equal(1);
+              expect(this.data.proposal.state).to.equal(this.constants.issuer.proposals.state.Pending);
+              expect(this.data.proposal.buyer).to.equal(this.signers.issuer.buyer.address);
+              expect(this.data.proposal.value).to.equal(this.params.issuer.value);
+              expect(this.data.proposal.price).to.equal(this.params.issuer.price);
+              expect(this.data.proposal.expiration).to.equal(this.data.expectedExpiration);
+            });
+
+            it("it emits a CreateProposal event", async () => {
+              await expect(this.data.tx)
+                .to.emit(this.issuer.contract, "CreateProposal")
+                .withArgs(
+                  this.sERC20.address,
+                  this.data.proposalId,
+                  this.signers.issuer.buyer.address,
+                  this.params.issuer.value,
+                  this.params.issuer.price,
+                  this.data.expectedExpiration
+                );
+            });
+          });
+
+          describe("» but issuance price is invalid", () => {
+            describe("» because issuance price is null", () => {
+              before(async () => {
+                await setup.issuer(this);
+                await this.issuer.register({ flash: false });
+              });
+
+              it("it reverts", async () => {
+                await expect(this.issuer.createProposal({ price: 0 })).to.be.revertedWith("Issuer: invalid issuance price");
+              });
+            });
+
+            describe("» because issuance price is lower than current price", () => {
+              before(async () => {
+                await setup.issuer(this);
+                await this.issuer.register({ flash: false });
+              });
+
+              it("it reverts", async () => {
+                await expect(this.issuer.createProposal({ price: this.params.issuer.reserve.add(this.constants.ONE) })).to.be.revertedWith(
+                  "Issuer: invalid issuance price"
+                );
+              });
+            });
+          });
+        });
+
+        describe("» but issuance value is null", () => {
+          before(async () => {
+            await setup.issuer(this);
+            await this.issuer.register({ flash: false });
+          });
+
+          it("it reverts", async () => {
+            await expect(this.issuer.createProposal({ value: 0 })).to.be.revertedWith("Issuer: issuance value cannot be null");
+          });
+        });
+      });
+
+      describe("» but flash issuance is enabled", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.issuer.createProposal()).to.be.revertedWith("Issuer: flash issuance is enabled");
+        });
+      });
+    });
+
+    describe("» issuance is not opened", () => {
+      before(async () => {
+        await setup.issuer(this);
+        await this.issuer.register({ flash: false });
+        await this.issuer.close();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.issuer.createProposal()).to.be.revertedWith("Issuer: invalid issuance state");
+      });
+    });
+  });
+
+  describe("# acceptProposal", () => {
+    describe("» caller is issuance's guardian", () => {
+      describe("» and issuance is opened", () => {
+        describe("» and proposal is pending", () => {
+          describe("» and flash issuance is disabled", () => {
+            before(async () => {
+              await setup.issuer(this);
+              await this.issuer.register({ flash: false });
+              await this.issuer.createProposal();
+
+              this.data.previousWeights = await this.pool.getNormalizedWeights();
+              this.data.previousPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
+              this.data.previousBankBalance = await this.signers.issuer.bank.getBalance();
+              this.data.previousBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
+              this.data.previousGuardianBalance = await this.signers.issuer.guardian.getBalance();
+              this.data.previousRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.buyer.address);
+
+              await this.issuer.acceptProposal();
+
+              this.data.proposal = await this.issuer.proposalFor(this.sERC20.address, this.data.proposalId);
+              this.data.latestTotalSupply = await this.sERC20.totalSupply();
+              this.data.latestPoolBalances = (await this.contracts.bVault.getPoolTokens(this.data.poolId)).balances;
+              this.data.latestWeights = await this.pool.getNormalizedWeights();
+              this.data.latestBankBalance = await this.signers.issuer.bank.getBalance();
+              this.data.latestBankBTPBalance = await this.pool.balanceOf(this.signers.issuer.bank.address);
+              this.data.latestGuardianBalance = await this.signers.issuer.guardian.getBalance();
+              this.data.latestRecipientBalance = await this.sERC20.balanceOf(this.signers.issuer.buyer.address);
+              this.data.expectedFee = this.params.issuer.value.mul(this.params.issuer.fee).div(this.constants.issuer.HUNDRED);
+              this.data.expectedProtocolFee = this.params.issuer.value
+                .sub(this.data.expectedFee)
+                .mul(this.params.issuer.protocolFee)
+                .div(this.constants.issuer.HUNDRED);
+              this.data.expectedAmount = this.params.issuer.value
+                .sub(this.data.expectedProtocolFee)
+                .sub(this.data.expectedFee)
+                .mul(this.params.issuer.price)
+                .div(this.constants.issuer.DECIMALS);
+              this.data.expectedReward = this.data.expectedFee
+                .mul(this.params.issuer.price)
+                .mul(this.params.pool.sMaxNormalizedWeight)
+                .div(this.constants.pool.ONE.sub(this.params.pool.sMaxNormalizedWeight))
+                .div(this.constants.issuer.DECIMALS);
+              this.data.expectedGuardianProceeds = this.params.issuer.value.sub(this.data.expectedProtocolFee).sub(this.data.expectedFee);
+            });
+
+            it("it updates proposal state", async () => {
+              expect(this.data.proposal.state).to.equal(this.constants.issuer.proposals.state.Accepted);
+            });
+
+            it("it emits a AcceptProposal event", async () => {
+              await expect(this.data.tx).to.emit(this.issuer.contract, "AcceptProposal").withArgs(this.sERC20.address, this.data.proposalId);
+            });
+
+            itIssuesLikeExpected(this, { gas: true });
+          });
+
+          describe("» but flash issuance is enabled", () => {
+            before(async () => {
+              await setup.issuer(this);
+              await this.issuer.register({ flash: false });
+              await this.issuer.createProposal();
+              await this.issuer.enableFlashIssuance();
+            });
+
+            it("it reverts", async () => {
+              await expect(this.issuer.acceptProposal()).to.be.revertedWith("Issuer: flash issuance is enabled");
+            });
+          });
+        });
+
+        describe("» but proposal is not pending", () => {
+          describe("» because proposal is lapsed", () => {
+            before(async () => {
+              await setup.issuer(this);
+              await this.issuer.register({ flash: false });
+              await this.issuer.createProposal();
+              await advanceTime(this.params.broker.lifespan.add(this.constants.ONE));
+            });
+
+            it("it reverts", async () => {
+              await expect(this.issuer.acceptProposal()).to.be.revertedWith("Issuer: invalid proposal state");
+            });
+          });
+
+          describe("» because proposal is already accepted", () => {
+            before(async () => {
+              await setup.issuer(this);
+              await this.issuer.register({ flash: false });
+              await this.issuer.createProposal();
+              await this.issuer.acceptProposal();
+            });
+
+            it("it reverts", async () => {
+              await expect(this.issuer.acceptProposal()).to.be.revertedWith("Issuer: invalid proposal state");
+            });
+          });
+        });
+      });
+
+      describe("» but issuance is not opened", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register({ flash: false });
+          await this.issuer.createProposal();
+          await this.issuer.close();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.issuer.acceptProposal()).to.be.revertedWith("Issuer: invalid issuance state");
+        });
+      });
+    });
+
+    describe("» caller is not sale's guardian", () => {
+      before(async () => {
+        await setup.issuer(this);
+        await this.issuer.register({ flash: false });
+        await this.issuer.createProposal();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.issuer.acceptProposal({ from: this.signers.others[0] })).to.be.revertedWith("Issuer: must be issuance's guardian to accept proposal");
       });
     });
   });
@@ -438,9 +646,7 @@ describe("Issuer", () => {
           before(async () => {
             await setup.issuer(this);
             await this.issuer.register({ flash: false });
-
-            this.data.tx = await this.issuer.contract.connect(this.signers.issuer.guardian).enableFlashIssuance(this.sERC20.address);
-            this.data.receipt = await this.data.tx.wait();
+            await this.issuer.enableFlashIssuance();
           });
 
           it("it enables flash issuance", async () => {
@@ -459,9 +665,7 @@ describe("Issuer", () => {
           });
 
           it("it reverts", async () => {
-            await expect(this.issuer.contract.connect(this.signers.issuer.guardian).enableFlashIssuance(this.sERC20.address)).to.be.revertedWith(
-              "Issuer: flash issuance already enabled"
-            );
+            await expect(this.issuer.enableFlashIssuance()).to.be.revertedWith("Issuer: flash issuance already enabled");
           });
         });
       });
@@ -474,9 +678,7 @@ describe("Issuer", () => {
         });
 
         it("it reverts", async () => {
-          await expect(this.issuer.contract.connect(this.signers.issuer.guardian).enableFlashIssuance(this.sERC20.address)).to.be.revertedWith(
-            "Issuer: invalid issuance state"
-          );
+          await expect(this.issuer.enableFlashIssuance()).to.be.revertedWith("Issuer: invalid issuance state");
         });
       });
     });
@@ -488,7 +690,7 @@ describe("Issuer", () => {
       });
 
       it("it reverts", async () => {
-        await expect(this.issuer.contract.connect(this.signers.others[0]).enableFlashIssuance(this.sERC20.address)).to.be.revertedWith(
+        await expect(this.issuer.enableFlashIssuance({ from: this.signers.others[0] })).to.be.revertedWith(
           "Issuer: must be issuance's guardian to enable flash issuance"
         );
       });
