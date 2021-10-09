@@ -10,18 +10,28 @@ interface ISplitter {
         mapping(address => uint256) withdrawn;
     }
 
-    event Register(sIERC20 indexed sERC20, address[] beneficiaries, uint256[] shares);
+    event Register(sIERC20 indexed sERC20, address[] beneficiaries, uint256[] shares, uint256 fee, uint256 allocation);
     event Withdraw(sIERC20 indexed sERC20, address indexed beneficiary, uint256 amount);
+    event SetBank(address bank);
+    event SetFee(uint256 fee);
 
     function register(
         sIERC20 sERC20,
         address[] calldata beneficiaries,
         uint256[] calldata shares
-    ) external;
+    ) external returns (uint256);
 
     function withdraw(sIERC20 sERC20, address beneficiary) external;
 
     function withdrawBatch(sIERC20[] calldata sERC20s, address beneficiary) external;
+
+    function setBank(address bank_) external;
+
+    function setFee(uint256 fee_) external;
+
+    function bank() external view returns (address);
+
+    function fee() external view returns (uint256);
 
     function stateOf(sIERC20 sERC20) external view returns (uint256 received, uint256 totalWithdrawn);
 
