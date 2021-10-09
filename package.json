@@ -29,9 +29,7 @@
     "@balancer-labs/v2-solidity-utils": "^2.0.0",
     "@balancer-labs/v2-vault": "^2.0.0",
     "@openzeppelin/contracts": "^4.0.0",
-    "@openzeppelin/contracts-0.7": "npm:@openzeppelin/contracts@^3.4.0",
-    "@openzeppelin/contracts-upgradeable": "^4.0.0",
-    "@openzeppelin/contracts-upgradeable-0.7": "npm:@openzeppelin/contracts-upgradeable@^3.4.0"
+    "@openzeppelin/contracts-upgradeable": "^4.0.0"
   },
   "devDependencies": {
     "@balancer-labs/balancer-js": "^1.0.1",
