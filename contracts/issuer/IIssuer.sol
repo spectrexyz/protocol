@@ -13,9 +13,6 @@ interface IIssuer {
         sERC20
     }
 
-    /**
-     * @notice Emitted when an `sERC20`pit is registered.
-     */
     event Register(
         sIERC20 indexed sERC20,
         address indexed guardian,

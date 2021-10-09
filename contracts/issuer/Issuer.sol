@@ -11,8 +11,6 @@ import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @title Issuer
  * @notice Handles the issuance of sERC20 tokens.
@@ -128,7 +126,6 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         }
 
         bytes32 poolId = pool.getPoolId();
-
         issuance.state = Issuances.State.Opened;
         issuance.guardian = guardian;
         issuance.pool = pool;
@@ -186,7 +183,10 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         require(issuance.state == Issuances.State.Opened, "Issuer: invalid issuance state");
         require(!issuance.flash, "Issuer: flash issuance is enabled");
         require(msg.value > 0, "Issuer: issuance value cannot be null");
-        require(price > 0 && price <= _priceOf(issuance.pool, issuance.reserve, issuance.pool.totalSupply() > 0, issuance.sERC20IsToken0), "Issuer: invalid issuance price");
+        require(
+            price > 0 && price <= _priceOf(issuance.pool, issuance.reserve, issuance.pool.totalSupply() > 0, issuance.sERC20IsToken0),
+            "Issuer: invalid issuance price"
+        );
 
         uint256 proposalId = issuance.nbOfProposals++;
         uint256 expiration = lifespan == 0 ? 0 : block.timestamp + lifespan;
@@ -451,7 +451,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         uint256 protocolFee_ = ((value - fee) * _protocolFee) / HUNDRED;
         uint256 remaining = value - fee - protocolFee_;
         uint256 amount = (remaining * price) / DECIMALS;
- 
+
         // pool LP reward
         uint256 reward = _doReward(sERC20, issuance, fee, price, poolIsInitialized, sERC20IsToken0);
         // mint recipient tokens
@@ -499,7 +499,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     ) private returns (uint256) {
         IBVault vault_ = _vault;
         uint256 reward = _reward(vault_, issuance.pool, issuance.poolId, price, value, poolIsInitialized, sERC20IsToken0);
-        
+
         if (value > 0 || reward > 0) {
             sERC20.mint(address(this), reward);
             sERC20.approve(address(vault_), reward);
