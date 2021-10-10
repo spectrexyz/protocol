@@ -11,6 +11,7 @@
     "compile": "npx hardhat compile",
     "lint": "npx prettier --write contracts/",
     "test:broker": "npx hardhat test test/broker/*",
+    "test:channeler": "npx hardhat test test/channeler/*",
     "test:issuer": "npx hardhat test test/issuer/*",
     "test:pool": "npx hardhat test test/pool/pool.test.js",
     "test:pool:factory": "npx hardhat test test/pool/pool-factory.test.js",

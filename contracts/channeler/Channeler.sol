@@ -7,7 +7,7 @@ import "../utils/ISplitter.sol";
 import "../vault/IVault.sol";
 import "../token/sIERC20.sol";
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
@@ -16,29 +16,30 @@ import "@openzeppelin/contracts/utils/Context.sol";
  * @title Channeler
  * @notice Wraps all the transaction needed to fractionalize an NFT into an atomic one.
  */
-contract Channeler is Context, AccessControl, Pausable {
+contract Channeler is Context, AccessControlEnumerable, Pausable {
     bytes32 public constant MINT_ROLE = keccak256("MINT_ROLE");
 
     IVault private immutable _vault;
-    IBroker private immutable _broker;
     IIssuer private immutable _issuer;
+    IBroker private immutable _broker;
     ISplitter private immutable _splitter;
 
     constructor(
         address vault_,
-        address broker_,
         address issuer_,
+        address broker_,
         address splitter_
     ) {
         require(vault_ != address(0), "Channeler: vault cannot be the zero address");
-        require(broker_ != address(0), "Channeler: broker cannot be the zero address");
         require(issuer_ != address(0), "Channeler: issuer cannot be the zero address");
+        require(broker_ != address(0), "Channeler: broker cannot be the zero address");
         require(splitter_ != address(0), "Channeler: splitter cannot be the zero address");
 
         _vault = IVault(vault_);
-        _broker = IBroker(broker_);
         _issuer = IIssuer(issuer_);
+        _broker = IBroker(broker_);
         _splitter = ISplitter(splitter_);
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
     struct FractionalizationData {
@@ -78,6 +79,34 @@ contract Channeler is Context, AccessControl, Pausable {
             data.issuanceFlash
         );
         sIERC20(sERC20).grantRole(MINT_ROLE, address(_issuer));
+    }
+
+    function pause() external whenNotPaused {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Channeler: must have DEFAULT_ADMIN_ROLE to pause channeler");
+
+        _pause();
+    }
+
+    function unpause() external whenPaused {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Channeler: must have DEFAULT_ADMIN_ROLE to unpause channeler");
+
+        _unpause();
+    }
+
+    function vault() public view returns (IVault) {
+        return _vault;
+    }
+
+    function issuer() public view returns (IIssuer) {
+        return _issuer;
+    }
+
+    function broker() public view returns (IBroker) {
+        return _broker;
+    }
+
+    function splitter() public view returns (ISplitter) {
+        return _splitter;
     }
 
     function _fractionalize(

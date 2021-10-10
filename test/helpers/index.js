@@ -3,12 +3,13 @@ const _ERC1155ReceiverMock_ = require("../../artifacts/contracts/mock/ERC1155Rec
 const _ERC721Mock_ = require("../../artifacts/contracts/mock/ERC721Mock.sol/ERC721Mock.json");
 const _ERC721SenderMock_ = require("../../artifacts/contracts/mock/ERC721SenderMock.sol/ERC721SenderMock.json");
 const config = require("./config");
-const { Broker, Issuer, Vault, sERC721, Pool, PoolFactory, Splitter } = require("./models");
+const { Broker, Channeler, Issuer, Vault, sERC721, Pool, PoolFactory, Splitter } = require("./models");
 
 const _signers = async (ctx) => {
   const signers = {
     sERC20: {},
     sERC721: { owners: [] },
+    channeler: {},
     vault: {},
     splitter: { beneficiaries: [] },
     issuer: {},
@@ -43,6 +44,8 @@ const _signers = async (ctx) => {
     signers.broker.escaper,
     signers.broker.beneficiaries[0],
     signers.broker.beneficiaries[1],
+    signers.channeler.admin,
+    signers.channeler.guardian,
     signers.issuer.admin,
     signers.issuer.bank,
     signers.issuer.splitter,
@@ -74,6 +77,7 @@ const initialize = async (ctx) => {
     sERC20: config.sERC20.params,
     sERC721: config.sERC721.params,
     broker: config.broker.params,
+    channeler: config.channeler.params,
     issuer: config.issuer.params,
     pool: config.pool.params,
     splitter: config.splitter.params,
@@ -84,6 +88,7 @@ const initialize = async (ctx) => {
     ONE: ethers.BigNumber.from(1),
     sERC20: config.sERC20.constants,
     broker: config.broker.constants,
+    channeler: config.channeler.constants,
     issuer: config.issuer.constants,
     pool: config.pool.constants,
     splitter: config.splitter.constants,
@@ -135,6 +140,19 @@ const setup = {
 
     await ctx.sERC721.mint(opts);
     await ctx.vault.fractionalize({ broker: ctx.broker });
+  },
+  channeler: async (ctx, opts = {}) => {
+    ctx.contracts.sERC20Base = await waffle.deployContract(ctx.signers.root, _sERC20_);
+
+    await sERC721.deploy(ctx);
+    await Vault.deploy(ctx);
+    await PoolFactory.deploy(ctx, opts);
+    await Issuer.deploy(ctx, { minter: false });
+    await Broker.deploy(ctx, { issuer: this.issuer });
+    await Splitter.deploy(ctx);
+    await Channeler.deploy(ctx);
+
+    await ctx.sERC721.mint(opts);
   },
   issuer: async (ctx, opts = {}) => {
     opts.fractionalize ??= true;

@@ -31,6 +31,7 @@ class Issuer {
     opts.splitter ??= ctx.signers.issuer.splitter;
     opts.protocolFee ??= ctx.params.issuer.protocolFee;
     opts.closer ??= ctx.signers.issuer.closer;
+    opts.minter ??= true;
 
     ctx.contracts.issuer = await waffle.deployContract(ctx.signers.issuer.admin, _Issuer_, [
       opts.vault.address,
@@ -44,7 +45,7 @@ class Issuer {
 
     await ctx.issuer.grantRole({ role: ctx.constants.issuer.CLOSE_ROLE, account: ctx.signers.issuer.closer });
     await ctx.issuer.grantRole({ role: ctx.constants.issuer.REGISTER_ROLE, account: ctx.signers.issuer.registerer });
-    await ctx.sERC20.grantRole({ role: ctx.constants.sERC20.MINT_ROLE, account: ctx.issuer });
+    if (opts.minter) await ctx.sERC20.grantRole({ role: ctx.constants.sERC20.MINT_ROLE, account: ctx.issuer });
   }
 
   async grantRole(opts = {}) {

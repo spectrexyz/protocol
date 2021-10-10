@@ -1,5 +1,3 @@
-const { ethers } = require("ethers");
-
 module.exports = {
   params: {
     reserve: ethers.utils.parseEther("0.1"),
