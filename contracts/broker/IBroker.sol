@@ -69,17 +69,6 @@ interface IBroker {
 
     function priceOfFor(sIERC20 sERC20, address buyer) external view returns (uint256 value, uint256 collateral);
 
-    function proposalFor(sIERC20 sERC20, uint256 proposalId)
-        external
-        view
-        returns (
-            Proposals.State state,
-            address buyer,
-            uint256 value,
-            uint256 collateral,
-            uint256 expiration
-        );
-
     function saleOf(sIERC20 sERC20)
         external
         view
@@ -93,5 +82,16 @@ interface IBroker {
             uint256 nbOfProposals,
             bool flash,
             bool escape
+        );
+
+    function proposalFor(sIERC20 sERC20, uint256 proposalId)
+        external
+        view
+        returns (
+            Proposals.State state,
+            address buyer,
+            uint256 value,
+            uint256 collateral,
+            uint256 expiration
         );
 }

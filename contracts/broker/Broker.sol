@@ -347,30 +347,6 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
     }
 
     /**
-     * @notice Return the proposal #`proposalId` to buyout the NFT pegged to `sERC20`.
-     */
-    function proposalFor(sIERC20 sERC20, uint256 proposalId)
-        public
-        view
-        override
-        returns (
-            Proposals.State state,
-            address buyer,
-            uint256 value,
-            uint256 collateral,
-            uint256 expiration
-        )
-    {
-        Proposals.Proposal storage proposal = _sales[sERC20].proposals[proposalId];
-
-        state = proposal.state();
-        buyer = proposal.buyer;
-        value = proposal.value;
-        collateral = proposal.collateral;
-        expiration = proposal.expiration;
-    }
-
-    /**
      * @notice Return the sale of the NFT pegged to `sERC20`.
      */
     function saleOf(sIERC20 sERC20)
@@ -400,6 +376,30 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         nbOfProposals = sale.nbOfProposals;
         flash = sale.flash;
         escape = sale.escape;
+    }
+
+    /**
+     * @notice Return the proposal #`proposalId` to buyout the NFT pegged to `sERC20`.
+     */
+    function proposalFor(sIERC20 sERC20, uint256 proposalId)
+        public
+        view
+        override
+        returns (
+            Proposals.State state,
+            address buyer,
+            uint256 value,
+            uint256 collateral,
+            uint256 expiration
+        )
+    {
+        Proposals.Proposal storage proposal = _sales[sERC20].proposals[proposalId];
+
+        state = proposal.state();
+        buyer = proposal.buyer;
+        value = proposal.value;
+        collateral = proposal.collateral;
+        expiration = proposal.expiration;
     }
 
     function _buyout(
