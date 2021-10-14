@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { initialize, setup } = require("../helpers");
 const { Channeler } = require("../helpers/models");
 
-describe.only("Channeler", () => {
+describe("Channeler", () => {
   before(async () => {
     await initialize(this);
   });
