@@ -1,5 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
+require("hardhat-deploy");
 require("hardhat-gas-reporter");
+require("hardhat-deploy-ethers");
 require("solidity-coverage");
 
 module.exports = {
@@ -31,9 +33,14 @@ module.exports = {
         count: 50,
       },
     },
-    frame: {
+    rinkeby: {
       url: "http://localhost:1248",
       timeout: 2000000,
+    },
+  },
+  namedAccounts: {
+    deployer: {
+      default: 0, // here this will by default take the first account as deployer
     },
   },
   gasReporter: {

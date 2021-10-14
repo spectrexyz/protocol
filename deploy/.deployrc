@@ -17,9 +17,9 @@ module.exports = {
     fee: ethers.utils.parseEther("2.5"), // 2.5% of all sERC20s
   },
   issuer: {
-    fee: ethers.utils.parseEther("3"),
+    protocolFee: ethers.utils.parseEther("3"),
   },
   broker: {
-    fee: ethers.utils.parseEther("3"),
+    protocolFee: ethers.utils.parseEther("3"),
   },
 };
