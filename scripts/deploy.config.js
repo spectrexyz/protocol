@@ -1,6 +1,25 @@
 module.exports = {
+  bank: "0x8873b045d40a458e46e356a96279ae1820a898ba",
+  balancer: {
+    rinkeby: {
+      vault: "0xba12222222228d8ba445958a75a0704d566bf2c8",
+    },
+  },
+  sERC721: {
+    name: "Spectre",
+    symbol: "SPCTR",
+  },
   vault: {
     unavailableURI: "ipfs://unavailableURI...",
     unlockedURI: "ipfs://unlockedURI...",
+  },
+  splitter: {
+    fee: ethers.utils.parseEther("2.5"), // 2.5% of all sERC20s
+  },
+  issuer: {
+    fee: ethers.utils.parseEther("3"),
+  },
+  broker: {
+    fee: ethers.utils.parseEther("3"),
   },
 };

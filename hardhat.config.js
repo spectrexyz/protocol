@@ -33,6 +33,7 @@ module.exports = {
     },
     frame: {
       url: "http://localhost:1248",
+      timeout: 2000000,
     },
   },
   gasReporter: {
