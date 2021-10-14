@@ -34,6 +34,8 @@ const _signers = async (ctx) => {
     signers.sERC20.minter,
     signers.sERC20.pauser,
     signers.sERC20.snapshoter,
+    signers.sERC721.admin,
+    signers.sERC721.minter,
     signers.sERC721.owners[0],
     signers.sERC721.owners[1],
     signers.broker.admin,
@@ -87,6 +89,7 @@ const initialize = async (ctx) => {
   ctx.constants = {
     ONE: ethers.BigNumber.from(1),
     sERC20: config.sERC20.constants,
+    sERC721: config.sERC721.constants,
     broker: config.broker.constants,
     channeler: config.channeler.constants,
     issuer: config.issuer.constants,
@@ -128,6 +131,9 @@ const mock = {
 const setup = {
   sERC20: async (ctx, opts = {}) => {
     await setup.vault(ctx, opts);
+  },
+  sERC721: async (ctx, opts = {}) => {
+    await sERC721.deploy(ctx);
   },
   broker: async (ctx, opts = {}) => {
     opts.fractionalize ??= true;

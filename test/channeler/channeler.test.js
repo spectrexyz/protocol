@@ -171,7 +171,7 @@ describe.only("Channeler", () => {
       });
 
       it("it reverts", async () => {
-        await expect(this.channeler.pause({ from: this.signers.others[0] })).to.be.revertedWith("Channeler: must have DEFAULT_ADMIN_ROLE to pause channeler");
+        await expect(this.channeler.pause({ from: this.signers.others[0] })).to.be.revertedWith("Channeler: must have DEFAULT_ADMIN_ROLE to pause");
       });
     });
   });
@@ -208,9 +208,7 @@ describe.only("Channeler", () => {
       });
 
       it("it reverts", async () => {
-        await expect(this.channeler.unpause({ from: this.signers.others[0] })).to.be.revertedWith(
-          "Channeler: must have DEFAULT_ADMIN_ROLE to unpause channeler"
-        );
+        await expect(this.channeler.unpause({ from: this.signers.others[0] })).to.be.revertedWith("Channeler: must have DEFAULT_ADMIN_ROLE to unpause");
       });
     });
   });
