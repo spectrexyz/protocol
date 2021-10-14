@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
+import "./IChanneler.sol";
 import "../broker/IBroker.sol";
 import {IIssuer} from "../issuer/IIssuer.sol";
 import "../utils/ISplitter.sol";
@@ -16,8 +17,8 @@ import "@openzeppelin/contracts/utils/Context.sol";
  * @title Channeler
  * @notice Wraps all the transaction needed to fractionalize an NFT into an atomic one.
  */
-contract Channeler is Context, AccessControlEnumerable, Pausable {
-    bytes32 public constant MINT_ROLE = keccak256("MINT_ROLE");
+contract Channeler is Context, AccessControlEnumerable, Pausable, IChanneler {
+    bytes32 private constant MINT_ROLE = keccak256("MINT_ROLE");
 
     IVault private immutable _vault;
     IIssuer private immutable _issuer;
@@ -42,28 +43,7 @@ contract Channeler is Context, AccessControlEnumerable, Pausable {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
-    struct FractionalizationData {
-        address guardian;
-        IERC721 collection;
-        uint256 tokenId;
-        string name;
-        string symbol;
-        uint256 cap;
-        uint256 buyoutReserve;
-        uint256 multiplier;
-        uint256 timelock;
-        uint256 sMaxNormalizedWeight;
-        uint256 sMinNormalizedWeight;
-        address[] beneficiaries;
-        uint256[] shares;
-        uint256 swapFeePercentage;
-        uint256 issuanceReserve;
-        uint256 fee;
-        bool buyoutFlash;
-        bool issuanceFlash;
-    }
-
-    function fractionalize(FractionalizationData calldata data) external whenNotPaused {
+    function fractionalize(FractionalizationData calldata data) external override whenNotPaused {
         sIERC20 sERC20 = _fractionalize(data.collection, data.tokenId, data.name, data.symbol, data.cap);
         uint256 allocation = _splitter.register(sERC20, data.beneficiaries, data.shares);
         _broker.register(sERC20, data.guardian, data.buyoutReserve, data.multiplier, data.timelock, data.buyoutFlash, true);
@@ -81,31 +61,31 @@ contract Channeler is Context, AccessControlEnumerable, Pausable {
         sIERC20(sERC20).grantRole(MINT_ROLE, address(_issuer));
     }
 
-    function pause() external whenNotPaused {
+    function pause() external override whenNotPaused {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Channeler: must have DEFAULT_ADMIN_ROLE to pause channeler");
 
         _pause();
     }
 
-    function unpause() external whenPaused {
+    function unpause() external override whenPaused {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Channeler: must have DEFAULT_ADMIN_ROLE to unpause channeler");
 
         _unpause();
     }
 
-    function vault() public view returns (IVault) {
+    function vault() public view override returns (IVault) {
         return _vault;
     }
 
-    function issuer() public view returns (IIssuer) {
+    function issuer() public view override returns (IIssuer) {
         return _issuer;
     }
 
-    function broker() public view returns (IBroker) {
+    function broker() public view override returns (IBroker) {
         return _broker;
     }
 
-    function splitter() public view returns (ISplitter) {
+    function splitter() public view override returns (ISplitter) {
         return _splitter;
     }
 

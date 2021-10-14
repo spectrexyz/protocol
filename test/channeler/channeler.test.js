@@ -128,7 +128,7 @@ describe.only("Channeler", () => {
       });
     });
 
-    describe("» channeler is not paused", () => {
+    describe("» channeler is paused", () => {
       before(async () => {
         await setup.channeler(this);
         await this.channeler.pause();

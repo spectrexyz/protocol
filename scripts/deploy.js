@@ -1,5 +1,5 @@
 const chalk = require("chalk");
-const config = require("./config");
+const config = require("./deploy.config");
 async function main() {
   const _sERC20_ = await ethers.getContractFactory("sERC20");
   const _Vault_ = await ethers.getContractFactory("contracts/vault/Vault.sol:Vault");

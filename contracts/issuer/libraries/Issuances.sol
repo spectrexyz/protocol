@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "../interfaces/IFractionalizationBootstrappingPool.sol";
 import "./Proposals.sol";
+import "../interfaces/IFractionalizationBootstrappingPool.sol";
 
 library Issuances {
     enum State {
