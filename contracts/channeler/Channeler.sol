@@ -61,14 +61,14 @@ contract Channeler is Context, AccessControlEnumerable, Pausable, IChanneler {
         sIERC20(sERC20).grantRole(MINT_ROLE, address(_issuer));
     }
 
-    function pause() external override whenNotPaused {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Channeler: must have DEFAULT_ADMIN_ROLE to pause channeler");
+    function pause() external override {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Channeler: must have DEFAULT_ADMIN_ROLE to pause");
 
         _pause();
     }
 
-    function unpause() external override whenPaused {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Channeler: must have DEFAULT_ADMIN_ROLE to unpause channeler");
+    function unpause() external override {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Channeler: must have DEFAULT_ADMIN_ROLE to unpause");
 
         _unpause();
     }
