@@ -8,7 +8,6 @@ import "../vault/IVault.sol";
 import "../token/sIERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-
 interface IChanneler {
     struct FractionalizationData {
         address guardian;
