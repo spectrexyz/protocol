@@ -104,7 +104,7 @@ describe("Channeler", () => {
         expect(this.data.issuance.guardian).to.equal(this.signers.channeler.guardian.address);
         expect(this.data.issuance.reserve).to.equal(this.params.issuer.reserve);
         expect(this.data.issuance.allocation).to.equal(
-          this.params.splitter.shares[0].add(this.params.splitter.shares[1]).add(this.params.splitter.shares[2]).add(this.params.splitter.fee)
+          this.params.splitter.shares[0].add(this.params.splitter.shares[1]).add(this.params.splitter.shares[2]).add(this.params.splitter.protocolFee)
         );
         expect(this.data.issuance.fee).to.equal(this.params.issuer.fee);
         expect(this.data.issuance.flash).to.equal(false);
