@@ -13,7 +13,7 @@ interface ISplitter {
     event Register(sIERC20 indexed sERC20, address[] beneficiaries, uint256[] shares, uint256 fee, uint256 allocation);
     event Withdraw(sIERC20 indexed sERC20, address indexed beneficiary, uint256 amount);
     event SetBank(address bank);
-    event SetFee(uint256 fee);
+    event SetProtocolFee(uint256 protocolFee);
 
     function register(
         sIERC20 sERC20,
@@ -27,11 +27,11 @@ interface ISplitter {
 
     function setBank(address bank_) external;
 
-    function setFee(uint256 fee_) external;
+    function setProtocolFee(uint256 fee_) external;
 
     function bank() external view returns (address);
 
-    function fee() external view returns (uint256);
+    function protocolFee() external view returns (uint256);
 
     function stateOf(sIERC20 sERC20) external view returns (uint256 received, uint256 totalWithdrawn);
 

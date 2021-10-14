@@ -1,7 +1,7 @@
 module.exports = {
   params: {
     shares: [ethers.utils.parseEther("5"), ethers.utils.parseEther("15"), ethers.utils.parseEther("20")],
-    fee: ethers.utils.parseEther("5"),
+    protocolFee: ethers.utils.parseEther("5"),
   },
   constants: {
     HUNDRED: ethers.utils.parseEther("100"),

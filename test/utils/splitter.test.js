@@ -9,7 +9,7 @@ describe("Splitter", () => {
 
   describe("# constructor", () => {
     describe("» bank is not the zero address", () => {
-      describe("» and fee is inferior to 100%", () => {
+      describe("» and protocol fee is inferior to 100%", () => {
         before(async () => {
           await setup.splitter(this);
         });
@@ -18,8 +18,8 @@ describe("Splitter", () => {
           expect(await this.splitter.bank()).to.equal(this.signers.splitter.bank.address);
         });
 
-        it("it sets up splitter's fee", async () => {
-          expect(await this.splitter.fee()).to.equal(this.params.splitter.fee);
+        it("it sets up splitter's protocol fee", async () => {
+          expect(await this.splitter.protocolFee()).to.equal(this.params.splitter.protocolFee);
         });
 
         it("it sets up splitter's permissions", async () => {
@@ -28,13 +28,13 @@ describe("Splitter", () => {
         });
       });
 
-      describe("» but fee is superior or equal to 100%", () => {
+      describe("» but protocol fee is superior or equal to 100%", () => {
         it("it reverts", async () => {
           await expect(
             Splitter.deploy(this, {
-              fee: this.constants.splitter.HUNDRED.add(this.constants.ONE),
+              protocolFee: this.constants.splitter.HUNDRED.add(this.constants.ONE),
             })
-          ).to.be.revertedWith("Splitter: fee must be inferior to 100%");
+          ).to.be.revertedWith("Splitter: protocol fee must be inferior to 100%");
         });
       });
     });
@@ -63,7 +63,7 @@ describe("Splitter", () => {
                 this.data.total = this.params.splitter.shares[0]
                   .add(this.params.splitter.shares[1])
                   .add(this.params.splitter.shares[2])
-                  .add(this.params.splitter.fee);
+                  .add(this.params.splitter.protocolFee);
                 this.data.normalizedShares = this.splitter.normalizedShares();
               });
 
@@ -90,8 +90,8 @@ describe("Splitter", () => {
                     this.sERC20.address,
                     this.signers.splitter.beneficiaries.map((beneficiary) => beneficiary.address),
                     this.params.splitter.shares,
-                    this.params.issuer.fee,
-                    this.params.splitter.shares[0].add(this.params.splitter.shares[1]).add(this.params.splitter.shares[2]).add(this.params.splitter.fee)
+                    this.params.splitter.protocolFee,
+                    this.params.splitter.shares[0].add(this.params.splitter.shares[1]).add(this.params.splitter.shares[2]).add(this.params.splitter.protocolFee)
                   );
               });
             });
@@ -397,34 +397,34 @@ describe("Splitter", () => {
     });
   });
 
-  describe("# setFee", () => {
+  describe("# setProtocolFee", () => {
     describe("» caller has DEFAULT_ADMIN_ROLE", () => {
-      describe("» and fee is inferior to 100%", () => {
+      describe("» and protocol fee is inferior to 100%", () => {
         before(async () => {
           await setup.splitter(this);
-          await this.splitter.setFee({ fee: "100" });
+          await this.splitter.setProtocolFee({ protocolFee: "100" });
         });
 
-        it("it sets fee", async () => {
-          expect(await this.splitter.fee()).to.equal(100);
+        it("it sets protocol fee", async () => {
+          expect(await this.splitter.protocolFee()).to.equal(100);
         });
 
-        it("it emits a SetFee event", async () => {
-          await expect(this.data.tx).to.emit(this.splitter.contract, "SetFee").withArgs(100);
+        it("it emits a SetProtocolFee event", async () => {
+          await expect(this.data.tx).to.emit(this.splitter.contract, "SetProtocolFee").withArgs(100);
         });
       });
 
-      describe("» but fee is superior or equal to 100%", () => {
+      describe("» but protocol fee is superior or equal to 100%", () => {
         before(async () => {
           await setup.splitter(this);
         });
 
         it("it reverts", async () => {
           await expect(
-            this.splitter.setFee({
-              fee: this.constants.splitter.HUNDRED.add(this.constants.ONE),
+            this.splitter.setProtocolFee({
+              protocolFee: this.constants.splitter.HUNDRED.add(this.constants.ONE),
             })
-          ).to.be.revertedWith("Splitter: fee must be inferior to 100%");
+          ).to.be.revertedWith("Splitter: protocol fee must be inferior to 100%");
         });
       });
     });
@@ -436,10 +436,10 @@ describe("Splitter", () => {
 
       it("it reverts", async () => {
         await expect(
-          this.splitter.setFee({
+          this.splitter.setProtocolFee({
             from: this.signers.others[0],
           })
-        ).to.be.revertedWith("Splitter: must have DEFAULT_ADMIN_ROLE to set fee");
+        ).to.be.revertedWith("Splitter: must have DEFAULT_ADMIN_ROLE to set protocol fee");
       });
     });
   });

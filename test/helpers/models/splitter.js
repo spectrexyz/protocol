@@ -6,7 +6,7 @@ class Splitter {
     this.contract = ctx.contracts.splitter;
     this.address = this.contract.address;
     this.bank = this.contract.bank;
-    this.fee = this.contract.fee;
+    this.protocolFee = this.contract.protocolFee;
     this.hasRole = this.contract.hasRole;
     this.getRoleAdmin = this.contract.getRoleAdmin;
     this.stateOf = this.contract.stateOf;
@@ -16,9 +16,9 @@ class Splitter {
 
   static async deploy(ctx, opts = {}) {
     opts.bank ??= ctx.signers.splitter.bank;
-    opts.fee ??= ctx.params.splitter.fee;
+    opts.protocolFee ??= ctx.params.splitter.protocolFee;
 
-    ctx.contracts.splitter = await waffle.deployContract(ctx.signers.splitter.admin, _Splitter_, [opts.bank.address, opts.fee]);
+    ctx.contracts.splitter = await waffle.deployContract(ctx.signers.splitter.admin, _Splitter_, [opts.bank.address, opts.protocolFee]);
     ctx.splitter = new Splitter(ctx);
 
     const tx = await ctx.contracts.splitter.grantRole(await ctx.constants.splitter.REGISTER_ROLE, ctx.signers.splitter.registrar.address);
@@ -60,11 +60,11 @@ class Splitter {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
-  async setFee(opts = {}) {
+  async setProtocolFee(opts = {}) {
     opts.from ??= this.ctx.signers.splitter.admin;
-    opts.fee ??= this.ctx.params.splitter.fee;
+    opts.protocolFee ??= this.ctx.params.splitter.protocolFee;
 
-    this.ctx.data.tx = await this.contract.connect(opts.from).setFee(opts.fee);
+    this.ctx.data.tx = await this.contract.connect(opts.from).setProtocolFee(opts.protocolFee);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -72,7 +72,7 @@ class Splitter {
     const total = this.ctx.params.splitter.shares[0]
       .add(this.ctx.params.splitter.shares[1])
       .add(this.ctx.params.splitter.shares[2])
-      .add(this.ctx.params.splitter.fee);
+      .add(this.ctx.params.splitter.protocolFee);
     const share0 = this.ctx.params.splitter.shares[0].mul(this.ctx.constants.splitter.HUNDRED).div(total);
     const share1 = this.ctx.params.splitter.shares[1].mul(this.ctx.constants.splitter.HUNDRED).div(total);
     const share2 = this.ctx.params.splitter.shares[2].mul(this.ctx.constants.splitter.HUNDRED).div(total);

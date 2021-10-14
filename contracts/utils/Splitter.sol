@@ -15,16 +15,16 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
     uint256 public constant HUNDRED = 1e20; // 100% = 1e20 | 1% = 1e18 | 0% = 0
 
     address private _bank;
-    uint256 private _fee;
+    uint256 private _protocolFee;
 
     mapping(sIERC20 => Split) _splits;
 
-    constructor(address bank_, uint256 fee_) {
+    constructor(address bank_, uint256 protocolFee_) {
         require(bank_ != address(0), "Splitter: bank cannot be the zero address");
-        require(fee_ < HUNDRED, "Splitter: fee must be inferior to 100%");
+        require(protocolFee_ < HUNDRED, "Splitter: protocol fee must be inferior to 100%");
 
         _setBank(bank_);
-        _setFee(fee_);
+        _setProtocolFee(protocolFee_);
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
@@ -49,6 +49,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
         uint256 total;
         uint256 share;
+        uint256 protocolFee_ = _protocolFee;
 
         for (uint256 i = 0; i < shares.length; i++) {
             share = shares[i];
@@ -58,7 +59,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
             total += share;
         }
 
-        total += _fee;
+        total += protocolFee_;
 
         require(total < HUNDRED, "Splitter: total allocation must be inferior to 100%");
 
@@ -76,7 +77,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
             split.shares[_bank] = HUNDRED - normalizedTotal;
         }
 
-        emit Register(sERC20, beneficiaries, shares, _fee, total);
+        emit Register(sERC20, beneficiaries, shares, protocolFee_, total);
 
         return total;
     }
@@ -143,7 +144,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
      * @notice Set the splitter's bank.
      * @param bank_ The bank to set.
      */
-    function setBank(address bank_) external {
+    function setBank(address bank_) external override {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Splitter: must have DEFAULT_ADMIN_ROLE to set bank");
         require(bank_ != address(0), "Splitter: bank cannot be the zero address");
 
@@ -154,25 +155,25 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
      * @notice Set the splitter's fee.
      * @param fee_ The fee to set [expressed with 1e18 decimals].
      */
-    function setFee(uint256 fee_) external {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Splitter: must have DEFAULT_ADMIN_ROLE to set fee");
-        require(fee_ < HUNDRED, "Splitter: fee must be inferior to 100%");
+    function setProtocolFee(uint256 fee_) external override {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Splitter: must have DEFAULT_ADMIN_ROLE to set protocol fee");
+        require(fee_ < HUNDRED, "Splitter: protocol fee must be inferior to 100%");
 
-        _setFee(fee_);
+        _setProtocolFee(fee_);
     }
 
     /**
      * @notice Return the splitter's bank.
      */
-    function bank() public view returns (address) {
+    function bank() public view override returns (address) {
         return _bank;
     }
 
     /**
      * @notice Return the splitter's fee.
      */
-    function fee() public view returns (uint256) {
-        return _fee;
+    function protocolFee() public view override returns (uint256) {
+        return _protocolFee;
     }
 
     /**
@@ -205,9 +206,9 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
         emit SetBank(bank_);
     }
 
-    function _setFee(uint256 fee_) private {
-        _fee = fee_;
+    function _setProtocolFee(uint256 protocolFee_) private {
+        _protocolFee = protocolFee_;
 
-        emit SetFee(fee_);
+        emit SetProtocolFee(protocolFee_);
     }
 }
