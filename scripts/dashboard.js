@@ -1,6 +1,10 @@
 const chalk = require("chalk");
 
 const roles = {
+  sERC721: {
+    DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
+    MINT_ROLE: ethers.BigNumber.from("0x154c00819833dac601ee5ddded6fda79d9d8b506b911b3dbd54cdb95fe6c3686"),
+  },
   broker: {
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
     REGISTER_ROLE: ethers.BigNumber.from("0xd1f21ec03a6eb050fba156f5316dad461735df521fb446dd42c5a4728e9c70fe"),
@@ -24,6 +28,9 @@ const roles = {
 };
 
 const properties = {
+  sERC721: {
+    paused: {},
+  },
   broker: {
     vault: { address: true },
     issuer: { address: true },
@@ -43,6 +50,7 @@ const properties = {
     issuer: { address: true },
     broker: { address: true },
     splitter: { address: true },
+    paused: {},
   },
   splitter: {
     bank: { address: true },
@@ -142,6 +150,7 @@ const terminal = {
 const fetch = {
   all: async () => {
     this.sERC20 = await ethers.getContract("sERC20");
+    this.sERC721 = await ethers.getContract("sERC721");
     this.vault = await ethers.getContract("Vault");
     this.broker = await ethers.getContract("Broker");
     this.issuer = await ethers.getContract("Issuer");
