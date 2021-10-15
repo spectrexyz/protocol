@@ -108,6 +108,10 @@ chai.use(function (chai, utils) {
           // If the catch function didn't throw, then return it because it did match what we were expecting
           return catchResult;
         } catch (error) {
+          if (!(error instanceof Error)) {
+            return;
+          }
+
           // If the catch didn't throw because another reason was expected, re-throw the error
           if (!error.message.includes("but other exception was thrown"))
             throw error;
