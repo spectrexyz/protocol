@@ -7,6 +7,7 @@ module.exports = {
     balance: ethers.utils.parseEther("1"),
     lifespan: ethers.BigNumber.from("3600"),
     protocolFee: ethers.utils.parseEther("10"),
+    tokenURI: "ipfs://myawesomefractionalizedNFT",
   },
   constants: {
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
