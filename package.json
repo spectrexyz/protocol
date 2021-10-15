@@ -40,6 +40,7 @@
     "@nomiclabs/hardhat-ethers": "^2.0.1",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@types/chai": "^4.2.22",
+    "@types/lodash": "^4.14.175",
     "@types/mocha": "^9.0.0",
     "chai": "^4.3.4",
     "decimal.js": "^10.3.1",
