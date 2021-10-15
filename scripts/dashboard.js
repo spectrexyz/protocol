@@ -116,8 +116,8 @@ const terminal = {
       case this.issuer.address:
         terminal.info(`${address} [issuer]`);
         break;
-      case this.broker.address:
-        terminal.info(`${address} [broker]`);
+      case this.channeler.address:
+        terminal.info(`${address} [channeler]`);
         break;
       case this.poolFactory.address:
         terminal.info(`${address} [poolFactory]`);
@@ -161,6 +161,7 @@ const fetch = {
 };
 
 const main = async () => {
+  process.stdout.write("\x1Bc");
   await fetch.all();
   await print.all();
 };
