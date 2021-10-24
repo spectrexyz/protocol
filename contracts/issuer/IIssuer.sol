@@ -30,7 +30,7 @@ interface IIssuer {
     event AcceptProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event RejectProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event WithdrawProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
-    event Close(sIERC20);
+    event Close(sIERC20 indexed sERC20);
     event EnableFlashIssuance(sIERC20 indexed sERC20);
     event SetBank(address bank);
     event SetProtocolFee(uint256 protocolFee);
@@ -51,7 +51,7 @@ interface IIssuer {
 
     function createProposal(
         sIERC20 sERC20,
-        uint256 amount,
+        uint256 price,
         uint256 lifespan
     ) external payable returns (uint256);
 

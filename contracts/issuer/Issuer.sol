@@ -135,9 +135,9 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         issuance.fee = fee;
         issuance.sERC20IsToken0 = sERC20IsToken0;
 
-        if (flash) _enableFlashIssuance(sERC20, issuance);
-
         emit Register(sERC20, guardian, pool, poolId, sMaxNormalizedWeight, sMinNormalizedWeight, swapFeePercentage, reserve, allocation, fee);
+
+        if (flash) _enableFlashIssuance(sERC20, issuance);
     }
 
     /**
