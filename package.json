@@ -23,6 +23,7 @@
     "test:gas": "REPORT_GAS=true npx hardhat test",
     "test:coverage": "npx hardhat coverage",
     "deploy:rinkeby": "npx hardhat deploy --network rinkeby",
+    "verify:rinkeby": "npx hardhat --network rinkeby etherscan-verify --api-key $API_KEY",
     "roles:rinkeby": "npx hardhat run scripts/roles.js  --network rinkeby",
     "fractionalize:rinkeby": "npx hardhat run scripts/fractionalize.js --network rinkeby",
     "dashboard:rinkeby": "npx hardhat run scripts/dashboard.js --network rinkeby"
