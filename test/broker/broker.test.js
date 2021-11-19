@@ -1011,6 +1011,11 @@ describe("Broker", () => {
             expect(await this.sERC721.ownerOf(this.data.tokenId1)).to.equal(this.signers.broker.beneficiaries[1].address);
           });
 
+          it("it closes NFTs sales", async () => {
+            expect((await this.broker.saleOf(this.data.sERC20.address)).state).to.equal(this.constants.broker.sales.state.Closed);
+            expect((await this.broker.saleOf(this.sERC20.address)).state).to.equal(this.constants.broker.sales.state.Closed);
+          });
+
           it("it emits an Escape event", async () => {
             await expect(this.data.tx)
               .to.emit(this.broker.contract, "Escape")

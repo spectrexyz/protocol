@@ -318,6 +318,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         for (uint256 i = 0; i < sERC20s.length; i++) {
             require(_sales[sERC20s[i]].escape, "Broker: escape is disabled");
 
+            _sales[sERC20s[i]]._state = Sales.State.Closed;
             _vault.unlock(sERC20s[i], beneficiaries[i], datas[i]);
 
             emit Escape(sERC20s[i], beneficiaries[i], datas[i]);
