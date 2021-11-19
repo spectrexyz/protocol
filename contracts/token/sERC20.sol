@@ -225,6 +225,14 @@ contract sERC20 is
         uint256 amount
     ) internal override(ERC20Upgradeable, ERC20PausableUpgradeable, ERC20SnapshotUpgradeable) {
         super._beforeTokenTransfer(from, to, amount);
+    }
+
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override {
+        super._afterTokenTransfer(from, to, amount);
 
         if (!_isHooked) _vault.onERC20Transferred(from, to, amount);
     }
