@@ -21,7 +21,6 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 interface IVault {
     event Fractionalize(IERC721 indexed collection, uint256 indexed tokenId, uint256 indexed id, sIERC20 sERC20, address broker);
     event Unlock(uint256 indexed id, address recipient);
-    event Escape(IERC721 collection, uint256 tokenId, address recipient);
 
     function fractionalize(
         IERC721 collection,
@@ -43,13 +42,6 @@ interface IVault {
         sIERC20 sERC20,
         address recipient,
         bytes calldata data
-    ) external;
-
-    function escape(
-        IERC721 collection,
-        uint256 tokenId,
-        address recipient,
-        bytes memory data
     ) external;
 
     function setUnavailableURI(string memory unavailableURI_) external;

@@ -1017,61 +1017,6 @@ describe("Vault", () => {
       });
     });
 
-    describe("# escape", () => {
-      describe("» caller has DEFAULT_ADMIN_ROLE", () => {
-        describe("» and NFT is not locked", () => {
-          describe("» and NFT is owned by the vault", () => {
-            before(async () => {
-              await setup.vault(this, { fractionalize: false });
-              await this.sERC721.transfer();
-              await this.vault.escape();
-            });
-
-            it("it transfers NFT", async () => {
-              expect(await this.sERC721.ownerOf(this.data.tokenId)).to.equal(this.signers.others[0].address);
-            });
-
-            it("it emits an Escape event", async () => {
-              await expect(this.data.tx)
-                .to.emit(this.vault.contract, "Escape")
-                .withArgs(this.sERC721.address, this.data.tokenId, this.signers.others[0].address);
-            });
-          });
-
-          describe("» but NFT is not owned by the vault", () => {
-            before(async () => {
-              await setup.vault(this, { fractionalize: false });
-            });
-
-            it("it reverts", async () => {
-              await expect(this.vault.escape()).to.be.revertedWith("Vault: NFT is not owned by this vault");
-            });
-          });
-        });
-
-        describe("» but NFT is locked", () => {
-          before(async () => {
-            await setup.vault(this);
-          });
-
-          it("it reverts", async () => {
-            await expect(this.vault.escape()).to.be.revertedWith("Vault: NFT is locked");
-          });
-        });
-      });
-
-      describe("» caller does not have DEFAULT_ADMIN_ROLE", () => {
-        before(async () => {
-          await setup.vault(this, { fractionalize: false });
-          await this.sERC721.transfer();
-        });
-
-        it("it reverts", async () => {
-          await expect(this.vault.escape({ from: this.signers.others[0] })).to.be.revertedWith("Vault: must have DEFAULT_ADMIN_ROLE to escape NFTs");
-        });
-      });
-    });
-
     describe("# setUnavailableURI", () => {
       describe("» caller has DEFAULT_ADMIN_ROLE", () => {
         before(async () => {

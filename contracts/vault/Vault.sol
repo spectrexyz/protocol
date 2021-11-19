@@ -371,29 +371,6 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
     }
 
     /**
-     * @notice Transfer the NFT belonging to `collection` and identified by `tokenId` to `recipient` with `data` as ERC721#safeTransferFrom callback data.
-     * @dev This function is only meant to be used in case an NFT accidentally ends up owned by this contract while un-fractionalized.
-     * @param collection The address of the ERC721 contract the NFT to escape belongs to.
-     * @param tokenId The tokenId of the NFT to escape.
-     * @param recipient The recipient of the NFT to escape.
-     * @param data The ERC721#safeTransferFrom callback data.
-     */
-    function escape(
-        IERC721 collection,
-        uint256 tokenId,
-        address recipient,
-        bytes calldata data
-    ) external override {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Vault: must have DEFAULT_ADMIN_ROLE to escape NFTs");
-        require(_tokenTypes[collection][tokenId] == 0, "Vault: NFT is locked");
-        require(collection.ownerOf(tokenId) == address(this), "Vault: NFT is not owned by this vault");
-
-        collection.safeTransferFrom(address(this), recipient, tokenId, data);
-
-        emit Escape(collection, tokenId, recipient);
-    }
-
-    /**
      * @notice Set the URI associated to spectres whose underlying NFTs do not implement IERC721Metadata to `unavailableURI_`.
      * @param unavailableURI_ The URI to associate to spectres whose underlying NFTs do not implement IERC721Metadata.
      */
