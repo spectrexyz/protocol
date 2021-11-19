@@ -22,7 +22,7 @@ contract ERC1155ReceiverMock is IERC1155Receiver {
     bytes4 private _batchReceiveValue;
     bool private _batchReceiveReverts;
 
-    event Received(address operator, address from, uint256 id, uint256 value, bytes data);
+    event Received(address operator, address from, uint256 id, uint256 value);
     event BatchReceived(address operator, address from, uint256[] ids, uint256[] values, bytes data);
 
     constructor(
@@ -46,10 +46,11 @@ contract ERC1155ReceiverMock is IERC1155Receiver {
         address from,
         uint256 id,
         uint256 value,
-        bytes calldata data
+        bytes calldata /*data*/
     ) external override returns (bytes4) {
         require(!_receiveReverts, "ERC1155ReceiverMock: reverting on receive");
-        emit Received(operator, from, id, value, data);
+        emit Received(operator, from, id, value);
+
         return _receiveValue;
     }
 

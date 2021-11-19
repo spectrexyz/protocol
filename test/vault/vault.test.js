@@ -257,7 +257,7 @@ describe("Vault", () => {
                   it("it calls onERC1155Received", async () => {
                     await expect(this.data.tx)
                       .to.emit(this.contracts.ERC1155Receiver, "Received")
-                      .withArgs(this.signers.holders[0].address, this.signers.holders[0].address, this.data.id, this.params.vault.amount, "0x12345678");
+                      .withArgs(this.signers.holders[0].address, this.signers.holders[0].address, this.data.id, this.params.vault.amount);
                   });
                 });
 
@@ -355,7 +355,7 @@ describe("Vault", () => {
                   it("it calls onERC1155Received", async () => {
                     await expect(this.data.tx)
                       .to.emit(this.contracts.ERC1155Receiver, "Received")
-                      .withArgs(this.signers.vault.operator.address, this.signers.holders[0].address, this.data.id, this.params.vault.amount, "0x12345678");
+                      .withArgs(this.signers.vault.operator.address, this.signers.holders[0].address, this.data.id, this.params.vault.amount);
                   });
                 });
               });
@@ -1115,36 +1115,64 @@ describe("Vault", () => {
                 it("it calls onERC1155Received", async () => {
                   await expect(this.data.tx)
                     .to.emit(this.contracts.ERC1155Receiver, "Received")
-                    .withArgs(this.sERC20.address, this.signers.holders[0].address, this.data.id, this.params.vault.amount, "0x");
-                });
-              });
-            });
-
-            describe("» but the receiver contract returns an invalid value", () => {
-              before(async () => {
-                await setup.vault(this);
-                await this.sERC20.mint({ to: this.signers.holders[0] });
-                await mock.deploy.ERC1155Receiver(this, {
-                  singleValue: "0x12345678",
+                    .withArgs(this.sERC20.address, this.signers.holders[0].address, this.data.id, this.params.vault.amount);
                 });
               });
 
-              it("it reverts", async () => {
-                await expect(this.sERC20.transfer({ to: this.contracts.ERC1155Receiver })).to.be.revertedWith("Vault: ERC1155Receiver rejected tokens");
-              });
-            });
+              describe("» but the receiver contract returns an invalid value", () => {
+                before(async () => {
+                  await setup.vault(this);
+                  await this.sERC20.mint({ to: this.signers.holders[0] });
+                  await mock.deploy.ERC1155Receiver(this, {
+                    singleValue: "0x12345678",
+                  });
+                  await this.sERC20.transfer({
+                    to: this.contracts.ERC1155Receiver,
+                  });
+                });
 
-            describe("» but the receiver contract reverts", () => {
-              before(async () => {
-                await setup.vault(this);
-                await this.sERC20.mint({ to: this.signers.holders[0] });
-                await mock.deploy.ERC1155Receiver(this, {
-                  singleReverts: true,
+                it("it emits a TransferSingle event", async () => {
+                  await expect(this.data.tx)
+                    .to.emit(this.vault.contract, "TransferSingle")
+                    .withArgs(
+                      this.sERC20.address,
+                      this.signers.holders[0].address,
+                      this.contracts.ERC1155Receiver.address,
+                      this.data.id,
+                      this.params.vault.amount
+                    );
+                });
+
+                it("it calls onERC1155Received", async () => {
+                  await expect(this.data.tx)
+                    .to.emit(this.contracts.ERC1155Receiver, "Received")
+                    .withArgs(this.sERC20.address, this.signers.holders[0].address, this.data.id, this.params.vault.amount);
                 });
               });
 
-              it("it reverts", async () => {
-                await expect(this.sERC20.transfer({ to: this.contracts.ERC1155Receiver })).to.be.revertedWith("ERC1155ReceiverMock: reverting on receive");
+              describe("» but the receiver contract reverts", () => {
+                before(async () => {
+                  await setup.vault(this);
+                  await this.sERC20.mint({ to: this.signers.holders[0] });
+                  await mock.deploy.ERC1155Receiver(this, {
+                    singleReverts: true,
+                  });
+                  await this.sERC20.transfer({
+                    to: this.contracts.ERC1155Receiver,
+                  });
+                });
+
+                it("it emits a TransferSingle event", async () => {
+                  await expect(this.data.tx)
+                    .to.emit(this.vault.contract, "TransferSingle")
+                    .withArgs(
+                      this.sERC20.address,
+                      this.signers.holders[0].address,
+                      this.contracts.ERC1155Receiver.address,
+                      this.data.id,
+                      this.params.vault.amount
+                    );
+                });
               });
             });
 

@@ -413,13 +413,11 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
         emit TransferSingle(operator, from, to, id, amount);
 
         if (to.supportsInterface(ERC165Ids.ERC1155Receiver)) {
-            try IERC1155Receiver(to).onERC1155Received(operator, from, id, amount, "") returns (bytes4 response) {
-                if (response != IERC1155Receiver(to).onERC1155Received.selector) {
-                    revert("Vault: ERC1155Receiver rejected tokens");
-                }
-            } catch Error(string memory reason) {
-                revert(reason);
-            }
+            try IERC1155Receiver(to).onERC1155Received(operator, from, id, amount, "") returns (
+                bytes4 /*response*/
+            ) {} catch Error(
+                string memory /*reason*/
+            ) {} catch {}
         }
     }
 
