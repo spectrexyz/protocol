@@ -30,7 +30,7 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
     address private _bank;
     uint256 private _protocolFee;
 
-    mapping(sIERC20 => Split) _splits;
+    mapping(sIERC20 => Split) private _splits;
 
     constructor(address bank_, uint256 protocolFee_) {
         require(bank_ != address(0), "Splitter: bank cannot be the zero address");
