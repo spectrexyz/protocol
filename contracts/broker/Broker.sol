@@ -284,6 +284,23 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         _disableEscape(sERC20, sale);
     }
 
+    /**
+     * @notice Set the reserve price for the NFT pegged to `sERC20`.
+     * @param sERC20 The sERC20 whose pegged NFT's reserve price is updated.
+     * @param reserve The new reserve price.
+     */
+    function setReserve(sIERC20 sERC20, uint256 reserve) external override {
+        Sales.Sale storage sale = _sales[sERC20];
+        Sales.State state = sale.state();
+
+        require(_msgSender() == sale.guardian, "Broker: must be sale's guardian to set reserve");
+        require(state == Sales.State.Pending || state == Sales.State.Opened, "Broker: invalid sale state");
+
+        sale.reserve = reserve;
+
+        emit SetReserve(sERC20, reserve);
+    }
+
     function setBank(address bank_) external override {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Broker: must have DEFAULT_ADMIN_ROLE to set bank");
         require(bank_ != address(0), "Broker: bank cannot be the zero address");

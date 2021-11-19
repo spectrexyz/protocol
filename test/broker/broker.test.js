@@ -915,6 +915,69 @@ describe("Broker", () => {
     });
   });
 
+  describe("# setReserve", () => {
+    describe("» caller is sale's guardian", () => {
+      describe("» and sale is pending", () => {
+        before(async () => {
+          await setup.broker(this);
+          await this.broker.register();
+          await this.broker.setReserve({ reserve: "10" });
+          this.data.sale = await this.broker.saleOf(this.sERC20.address);
+        });
+
+        it("it updates sale's reserve price", async () => {
+          expect(this.data.sale.reserve).to.equal("10");
+        });
+
+        it("it emits a SetReserve event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "SetReserve").withArgs(this.sERC20.address, "10");
+        });
+      });
+
+      describe("» and sale is opened", () => {
+        before(async () => {
+          await setup.broker(this);
+          await this.broker.register();
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.setReserve({ reserve: "10" });
+          this.data.sale = await this.broker.saleOf(this.sERC20.address);
+        });
+
+        it("it updates sale's reserve price", async () => {
+          expect(this.data.sale.reserve).to.equal("10");
+        });
+
+        it("it emits a SetReserve event", async () => {
+          await expect(this.data.tx).to.emit(this.broker.contract, "SetReserve").withArgs(this.sERC20.address, "10");
+        });
+      });
+
+      describe("» but sale is neither pending nor opened", () => {
+        before(async () => {
+          await setup.broker(this);
+          await this.broker.register();
+          await advanceTime(this.params.broker.timelock);
+          await this.broker.buyout();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.broker.setReserve()).to.be.revertedWith("Broker: invalid sale state");
+        });
+      });
+    });
+
+    describe("» but caller is not guardian", () => {
+      before(async () => {
+        await setup.broker(this);
+        await this.broker.register();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.broker.setReserve({ from: this.signers.others[0] })).to.be.revertedWith("Broker: must be sale's guardian to set reserve");
+      });
+    });
+  });
+
   describe("# setBank", () => {
     describe("» caller has DEFAULT_ADMIN_ROLE", () => {
       describe("» and bank is not the zero address", () => {

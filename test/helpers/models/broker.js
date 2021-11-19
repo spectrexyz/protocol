@@ -157,6 +157,15 @@ class Broker {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
+  async setReserve(opts = {}) {
+    opts.from ??= this.ctx.signers.broker.guardian;
+    opts.sERC20 ??= this.ctx.sERC20.contract;
+    opts.reserve ??= ethers.BigNumber.from("1");
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).setReserve(opts.sERC20.address, opts.reserve);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
   async claim(opts = {}) {
     opts.from ??= this.ctx.signers.others[0];
     opts.sERC20 ??= this.ctx.sERC20.contract.address;
