@@ -85,7 +85,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         Sales.Sale storage sale = _sales[sERC20];
 
         require(hasRole(REGISTER_ROLE, _msgSender()), "Broker: must have REGISTER_ROLE to register");
-        require(sale._state == Sales.State.Null, "Broker: sale already registered");
+        require(sale.state() == Sales.State.Null, "Broker: sale already registered");
         require(guardian != address(0), "Broker: guardian cannot be the zero address");
         require(timelock >= MINIMUM_TIMELOCK, "Broker: invalid timelock");
 
