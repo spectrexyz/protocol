@@ -22,7 +22,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20Burnable
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20CappedUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20SnapshotUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 /**
@@ -40,7 +39,6 @@ contract sERC20 is
     ERC20BurnableUpgradeable,
     ERC20PausableUpgradeable,
     ERC20SnapshotUpgradeable,
-    ERC20PermitUpgradeable,
     sIERC20
 {
     bytes32 public constant MINT_ROLE = keccak256("MINT_ROLE");
@@ -82,7 +80,6 @@ contract sERC20 is
         // __ERC20Burnable_init(); // does nothing so let's save gas
         // __ERC20Pausable_init(); // does nothing so let's save gas
         // __ERC20Snapshot_init(); // does nothing so let's save gas
-        __ERC20Permit_init(name_);
 
         _vault = IVault(_msgSender());
         _setupRole(DEFAULT_ADMIN_ROLE, admin);
