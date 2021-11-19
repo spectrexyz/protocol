@@ -108,94 +108,107 @@ describe("Broker", () => {
 
   describe("# register", () => {
     describe("» caller has REGISTER_ROLE", () => {
-      describe("» and guardian is not the zero address", () => {
-        describe("» and timelock period is valid", () => {
-          describe("» and flash buyout is enabled", () => {
-            describe("» and escape is enabled", () => {
+      describe("» and sale is not registered yet", () => {
+        describe("» and guardian is not the zero address", () => {
+          describe("» and timelock period is valid", () => {
+            describe("» and flash buyout is enabled", () => {
+              describe("» and escape is enabled", () => {
+                before(async () => {
+                  await setup.broker(this);
+                  await this.broker.register();
+                  this.data.sale = await this.broker.saleOf(this.sERC20.address);
+                  this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+                    this.params.broker.timelock
+                  );
+                });
+
+                itRegistersLikeExpected(this);
+
+                it("it emits a EnableFlashBuyout event", async () => {
+                  await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
+                });
+
+                it("it emits a EnableEscape event", async () => {
+                  await expect(this.data.tx).to.emit(this.broker.contract, "EnableEscape");
+                });
+              });
+
+              describe("» but escape is disabled", () => {
+                before(async () => {
+                  await setup.broker(this);
+                  await this.broker.register({ escape: false });
+                  this.data.sale = await this.broker.saleOf(this.sERC20.address);
+                  this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+                    this.params.broker.timelock
+                  );
+                });
+
+                itRegistersLikeExpected(this, { escape: false });
+
+                it("it emits a EnableFlashBuyout event", async () => {
+                  await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
+                });
+
+                it("it does not emit a EnableEscape event", async () => {
+                  await expect(this.data.tx).to.not.emit(this.broker.contract, "EnableEscape");
+                });
+              });
+            });
+
+            describe("» but flash buyout is disabled", () => {
               before(async () => {
                 await setup.broker(this);
-                await this.broker.register();
+                await this.broker.register({ flash: false });
                 this.data.sale = await this.broker.saleOf(this.sERC20.address);
                 this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
                   this.params.broker.timelock
                 );
               });
 
-              itRegistersLikeExpected(this);
+              itRegistersLikeExpected(this, { flash: false });
 
-              it("it emits a EnableFlashBuyout event", async () => {
-                await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
+              it("it does not emit a EnableFlashBuyout event", async () => {
+                await expect(this.data.tx).to.not.emit(this.broker.contract, "EnableFlashBuyout");
               });
 
               it("it emits a EnableEscape event", async () => {
                 await expect(this.data.tx).to.emit(this.broker.contract, "EnableEscape");
               });
             });
-
-            describe("» but escape is disabled", () => {
-              before(async () => {
-                await setup.broker(this);
-                await this.broker.register({ escape: false });
-                this.data.sale = await this.broker.saleOf(this.sERC20.address);
-                this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
-                  this.params.broker.timelock
-                );
-              });
-
-              itRegistersLikeExpected(this, { escape: false });
-
-              it("it emits a EnableFlashBuyout event", async () => {
-                await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
-              });
-
-              it("it does not emit a EnableEscape event", async () => {
-                await expect(this.data.tx).to.not.emit(this.broker.contract, "EnableEscape");
-              });
-            });
           });
 
-          describe("» but flash buyout is disabled", () => {
+          describe("» but timelock period is invalid", () => {
             before(async () => {
               await setup.broker(this);
-              await this.broker.register({ flash: false });
-              this.data.sale = await this.broker.saleOf(this.sERC20.address);
-              this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
-                this.params.broker.timelock
-              );
             });
 
-            itRegistersLikeExpected(this, { flash: false });
-
-            it("it does not emit a EnableFlashBuyout event", async () => {
-              await expect(this.data.tx).to.not.emit(this.broker.contract, "EnableFlashBuyout");
-            });
-
-            it("it emits a EnableEscape event", async () => {
-              await expect(this.data.tx).to.emit(this.broker.contract, "EnableEscape");
+            it("it reverts", async () => {
+              await expect(this.broker.register({ timelock: "100" })).to.be.revertedWith("Broker: invalid timelock");
             });
           });
         });
 
-        describe("» but timelock period is invalid", () => {
+        describe("» but guardian is the zero address", () => {
           before(async () => {
             await setup.broker(this);
           });
 
           it("it reverts", async () => {
-            await expect(this.broker.register({ timelock: "100" })).to.be.revertedWith("Broker: invalid timelock");
+            await expect(this.broker.register({ guardian: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
+              "Broker: guardian cannot be the zero address"
+            );
           });
         });
       });
 
-      describe("» but guardian is the zero address", () => {
+      describe("» but sale is already registered", () => {
         before(async () => {
           await setup.broker(this);
+          await this.broker.register();
         });
 
         it("it reverts", async () => {
-          await expect(this.broker.register({ guardian: { address: ethers.constants.AddressZero } })).to.be.revertedWith(
-            "Broker: guardian cannot be the zero address"
-          );
+          await expect(this.broker.register()).to.be.revertedWith("Broker: sale already registered");
         });
       });
     });

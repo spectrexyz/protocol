@@ -65,9 +65,6 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
 
     /**
      * @notice Put the NFT pegged to `sERC20` on sale.
-     * @dev - We do not check neither that `sERC20` is unregistered nor that it actually is an sERC20 to save gas.
-     *      - Indeed, only trusted templates, registering sERC20s out of actual NFT fractionalizations, are supposed to be granted REGISTER_ROLE.
-     *      - Other parameters are checked because they are passed by users and forwarded unchecked by templates.
      * @param sERC20 The sERC20 whose pegged NFT is put on sale.
      * @param guardian The account authorized to enable flash buyout and accept / reject proposals otherwise.
      * @param reserve The reserve price above which the NFT can be bought out.
@@ -88,6 +85,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         Sales.Sale storage sale = _sales[sERC20];
 
         require(hasRole(REGISTER_ROLE, _msgSender()), "Broker: must have REGISTER_ROLE to register");
+        require(sale._state == Sales.State.Null, "Broker: sale already registered");
         require(guardian != address(0), "Broker: guardian cannot be the zero address");
         require(timelock >= MINIMUM_TIMELOCK, "Broker: invalid timelock");
 
