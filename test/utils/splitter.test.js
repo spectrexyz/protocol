@@ -55,59 +55,37 @@ describe("Splitter", () => {
       describe("» and beneficiaries and shares arrays have the same length", () => {
         describe("» and no beneficiary is the zero address", () => {
           describe("» and no share is worth zero", () => {
-            describe("» and shares add up to less than 100% [with fee]", () => {
-              before(async () => {
-                await setup.splitter(this);
-                await this.splitter.register();
-                this.data.split = await this.splitter.stateOf(this.sERC20.address);
-                this.data.total = this.params.splitter.shares[0]
-                  .add(this.params.splitter.shares[1])
-                  .add(this.params.splitter.shares[2])
-                  .add(this.params.splitter.protocolFee);
-                this.data.normalizedShares = this.splitter.normalizedShares();
-              });
-
-              it("it registers split", async () => {
-                expect(this.data.split.received).to.equal(0);
-                expect(this.data.split.totalWithdrawn).to.equal(0);
-
-                expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[0].address)).to.equal(
-                  this.data.normalizedShares[0]
-                );
-                expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[1].address)).to.equal(
-                  this.data.normalizedShares[1]
-                );
-                expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[2].address)).to.equal(
-                  this.data.normalizedShares[2]
-                );
-                expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.bank.address)).to.equal(this.data.normalizedShares[3]);
-              });
-
-              it("it emits a Register event", async () => {
-                await expect(this.data.tx)
-                  .to.emit(this.splitter.contract, "Register")
-                  .withArgs(
-                    this.sERC20.address,
-                    this.signers.splitter.beneficiaries.map((beneficiary) => beneficiary.address),
-                    this.params.splitter.shares,
-                    this.params.splitter.protocolFee,
-                    this.params.splitter.shares[0].add(this.params.splitter.shares[1]).add(this.params.splitter.shares[2]).add(this.params.splitter.protocolFee)
-                  );
-              });
+            before(async () => {
+              await setup.splitter(this);
+              await this.splitter.register();
+              this.data.split = await this.splitter.stateOf(this.sERC20.address);
+              this.data.total = this.params.splitter.shares[0]
+                .add(this.params.splitter.shares[1])
+                .add(this.params.splitter.shares[2])
+                .add(this.params.splitter.protocolFee);
+              this.data.normalizedShares = this.splitter.normalizedShares();
             });
 
-            describe("» but shares add up to 100% or more [with fee]", () => {
-              before(async () => {
-                await setup.splitter(this);
-              });
+            it("it registers split", async () => {
+              expect(this.data.split.received).to.equal(0);
+              expect(this.data.split.totalWithdrawn).to.equal(0);
 
-              it("it reverts", async () => {
-                await expect(
-                  this.splitter.register({
-                    shares: [ethers.utils.parseEther("20"), ethers.utils.parseEther("80"), ethers.utils.parseEther("1")],
-                  })
-                ).to.be.revertedWith("Splitter: total allocation must be inferior to 100%");
-              });
+              expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[0].address)).to.equal(this.data.normalizedShares[0]);
+              expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[1].address)).to.equal(this.data.normalizedShares[1]);
+              expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.beneficiaries[2].address)).to.equal(this.data.normalizedShares[2]);
+              expect(await this.splitter.shareOf(this.sERC20.address, this.signers.splitter.bank.address)).to.equal(this.data.normalizedShares[3]);
+            });
+
+            it("it emits a Register event", async () => {
+              await expect(this.data.tx)
+                .to.emit(this.splitter.contract, "Register")
+                .withArgs(
+                  this.sERC20.address,
+                  this.signers.splitter.beneficiaries.map((beneficiary) => beneficiary.address),
+                  this.params.splitter.shares,
+                  this.params.splitter.protocolFee,
+                  this.params.splitter.shares[0].add(this.params.splitter.shares[1]).add(this.params.splitter.shares[2]).add(this.params.splitter.protocolFee)
+                );
             });
           });
 

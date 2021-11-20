@@ -74,8 +74,6 @@ contract Splitter is Context, AccessControlEnumerable, ISplitter {
 
         total += protocolFee_;
 
-        require(total < HUNDRED, "Splitter: total allocation must be inferior to 100%");
-
         if (total > 0) {
             uint256 normalizedShare;
             uint256 normalizedTotal;
