@@ -31,6 +31,7 @@ class Channeler {
 
     ctx.channeler = new Channeler(ctx);
 
+    await (await ctx.contracts.vault.connect(ctx.signers.vault.admin).grantRole(await ctx.constants.vault.FRACTIONALIZE_ROLE, ctx.channeler.address)).wait();
     await (await ctx.contracts.sERC721.connect(ctx.signers.sERC721.admin).grantRole(await ctx.constants.sERC721.MINT_ROLE, ctx.channeler.address)).wait();
     await (await ctx.contracts.issuer.connect(ctx.signers.issuer.admin).grantRole(await ctx.constants.issuer.REGISTER_ROLE, ctx.channeler.address)).wait();
     await (await ctx.contracts.broker.connect(ctx.signers.broker.admin).grantRole(await ctx.constants.broker.REGISTER_ROLE, ctx.channeler.address)).wait();
@@ -108,9 +109,10 @@ class Channeler {
     opts.fee ??= this.ctx.params.issuer.fee;
     opts.buyoutFlash ??= false;
     opts.issuanceFlash ??= false;
+    opts.from ??= this.ctx.signers.sERC721.owners[0];
 
     await this.ctx.sERC721.approve();
-    this.ctx.data.tx = await this.contract.fractionalize(opts.collection.address, opts.tokenId, {
+    this.ctx.data.tx = await this.contract.connect(opts.from).fractionalize(opts.collection.address, opts.tokenId, {
       guardian: opts.guardian.address,
       name: opts.name,
       symbol: opts.symbol,

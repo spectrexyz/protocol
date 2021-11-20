@@ -70,6 +70,8 @@ contract Channeler is Context, AccessControlEnumerable, Pausable, IChanneler {
         uint256 tokenId,
         FractionalizationData calldata data
     ) public override whenNotPaused {
+        require(_msgSender() == collection.ownerOf(tokenId), "Channeler: must be NFT owner to fractionalize");
+
         sIERC20 sERC20 = _fractionalize(collection, tokenId, data.name, data.symbol, data.cap);
         uint256 allocation = _splitter.register(sERC20, data.beneficiaries, data.shares);
         _broker.register(sERC20, data.guardian, data.buyoutReserve, data.multiplier, data.timelock, data.buyoutFlash, true);

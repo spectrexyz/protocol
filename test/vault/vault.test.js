@@ -853,11 +853,34 @@ describe("Vault", () => {
         describe("» and NFT is ERC721-compliant", () => {
           describe("» and the vault has been approved to transfer NFT", () => {
             describe("» and NFT is not owned by the vault", () => {
-              before(async () => {
-                await setup.vault(this);
+              describe("» and caller has FRACTIONALIZE_ROLE", () => {
+                before(async () => {
+                  await setup.vault(this);
+                });
+
+                itFractionalizesLikeExpected(this);
               });
 
-              itFractionalizesLikeExpected(this);
+              describe("» and caller is NFT owner", () => {
+                before(async () => {
+                  await setup.vault(this, { fractionalize: false });
+                  await this.vault.fractionalize({ from: this.signers.sERC721.owners[0] });
+                });
+
+                itFractionalizesLikeExpected(this, { fromOwner: true });
+              });
+
+              describe("» but caller does not have FRACTIONALIZE_ROLE nor is NFT owner", () => {
+                before(async () => {
+                  await setup.vault(this, { fractionalize: false });
+                });
+
+                it("it reverts", async () => {
+                  await expect(this.vault.fractionalize({ from: this.signers.others[0] })).to.be.revertedWith(
+                    "Vault: must have FRACTIONALIZE_ROLE or be NFT owner to fractionalize"
+                  );
+                });
+              });
             });
 
             describe("» but NFT is owned by the vault", () => {

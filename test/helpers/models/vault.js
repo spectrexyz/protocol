@@ -31,6 +31,8 @@ class Vault {
     ]);
 
     ctx.vault = new Vault(ctx);
+    const tx = await ctx.vault.contract.grantRole(await ctx.constants.vault.FRACTIONALIZE_ROLE, ctx.signers.vault.fractionalizer.address);
+    await tx.wait();
   }
 
   async setApprovalForAll(opts = {}) {
@@ -71,17 +73,20 @@ class Vault {
     opts.transfer ??= false;
     opts.mock ??= false;
     opts.broker ??= this.ctx.signers.vault.broker;
+    opts.from ??= this.ctx.signers.vault.fractionalizer;
 
     if (opts.mock) {
-      this.ctx.data.tx = await this.contract.fractionalize(
-        this.ctx.contracts.ERC721Mock.address,
-        0,
-        this.ctx.params.sERC20.name,
-        this.ctx.params.sERC20.symbol,
-        this.ctx.params.sERC20.cap,
-        this.ctx.signers.sERC20.admin.address,
-        opts.broker.address
-      );
+      this.ctx.data.tx = await this.contract
+        .connect(opts.from)
+        .fractionalize(
+          this.ctx.contracts.ERC721Mock.address,
+          0,
+          this.ctx.params.sERC20.name,
+          this.ctx.params.sERC20.symbol,
+          this.ctx.params.sERC20.cap,
+          this.ctx.signers.sERC20.admin.address,
+          opts.broker.address
+        );
       this.ctx.data.receipt = await this.ctx.data.tx.wait();
       this.ctx.data.id = await this._id();
     } else {
@@ -91,7 +96,7 @@ class Vault {
         this.ctx.data.id = await this._id({ transfer: true });
       } else {
         this.ctx.data.tx = await this.contract
-          .connect(this.ctx.signers.root)
+          .connect(opts.from)
           .fractionalize(
             opts.collection.address,
             this.ctx.data.tokenId,

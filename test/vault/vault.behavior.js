@@ -73,7 +73,8 @@ const itFractionalizesLikeExpected = (ctx, opts = {}) => {
   });
 
   it("it emits a TransferSingle event as per the ERC1155 standard", async () => {
-    opts.operator = opts.transfer ? ctx.contracts.sERC721 : ctx.signers.root;
+    opts.operator = opts.transfer ? ctx.contracts.sERC721 : ctx.signers.vault.fractionalizer;
+    opts.operator = opts.fromOwner ? ctx.signers.sERC721.owners[0] : opts.operator;
 
     await expect(ctx.data.tx2)
       .to.emit(ctx.contracts.vault, "TransferSingle")

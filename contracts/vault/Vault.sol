@@ -48,6 +48,7 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
     using Clones for address;
     using ERC165Checker for address;
 
+    bytes32 public constant FRACTIONALIZE_ROLE = keccak256("FRACTIONALIZE_ROLE");
     bytes32 public constant DERRIDA = 0x1d2496c631fd6d8be20fb18c5c1fa9499e1f28016c62da960ec6dcf752f2f7ce; // keccak256("Le spectral, ce sont ces autres, jamais présents comme tels, ni vivants ni morts, avec lesquels je m'entretiens");
 
     address private _sERC20Base;
@@ -318,6 +319,10 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
         address admin,
         address broker
     ) external override returns (uint256) {
+        require(
+            hasRole(FRACTIONALIZE_ROLE, _msgSender()) || _msgSender() == collection.ownerOf(tokenId),
+            "Vault: must have FRACTIONALIZE_ROLE or be NFT owner to fractionalize"
+        );
         require(collection.supportsInterface(ERC165Ids.ERC721), "Vault: NFT is not ERC721-compliant");
         require(_tokenTypes[collection][tokenId] == 0, "Vault: NFT is already locked");
 

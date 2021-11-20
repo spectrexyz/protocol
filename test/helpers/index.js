@@ -65,6 +65,7 @@ const _signers = async (ctx) => {
     signers.vault.admin,
     signers.vault.broker,
     signers.vault.operator,
+    signers.vault.fractionalizer,
     ...signers.others
   ] = await ethers.getSigners();
 
@@ -188,6 +189,7 @@ const setup = {
     await ctx.sERC721.mint(opts);
 
     if (opts.fractionalize) {
+      opts.from = undefined;
       await ctx.vault.fractionalize(opts);
     }
   },
