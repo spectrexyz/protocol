@@ -33,12 +33,6 @@ interface IVault {
     ) external returns (uint256);
 
     function unlock(
-        uint256 id,
-        address recipient,
-        bytes calldata data
-    ) external;
-
-    function unlock(
         sIERC20 sERC20,
         address recipient,
         bytes calldata data

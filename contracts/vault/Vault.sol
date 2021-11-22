@@ -337,25 +337,6 @@ contract Vault is Context, ERC165, AccessControlEnumerable, IERC1155, IERC1155Me
     }
 
     /**
-     * @notice Unlock the spectre tied to token type `id` and transfer its underlying NFT to `recipient` with `data` as ERC721#safeTransferFrom callback data.
-     * @param id The token type of the spectre to unlock.
-     * @param recipient The recipient of the spectre's underlying NFT.
-     * @param data The ERC721#safeTransferFrom callback data.
-     */
-    function unlock(
-        uint256 id,
-        address recipient,
-        bytes calldata data
-    ) external override {
-        Spectres.Spectre storage spectre = _spectres[id];
-
-        require(spectre.state == Spectres.State.Locked, "Vault: spectre is not locked");
-        require(_msgSender() == spectre.broker, "Vault: must be spectre's broker to unlock");
-
-        _unlock(spectre.collection, spectre.tokenId, id, recipient, data);
-    }
-
-    /**
      * @notice Unlock the spectre tied to `sERC20` and transfer its underlying NFT to `recipient` with `data` as ERC721#safeTransferFrom callback data.
      * @param sERC20 The sERC20 of the spectre to unlock.
      * @param recipient The recipient of the spectre's underlying NFT.

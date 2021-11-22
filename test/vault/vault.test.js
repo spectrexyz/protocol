@@ -943,52 +943,6 @@ describe("Vault", () => {
       });
     });
 
-    describe("# unlock [by id]", () => {
-      describe("» spectre exists", () => {
-        describe("» and spectre is locked", () => {
-          describe("» and caller is spectre's broker", () => {
-            before(async () => {
-              await setup.vault(this);
-              await this.vault.unlock();
-            });
-
-            itUnlocksLikeExpected(this);
-          });
-
-          describe("» but caller is not spectre's broker", () => {
-            before(async () => {
-              await setup.vault(this);
-            });
-
-            it("it reverts", async () => {
-              await expect(this.vault.unlock({ from: this.signers.others[0] })).to.be.revertedWith("Vault: must be spectre's broker to unlock");
-            });
-          });
-        });
-
-        describe("» but spectre is not locked anymore", () => {
-          before(async () => {
-            await setup.vault(this);
-            await this.vault.unlock();
-          });
-
-          it("it reverts", async () => {
-            await expect(this.vault.unlock()).to.be.revertedWith("Vault: spectre is not locked");
-          });
-        });
-      });
-
-      describe("» spectre does not exists", () => {
-        before(async () => {
-          await setup.vault(this, { fractionalize: false });
-        });
-
-        it("it reverts", async () => {
-          await expect(this.vault.unlock()).to.be.revertedWith("Vault: spectre is not locked");
-        });
-      });
-    });
-
     describe("# unlock [by address]", () => {
       describe("» spectre exists", () => {
         describe("» and spectre is locked", () => {

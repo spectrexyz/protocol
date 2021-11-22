@@ -116,18 +116,10 @@ class Vault {
 
   async unlock(opts = {}) {
     opts.from ??= this.ctx.signers.vault.broker;
-    opts.byAddress ??= false;
 
-    if (opts.byAddress) {
-      this.ctx.data.tx = await this.contract
-        .connect(opts.from)
-        ["unlock(address,address,bytes)"](this.ctx.contracts.sERC20.address, this.ctx.signers.sERC721.owners[1].address, ethers.constants.HashZero);
-    } else {
-      this.ctx.data.tx = await this.contract
-        .connect(opts.from)
-        ["unlock(uint256,address,bytes)"](this.ctx.data.id, this.ctx.signers.sERC721.owners[1].address, ethers.constants.HashZero);
-    }
-
+    this.ctx.data.tx = await this.contract
+      .connect(opts.from)
+      .unlock(this.ctx.contracts.sERC20.address, this.ctx.signers.sERC721.owners[1].address, ethers.constants.HashZero);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
