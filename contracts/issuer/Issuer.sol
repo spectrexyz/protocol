@@ -512,7 +512,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         IBVault vault_ = _vault;
         uint256 reward = _reward(vault_, issuance.pool, issuance.poolId, price, value, poolIsInitialized, sERC20IsToken0);
 
-        if (value > 0 || reward > 0) {
+        if (value > 0) {
             sERC20.mint(address(this), reward);
             sERC20.approve(address(vault_), reward);
             vault_.joinPool{value: value}(issuance.poolId, address(this), _bank, _request(sERC20, reward, value, poolIsInitialized, sERC20IsToken0));
