@@ -305,6 +305,23 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     }
 
     /**
+     * @notice Set the reserve price for the issuance of `sERC20`.
+     * @param sERC20 The sERC20 whose issuance reserve price is updated.
+     * @param reserve The reserve price below which sERC20 tokens can be issued [expressed in sERC20 per ETH and 1e18 decimals].
+     */
+    function setReserve(sIERC20 sERC20, uint256 reserve) external override {
+        Issuances.Issuance storage issuance = _issuances[sERC20];
+
+        require(_msgSender() == issuance.guardian, "Issuer: must be issuance's guardian to set reserve");
+        require(issuance.state == Issuances.State.Opened, "Issuer: invalid issuance state");
+        require(reserve != 0, "Issuer: reserve price cannot be null");
+
+        issuance.reserve = reserve;
+
+        emit SetReserve(sERC20, reserve);
+    }
+
+    /**
      * @notice Set the issuer's bank [to which protocol fees are transferred].
      */
     function setBank(address bank_) external override {

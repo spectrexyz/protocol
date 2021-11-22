@@ -143,6 +143,14 @@ class Issuer {
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
+  async setReserve(opts = {}) {
+    opts.from ??= this.ctx.signers.issuer.guardian;
+    opts.sERC20 ??= this.ctx.sERC20;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).setReserve(opts.sERC20.address, opts.reserve);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
   async issue(opts = {}) {
     opts.from ??= this.ctx.signers.issuer.buyer;
     opts.value ??= this.ctx.params.issuer.value;

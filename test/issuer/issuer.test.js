@@ -583,7 +583,7 @@ describe("Issuer", () => {
       });
     });
 
-    describe("» caller is not sale's guardian", () => {
+    describe("» caller is not issuance's guardian", () => {
       before(async () => {
         await setup.issuer(this);
         await this.issuer.register({ flash: false });
@@ -822,6 +822,65 @@ describe("Issuer", () => {
       it("it reverts", async () => {
         await expect(this.issuer.enableFlashIssuance({ from: this.signers.others[0] })).to.be.revertedWith(
           "Issuer: must be issuance's guardian to enable flash issuance"
+        );
+      });
+    });
+  });
+
+  describe("# setReserve", () => {
+    describe("» caller is issuance's guardian", () => {
+      describe("» and issuance is opened", () => {
+        describe("» and reserve price is not null", () => {
+          before(async () => {
+            await setup.issuer(this);
+            await this.issuer.register();
+            await this.issuer.setReserve({ reserve: "10" });
+            this.data.issuance = await this.issuer.issuanceOf(this.sERC20.address);
+          });
+
+          it("it updates issuance's reserve price", async () => {
+            expect(this.data.issuance.reserve).to.equal("10");
+          });
+
+          it("it emits a SetReserve event", async () => {
+            await expect(this.data.tx).to.emit(this.issuer.contract, "SetReserve").withArgs(this.sERC20.address, "10");
+          });
+        });
+
+        describe("» but reserve price is null", () => {
+          before(async () => {
+            await setup.issuer(this);
+            await this.issuer.register();
+          });
+
+          it("it reverts", async () => {
+            await expect(this.issuer.setReserve({ reserve: "0" })).to.be.revertedWith("Issuer: reserve price cannot be null");
+          });
+        });
+      });
+
+      describe("» but issuance is not opened", () => {
+        before(async () => {
+          await setup.issuer(this);
+          await this.issuer.register();
+          await this.issuer.close();
+        });
+
+        it("it reverts", async () => {
+          await expect(this.issuer.setReserve({ reserve: "10" })).to.be.revertedWith("Issuer: invalid issuance state");
+        });
+      });
+    });
+
+    describe("» but caller is not issuance's guardian", () => {
+      before(async () => {
+        await setup.issuer(this);
+        await this.issuer.register();
+      });
+
+      it("it reverts", async () => {
+        await expect(this.issuer.setReserve({ from: this.signers.others[0], reserve: "10" })).to.be.revertedWith(
+          "Issuer: must be issuance's guardian to set reserve"
         );
       });
     });

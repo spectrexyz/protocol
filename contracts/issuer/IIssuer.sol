@@ -45,6 +45,7 @@ interface IIssuer {
     event WithdrawProposal(sIERC20 indexed sERC20, uint256 indexed proposalId);
     event Close(sIERC20 indexed sERC20);
     event EnableFlashIssuance(sIERC20 indexed sERC20);
+    event SetReserve(sIERC20 indexed sERC20, uint256 reserve);
     event SetBank(address bank);
     event SetProtocolFee(uint256 protocolFee);
 
@@ -77,6 +78,8 @@ interface IIssuer {
     function close(sIERC20 sERC20) external;
 
     function enableFlashIssuance(sIERC20 sERC20) external;
+
+    function setReserve(sIERC20 sERC20, uint256 reserve) external;
 
     function setBank(address bank_) external;
 
