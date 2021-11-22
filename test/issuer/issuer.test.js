@@ -113,85 +113,98 @@ describe("Issuer", () => {
 
   describe("# register", () => {
     describe("» caller has REGISTER_ROLE", () => {
-      describe("» and guardian is not the zero address", () => {
-        describe("» and reserve price is not null", () => {
-          describe("» and allocation is inferior to 100%", () => {
-            describe("» and issuance fee is inferior to 100%", () => {
-              describe("» and flash issuance is enabled", () => {
-                before(async () => {
-                  await setup.issuer(this);
-                  await this.issuer.register();
-                  this.data.issuance = await this.issuer.issuanceOf(this.sERC20.contract.address);
+      describe("» and issuance is not registered yet", () => {
+        describe("» and guardian is not the zero address", () => {
+          describe("» and reserve price is not null", () => {
+            describe("» and allocation is inferior to 100%", () => {
+              describe("» and issuance fee is inferior to 100%", () => {
+                describe("» and flash issuance is enabled", () => {
+                  before(async () => {
+                    await setup.issuer(this);
+                    await this.issuer.register();
+                    this.data.issuance = await this.issuer.issuanceOf(this.sERC20.contract.address);
+                  });
+
+                  itRegistersLikeExpected(this);
+
+                  it("it enables flash Issuance", async () => {
+                    expect(this.data.issuance.flash).to.equal(true);
+                  });
+
+                  it("it emits a EnableFlashIssuance event", async () => {
+                    await expect(this.data.tx).to.emit(this.issuer.contract, "EnableFlashIssuance").withArgs(this.sERC20.address);
+                  });
                 });
 
-                itRegistersLikeExpected(this);
+                describe("» and flash issuance is disabled", () => {
+                  before(async () => {
+                    await setup.issuer(this);
+                    await this.issuer.register({ flash: false });
+                    this.data.issuance = await this.issuer.issuanceOf(this.sERC20.contract.address);
+                  });
 
-                it("it enables flash Issuance", async () => {
-                  expect(this.data.issuance.flash).to.equal(true);
-                });
+                  itRegistersLikeExpected(this);
 
-                it("it emits a EnableFlashIssuance event", async () => {
-                  await expect(this.data.tx).to.emit(this.issuer.contract, "EnableFlashIssuance").withArgs(this.sERC20.address);
+                  it("it disables flash Issuance", async () => {
+                    expect(this.data.issuance.flash).to.equal(false);
+                  });
+
+                  it("it emits no EnableFlashIssuance event", async () => {
+                    await expect(this.data.tx).to.not.emit(this.issuer.contract, "EnableFlashIssuance");
+                  });
                 });
               });
 
-              describe("» and flash issuance is disabled", () => {
+              describe("» but issuance fee is superior or equal to 100%", () => {
                 before(async () => {
                   await setup.issuer(this);
-                  await this.issuer.register({ flash: false });
-                  this.data.issuance = await this.issuer.issuanceOf(this.sERC20.contract.address);
                 });
 
-                itRegistersLikeExpected(this);
-
-                it("it disables flash Issuance", async () => {
-                  expect(this.data.issuance.flash).to.equal(false);
-                });
-
-                it("it emits no EnableFlashIssuance event", async () => {
-                  await expect(this.data.tx).to.not.emit(this.issuer.contract, "EnableFlashIssuance");
+                it("it reverts", async () => {
+                  await expect(
+                    this.issuer.register({
+                      fee: this.constants.issuer.HUNDRED,
+                    })
+                  ).to.be.revertedWith("Issuer: issuance fee must be inferior to 100%");
                 });
               });
             });
+          });
 
-            describe("» but issuance fee is superior or equal to 100%", () => {
-              before(async () => {
-                await setup.issuer(this);
-              });
+          describe("» but reserve price is null", () => {
+            before(async () => {
+              await setup.issuer(this);
+            });
 
-              it("it reverts", async () => {
-                await expect(
-                  this.issuer.register({
-                    fee: this.constants.issuer.HUNDRED,
-                  })
-                ).to.be.revertedWith("Issuer: issuance fee must be inferior to 100%");
-              });
+            it("it reverts", async () => {
+              await expect(this.issuer.register({ reserve: 0 })).to.be.revertedWith("Issuer: reserve price cannot be null");
             });
           });
         });
 
-        describe("» but reserve price is null", () => {
+        describe("» but guardian is the zero address", () => {
           before(async () => {
             await setup.issuer(this);
           });
 
           it("it reverts", async () => {
-            await expect(this.issuer.register({ reserve: 0 })).to.be.revertedWith("Issuer: reserve price cannot be null");
+            await expect(
+              this.issuer.register({
+                guardian: { address: ethers.constants.AddressZero },
+              })
+            ).to.be.revertedWith("Issuer: guardian cannot be the zero address");
           });
         });
       });
 
-      describe("» but guardian is the zero address", () => {
+      describe("» but issuance is already registered", () => {
         before(async () => {
           await setup.issuer(this);
+          await this.issuer.register();
         });
 
         it("it reverts", async () => {
-          await expect(
-            this.issuer.register({
-              guardian: { address: ethers.constants.AddressZero },
-            })
-          ).to.be.revertedWith("Issuer: guardian cannot be the zero address");
+          await expect(this.issuer.register()).to.be.revertedWith("Issuer: issuance already registered");
         });
       });
     });

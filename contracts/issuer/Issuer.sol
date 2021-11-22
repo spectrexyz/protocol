@@ -70,8 +70,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
     /**
      * @notice Initiate the issuance of `sERC20`.
      * @dev - We do not check neither that:
-     *        - `sERC20` is unregistered
-     *        - nor that it actually is an sERC20
+     *        - `sERC20` actually is an sERC20
      *        - nor that this contract is granted MINT_ROLE over `sERC20`
               to save gas.
      *      - Indeed, only trusted templates, registering sERC20s out of actual NFT fractionalizations and self-computing `allocation`, are supposed to be
@@ -104,6 +103,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         bool sERC20IsToken0 = address(sERC20) <= _WETH;
 
         require(hasRole(REGISTER_ROLE, _msgSender()), "Issuer: must have REGISTER_ROLE to register");
+        require(issuance.state == Issuances.State.Null, "Issuer: issuance already registered");
         require(guardian != address(0), "Issuer: guardian cannot be the zero address");
         require(reserve != 0, "Issuer: reserve price cannot be null");
         require(allocation < HUNDRED, "Issuer: allocation must be inferior to 100%");
