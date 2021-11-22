@@ -73,7 +73,6 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
      *        - `sERC20` is unregistered
      *        - nor that it actually is an sERC20
      *        - nor that this contract is granted MINT_ROLE over `sERC20`
-     *        - nor that `allocation` is inferior to 100%
               to save gas.
      *      - Indeed, only trusted templates, registering sERC20s out of actual NFT fractionalizations and self-computing `allocation`, are supposed to be
      *        granted REGISTER_ROLE.
