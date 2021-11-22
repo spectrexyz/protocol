@@ -68,8 +68,8 @@ const itIssuesLikeExpected = (ctx, opts = {}) => {
 };
 
 const itRejectsProposalLikeExpected = (ctx, opts = {}) => {
-  it("it updates proposal's state", async () => {
-    expect(ctx.data.proposal.state).to.equal(ctx.constants.issuer.proposals.state.Rejected);
+  it("it deletes proposal", async () => {
+    expect(ctx.data.proposal.state).to.equal(ctx.constants.issuer.proposals.state.Null);
   });
 
   it("it pays back proposal's buyer", async () => {
@@ -82,8 +82,8 @@ const itRejectsProposalLikeExpected = (ctx, opts = {}) => {
 };
 
 const itWithdrawsProposalLikeExpected = (ctx) => {
-  it("it updates proposal's state", async () => {
-    expect(ctx.data.proposal.state).to.equal(ctx.constants.issuer.proposals.state.Withdrawn);
+  it("it deletes proposal", async () => {
+    expect(ctx.data.proposal.state).to.equal(ctx.constants.issuer.proposals.state.Null);
   });
 
   it("it pays back proposal's buyer", async () => {

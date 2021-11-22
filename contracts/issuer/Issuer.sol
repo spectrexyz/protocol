@@ -250,8 +250,11 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         require(_msgSender() == issuance.guardian, "Issuer: must be issuance's guardian to reject proposal");
         require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Issuer: invalid proposal state");
 
-        proposal._state = Proposals.State.Rejected;
-        payable(proposal.buyer).sendValue(proposal.value);
+        address buyer = proposal.buyer;
+        uint256 value = proposal.value;
+        delete issuance.proposals[proposalId];
+
+        payable(buyer).sendValue(value);
 
         emit RejectProposal(sERC20, proposalId);
     }
@@ -269,8 +272,11 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         require(_msgSender() == proposal.buyer, "Issuer: must be proposal's buyer to withdraw proposal");
         require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Issuer: invalid proposal state");
 
-        proposal._state = Proposals.State.Withdrawn;
-        payable(proposal.buyer).sendValue(proposal.value);
+        address buyer = proposal.buyer;
+        uint256 value = proposal.value;
+        delete _issuances[sERC20].proposals[proposalId];
+
+        payable(buyer).sendValue(value);
 
         emit WithdrawProposal(sERC20, proposalId);
     }

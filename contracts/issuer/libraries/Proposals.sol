@@ -19,9 +19,7 @@ library Proposals {
         Null,
         Pending,
         Accepted,
-        Rejected,
-        Lapsed,
-        Withdrawn
+        Lapsed
     }
 
     struct Proposal {
