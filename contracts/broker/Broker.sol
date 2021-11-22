@@ -189,9 +189,12 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Broker: invalid proposal state");
 
         address buyer = proposal.buyer;
-        proposal._state = Proposals.State.Rejected;
-        sERC20.transfer(buyer, proposal.collateral);
-        payable(buyer).sendValue(proposal.value);
+        uint256 value = proposal.value;
+        uint256 collateral = proposal.collateral;
+        delete sale.proposals[proposalId];
+
+        sERC20.transfer(buyer, collateral);
+        payable(buyer).sendValue(value);
 
         emit RejectProposal(sERC20, proposalId);
     }
@@ -211,9 +214,12 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         require(state == Proposals.State.Pending || state == Proposals.State.Lapsed, "Broker: invalid proposal state");
 
         address buyer = proposal.buyer;
-        proposal._state = Proposals.State.Withdrawn;
-        sERC20.transfer(buyer, proposal.collateral);
-        payable(buyer).sendValue(proposal.value);
+        uint256 value = proposal.value;
+        uint256 collateral = proposal.collateral;
+        delete sale.proposals[proposalId];
+
+        sERC20.transfer(buyer, collateral);
+        payable(buyer).sendValue(value);
 
         emit WithdrawProposal(sERC20, proposalId);
     }
