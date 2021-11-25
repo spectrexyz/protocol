@@ -11,6 +11,8 @@ class PoolFactory {
     this.contract = ctx.contracts.poolFactory;
     this.address = this.contract.address;
     this.getVault = this.contract.getVault;
+    this.admin = this.contract.admin;
+    this.issuer = this.contract.issuer;
   }
 
   static async deploy(ctx, opts) {
@@ -25,7 +27,7 @@ class PoolFactory {
         QueryProcessor: ctx.contracts.QueryProcessor.address,
       },
     });
-    ctx.data.tx = await PoolFactoryFactory.connect(ctx.signers.root).deploy(ctx.contracts.bVault.address);
+    ctx.data.tx = await PoolFactoryFactory.connect(ctx.signers.root).deploy(ctx.contracts.bVault.address, ctx.signers.poolFactory.admin.address);
     ctx.contracts.poolFactory = await ctx.data.tx.deployed();
     ctx.data.receipt = await ctx.data.tx.deployTransaction.wait();
     ctx.poolFactory = new PoolFactory(ctx);
@@ -68,6 +70,14 @@ class PoolFactory {
     const pool = this.ctx.data.receipt.events.filter((event) => event.event === "CreatePool")[0].args.pool;
     this.ctx.pool = await Pool.at(this.ctx, pool, opts);
     this.ctx.pool.sERC20IsToken0 = sERC20IsToken0;
+  }
+
+  async setIssuer(opts = {}) {
+    opts.issuer ??= this.ctx.signers.pool.issuer;
+    opts.from ??= this.ctx.signers.poolFactory.admin;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).setIssuer(opts.issuer.address);
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 }
 

@@ -752,6 +752,10 @@ describe("Issuer", () => {
           expect((await this.issuer.issuanceOf(this.sERC20.address)).state).to.equal(this.constants.issuer.issuances.state.Closed);
         });
 
+        it("it closes pool's swaps", async () => {
+          expect(await this.pool.isClosed()).to.equal(true);
+        });
+
         it("it emits a Close event", async () => {
           await expect(this.data.tx).to.emit(this.issuer.contract, "Close").withArgs(this.sERC20.address);
         });

@@ -86,13 +86,20 @@ contract FractionalizationBootstrappingPool is
     uint256 private immutable _cap;
     uint256 private immutable _sMaxNormalizedWeight;
     uint256 private immutable _sWeightsDelta;
+    address private immutable _issuer;
     bool private immutable _sERC20IsToken0;
+    bool private _isClosed;
 
     event SwapFeePercentageChanged(uint256 swapFeePercentage);
 
     modifier onlyVault(bytes32 poolId) {
         _require(msg.sender == address(getVault()), Errors.CALLER_NOT_VAULT);
         _require(poolId == getPoolId(), Errors.INVALID_POOL_ID);
+        _;
+    }
+
+    modifier whenNotClosed() {
+        require(!_isClosed, "FBP: buyout happened and swaps are closed");
         _;
     }
 
@@ -109,6 +116,7 @@ contract FractionalizationBootstrappingPool is
         uint256 bufferPeriodDuration;
         bool sERC20IsToken0;
         address owner;
+        address issuer;
     }
 
     constructor(NewPoolParams memory params)
@@ -133,6 +141,7 @@ contract FractionalizationBootstrappingPool is
         params.vault.registerTokens(poolId, tokens, new address[](2));
 
         // Set immutable state variables - these cannot be read from during construction
+        _issuer = params.issuer;
         _vault = params.vault;
         _poolId = poolId;
 
@@ -148,10 +157,7 @@ contract FractionalizationBootstrappingPool is
         _cap = sERC20.cap();
 
         // Ensure each normalized weight is above them minimum and find the token index of the maximum weight
-        require(
-            params.sMaxNormalizedWeight > params.sMinNormalizedWeight,
-            "FractionalizationBootstrappingPool: sERC20 max weight must be superior to sERC20 min weight"
-        );
+        require(params.sMaxNormalizedWeight > params.sMinNormalizedWeight, "FBP: sERC20 max weight must be superior to sERC20 min weight");
         _require(params.sMinNormalizedWeight >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
         _require(FixedPoint.ONE.sub(params.sMaxNormalizedWeight) >= _MIN_WEIGHT, Errors.MIN_WEIGHT);
 
@@ -184,6 +190,12 @@ contract FractionalizationBootstrappingPool is
         }
     }
 
+    function close() external {
+        require(msg.sender == _issuer, "FBP: must be issuer to close swaps");
+
+        _isClosed = true;
+    }
+
     function _weightsFor(
         sIERC20 sERC20,
         uint256 sMaxNormalizedWeight,
@@ -193,7 +205,7 @@ contract FractionalizationBootstrappingPool is
         uint256[] memory weights = new uint256[](2);
         uint256 supply = sERC20.totalSupply();
         uint256 gamma = sWeightsDelta * supply;
-        require(gamma / sWeightsDelta == supply, "FractionalizationBootstrappingPool: math overflow");
+        require(gamma / sWeightsDelta == supply, "FBP: math overflow");
 
         uint256 sWeight = sMaxNormalizedWeight.sub(gamma / sERC20.cap()); // cap is always > 0
         uint256 eWeight = FixedPoint.ONE.sub(sWeight);
@@ -213,6 +225,14 @@ contract FractionalizationBootstrappingPool is
 
     function sERC20IsToken0() public view returns (bool) {
         return _sERC20IsToken0;
+    }
+
+    function issuer() public view returns (address) {
+        return _issuer;
+    }
+
+    function isClosed() public view returns (bool) {
+        return _isClosed;
     }
 
     function getVault() public view returns (IVault) {
@@ -307,7 +327,7 @@ contract FractionalizationBootstrappingPool is
         SwapRequest memory request,
         uint256 balanceTokenIn,
         uint256 balanceTokenOut
-    ) public virtual override whenNotPaused onlyVault(request.poolId) returns (uint256) {
+    ) public virtual override whenNotPaused whenNotClosed onlyVault(request.poolId) returns (uint256) {
         bool tokenInIsToken0 = request.tokenIn == _token0;
 
         uint256 scalingFactorTokenIn = _scalingFactor(tokenInIsToken0);

@@ -27,6 +27,8 @@ interface IFractionalizationBootstrappingPool {
 
     function poke() external;
 
+    function close() external;
+
     function totalSupply() external view returns (uint256);
 
     function getTimeWeightedAverage(IPriceOracle.OracleAverageQuery[] memory queries) external view returns (uint256[] memory prices);

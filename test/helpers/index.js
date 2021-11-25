@@ -19,6 +19,7 @@ const _signers = async (ctx) => {
       beneficiaries: [],
     },
     pool: {},
+    poolFactory: {},
     others: [],
   };
 
@@ -56,6 +57,8 @@ const _signers = async (ctx) => {
     signers.issuer.registerer,
     signers.issuer.closer,
     signers.pool.owner,
+    signers.pool.issuer,
+    signers.poolFactory.admin,
     signers.splitter.admin,
     signers.splitter.bank,
     signers.splitter.registrar,
@@ -173,6 +176,7 @@ const setup = {
     await ctx.vault.fractionalize({ broker: ctx.broker });
     await PoolFactory.deploy(ctx, opts);
     await Issuer.deploy(ctx, opts);
+    await ctx.poolFactory.setIssuer({ issuer: ctx.issuer });
   },
   splitter: async (ctx, opts = {}) => {
     await setup.vault(ctx, opts);

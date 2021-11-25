@@ -22,9 +22,14 @@ import "@balancer-labs/v2-solidity-utils/contracts/openzeppelin/IERC20.sol";
 import "@balancer-labs/v2-vault/contracts/interfaces/IVault.sol";
 
 contract FractionalizationBootstrappingPoolFactory is BasePoolSplitCodeFactory, FactoryWidePauseWindow {
+    address private immutable _admin;
+    address private _issuer;
+
     event CreatePool(address pool);
 
-    constructor(IVault vault) BasePoolSplitCodeFactory(vault, type(FractionalizationBootstrappingPool).creationCode) {}
+    constructor(IVault vault, address admin_) BasePoolSplitCodeFactory(vault, type(FractionalizationBootstrappingPool).creationCode) {
+        _admin = admin_;
+    }
 
     /**
      * @notice Deploys a new FractionalizationBootstrappingPool.
@@ -53,12 +58,27 @@ contract FractionalizationBootstrappingPoolFactory is BasePoolSplitCodeFactory, 
             pauseWindowDuration: pauseWindowDuration,
             bufferPeriodDuration: bufferPeriodDuration,
             sERC20IsToken0: sERC20IsToken0,
-            owner: address(0)
+            owner: address(0),
+            issuer: _issuer
         });
 
         address pool = _create(abi.encode(params));
         emit CreatePool(pool);
 
         return pool;
+    }
+
+    function setIssuer(address issuer_) external {
+        require(msg.sender == _admin, "FBPFactory: must be admin to set issuer");
+
+        _issuer = issuer_;
+    }
+
+    function admin() public view returns (address) {
+        return _admin;
+    }
+
+    function issuer() public view returns (address) {
+        return _issuer;
     }
 }

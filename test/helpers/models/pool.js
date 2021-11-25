@@ -31,6 +31,8 @@ class Pool {
     this.getSwapFeePercentage = this.contract.getSwapFeePercentage;
     this.getTimeWeightedAverage = this.contract.getTimeWeightedAverage;
     this.getPausedState = this.contract.getPausedState;
+    this.issuer = this.contract.issuer;
+    this.isClosed = this.contract.isClosed;
   }
 
   static async deploy(ctx, opts) {
@@ -45,6 +47,7 @@ class Pool {
     opts.pauseWindowDuration ??= ctx.params.pool.pauseWindowDuration;
     opts.bufferPeriodDuration ??= ctx.params.pool.bufferPeriodDuration;
     opts.owner ??= ctx.signers.pool.owner;
+    opts.issuer ??= ctx.signers.pool.issuer;
 
     ctx.contracts.authorizer = await waffle.deployContract(ctx.signers.root, _Authorizer_, [ctx.signers.root.address]);
     ctx.contracts.oracleMock = await waffle.deployContract(ctx.signers.root, _OracleMock_);
@@ -76,6 +79,7 @@ class Pool {
       bufferPeriodDuration: opts.bufferPeriodDuration,
       sERC20IsToken0,
       owner: opts.owner.address,
+      issuer: opts.issuer.address,
     };
 
     ctx.contracts.QueryProcessor = await waffle.deployContract(ctx.signers.root, _QueryProcessor_, []);
@@ -107,6 +111,13 @@ class Pool {
 
   async poke() {
     this.ctx.data.tx = await this.contract.poke();
+    this.ctx.data.receipt = await this.ctx.data.tx.wait();
+  }
+
+  async close(opts = {}) {
+    opts.from ??= this.ctx.signers.pool.issuer;
+
+    this.ctx.data.tx = await this.contract.connect(opts.from).close();
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 

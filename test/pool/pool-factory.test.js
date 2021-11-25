@@ -14,11 +14,39 @@ describe("FractionalizationBootstrappingPoolFactory", () => {
     it("it sets up the factory's vault", async () => {
       expect(await this.poolFactory.getVault()).to.equal(this.contracts.bVault.address);
     });
+
+    it("it sets up the factory's admin", async () => {
+      expect(await this.poolFactory.admin()).to.equal(this.signers.poolFactory.admin.address);
+    });
+  });
+
+  describe("# setIssuer", () => {
+    describe("» caller is factory's admin", () => {
+      before(async () => {
+        await setup.poolFactory(this);
+        await this.poolFactory.setIssuer();
+      });
+
+      it("it sets factory's issuer", async () => {
+        await expect(await this.poolFactory.issuer()).to.equal(this.signers.pool.issuer.address);
+      });
+    });
+
+    describe("» caller is not factory's admin", () => {
+      before(async () => {
+        await setup.poolFactory(this);
+      });
+
+      it("it reverts", async () => {
+        await expect(this.poolFactory.setIssuer({ from: this.signers.others[0] })).to.be.revertedWith("FBPFactory: must be admin to set issuer");
+      });
+    });
   });
 
   describe("# create", () => {
     before(async () => {
       await setup.poolFactory(this);
+      await this.poolFactory.setIssuer();
       await this.poolFactory.create(this);
     });
 
@@ -40,6 +68,10 @@ describe("FractionalizationBootstrappingPoolFactory", () => {
 
     it("it sets up the pool's authorizer", async () => {
       expect(await this.pool.getAuthorizer()).to.equal(this.contracts.authorizer.address);
+    });
+
+    it("it sets up the pool's issuer", async () => {
+      expect(await this.pool.issuer()).to.equal(this.signers.pool.issuer.address);
     });
 
     it("it sets up the pool's owner to the zero address", async () => {

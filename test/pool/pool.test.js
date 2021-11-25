@@ -41,6 +41,10 @@ describe("FractionalizationBootstrappingPool", () => {
             expect(await this.pool.getOwner()).to.equal(this.signers.pool.owner.address);
           });
 
+          it("it sets up the pool's issuer", async () => {
+            expect(await this.pool.issuer()).to.equal(this.signers.pool.issuer.address);
+          });
+
           it("it sets up the pool's pausable data", async () => {
             const state = await this.pool.getPausedState();
 
@@ -130,7 +134,7 @@ describe("FractionalizationBootstrappingPool", () => {
         describe("» because sERC20 maximum weight is smaller than sERC20 minimum weight", () => {
           it("it reverts", async () => {
             await expect(setup.pool(this, { mint: false, sMaxNormalizedWeight: this.params.pool.sMinNormalizedWeight })).to.be.revertedWith(
-              "FractionalizationBootstrappingPool: sERC20 max weight must be superior to sERC20 min weight"
+              "FBP: sERC20 max weight must be superior to sERC20 min weight"
             );
           });
         });
@@ -149,7 +153,7 @@ describe("FractionalizationBootstrappingPool", () => {
       describe("» because sERC20 minimal weight is bigger than sERC20 maximal weight", () => {
         it("it reverts", async () => {
           await expect(setup.pool(this, { mint: false, sMinNormalizedWeight: this.params.pool.sMaxNormalizedWeight })).to.be.revertedWith(
-            "FractionalizationBootstrappingPool: sERC20 max weight must be superior to sERC20 min weight"
+            "FBP: sERC20 max weight must be superior to sERC20 min weight"
           );
         });
       });
@@ -262,6 +266,36 @@ describe("FractionalizationBootstrappingPool", () => {
           expect(this.data.weights[0]).to.equal(this.data.expectedWeights[0]);
           expect(this.data.weights[1]).to.equal(this.data.expectedWeights[1]);
         });
+      });
+    });
+  });
+
+  describe("# close", () => {
+    describe("» caller is pool's issuer", () => {
+      before(async () => {
+        await setup.pool(this, { mint: true });
+        await this.pool.join({ init: true });
+        await this.pool.join();
+
+        await this.pool.close();
+      });
+
+      it("it closes pool", async () => {
+        expect(await this.pool.isClosed()).to.equal(true);
+      });
+
+      it("it disables swaps", async () => {
+        await expect(this.pool.swap()).to.be.revertedWith("FBP: buyout happened and swaps are closed");
+      });
+    });
+
+    describe("» caller is not pool's issuer", () => {
+      before(async () => {
+        await setup.pool(this, { mint: true });
+      });
+
+      it("it reverts", async () => {
+        await expect(this.pool.close({ from: this.signers.others[0] })).to.be.revertedWith("FBP: must be issuer to close swaps");
       });
     });
   });

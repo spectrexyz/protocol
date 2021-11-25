@@ -292,6 +292,7 @@ contract Issuer is Context, AccessControlEnumerable, IIssuer {
         require(issuance.state == Issuances.State.Opened, "Issuer: invalid issuance state");
 
         issuance.state = Issuances.State.Closed;
+        issuance.pool.close();
 
         emit Close(sERC20);
     }
