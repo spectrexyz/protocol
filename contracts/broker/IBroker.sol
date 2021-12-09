@@ -42,7 +42,8 @@ interface IBroker {
         uint256 multiplier,
         uint256 timelock,
         bool flash,
-        bool escape
+        bool escape,
+        bool cap
     ) external;
 
     function buyout(sIERC20 sERC20) external payable;
@@ -97,7 +98,8 @@ interface IBroker {
             uint256 stock,
             uint256 nbOfProposals,
             bool flash,
-            bool escape
+            bool escape,
+            bool cap
         );
 
     function proposalFor(sIERC20 sERC20, uint256 proposalId)

@@ -31,6 +31,7 @@ module.exports = {
     hardhat: {
       accounts: {
         count: 50,
+        accountsBalance: "1000000000000000000000000",
       },
     },
     rinkeby: {

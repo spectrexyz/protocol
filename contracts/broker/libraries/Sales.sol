@@ -35,6 +35,7 @@ library Sales {
         mapping(uint256 => Proposals.Proposal) proposals;
         bool flash;
         bool escape;
+        bool cap;
     }
 
     function state(Sale storage sale) internal view returns (State) {

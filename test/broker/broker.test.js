@@ -113,23 +113,46 @@ describe("Broker", () => {
           describe("» and timelock period is valid", () => {
             describe("» and flash buyout is enabled", () => {
               describe("» and escape is enabled", () => {
-                before(async () => {
-                  await setup.broker(this);
-                  await this.broker.register();
-                  this.data.sale = await this.broker.saleOf(this.sERC20.address);
-                  this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
-                    this.params.broker.timelock
-                  );
+                describe("» and cap is enabled", () => {
+                  before(async () => {
+                    await setup.broker(this);
+                    await this.broker.register({ cap: true });
+                    this.data.sale = await this.broker.saleOf(this.sERC20.address);
+                    this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+                      this.params.broker.timelock
+                    );
+                  });
+
+                  itRegistersLikeExpected(this, { cap: true });
+
+                  it("it emits a EnableFlashBuyout event", async () => {
+                    await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
+                  });
+
+                  it("it emits a EnableEscape event", async () => {
+                    await expect(this.data.tx).to.emit(this.broker.contract, "EnableEscape");
+                  });
                 });
 
-                itRegistersLikeExpected(this);
+                describe("» and cap is disabled", () => {
+                  before(async () => {
+                    await setup.broker(this);
+                    await this.broker.register();
+                    this.data.sale = await this.broker.saleOf(this.sERC20.address);
+                    this.data.expectedOpening = ethers.BigNumber.from((await ethers.provider.getBlock(this.data.receipt.blockNumber)).timestamp).add(
+                      this.params.broker.timelock
+                    );
+                  });
 
-                it("it emits a EnableFlashBuyout event", async () => {
-                  await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
-                });
+                  itRegistersLikeExpected(this);
 
-                it("it emits a EnableEscape event", async () => {
-                  await expect(this.data.tx).to.emit(this.broker.contract, "EnableEscape");
+                  it("it emits a EnableFlashBuyout event", async () => {
+                    await expect(this.data.tx).to.emit(this.broker.contract, "EnableFlashBuyout");
+                  });
+
+                  it("it emits a EnableEscape event", async () => {
+                    await expect(this.data.tx).to.emit(this.broker.contract, "EnableEscape");
+                  });
                 });
               });
 
@@ -227,67 +250,141 @@ describe("Broker", () => {
   describe("# buyout", () => {
     describe("» sale is opened", () => {
       describe("» and flash buyout is enabled", () => {
-        describe("» and buyout value is sufficient [collateral and ETH]", () => {
-          before(async () => {
-            await setup.broker(this);
-            await this.broker.register();
-            await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
-            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
-            await advanceTime(this.params.broker.timelock);
-            this.data.previousTotalSupply = await this.sERC20.totalSupply();
-            this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
-            await this.broker.buyout();
-            this.data.sale = await this.broker.saleOf(this.sERC20.address);
-            this.data.lastTotalSupply = await this.sERC20.totalSupply();
-            this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+        describe("» and cap is disabled", () => {
+          describe("» and buyout value is sufficient [collateral and ETH]", () => {
+            before(async () => {
+              await setup.broker(this);
+              await this.broker.register();
+              await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+              await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+              await advanceTime(this.params.broker.timelock);
+              this.data.previousTotalSupply = await this.sERC20.totalSupply();
+              this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
+              await this.broker.buyout();
+              this.data.sale = await this.broker.saleOf(this.sERC20.address);
+              this.data.lastTotalSupply = await this.sERC20.totalSupply();
+              this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+            });
+
+            itBuysOutLikeExpected(this, { value: true, collateral: true });
           });
 
-          itBuysOutLikeExpected(this, { value: true, collateral: true });
+          describe("» and buyout value is sufficient [collateral only]", () => {
+            before(async () => {
+              await setup.broker(this);
+              await this.broker.register();
+              await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+              await advanceTime(this.params.broker.timelock);
+              this.data.previousTotalSupply = await this.sERC20.totalSupply();
+              this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
+              await this.broker.buyout({ value: 0 });
+              this.data.sale = await this.broker.saleOf(this.sERC20.address);
+              this.data.lastTotalSupply = await this.sERC20.totalSupply();
+              this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+            });
+
+            itBuysOutLikeExpected(this, { value: false, collateral: true });
+          });
+
+          describe("» and buyout value is sufficient [ETH only]", () => {
+            before(async () => {
+              await setup.broker(this);
+              await this.broker.register();
+              await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+              await advanceTime(this.params.broker.timelock);
+              this.data.previousTotalSupply = await this.sERC20.totalSupply();
+              this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
+              await this.broker.buyout();
+              this.data.sale = await this.broker.saleOf(this.sERC20.address);
+              this.data.lastTotalSupply = await this.sERC20.totalSupply();
+              this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+            });
+
+            itBuysOutLikeExpected(this, { value: true, collateral: false });
+          });
+
+          describe("» but buyout value is insufficient", () => {
+            before(async () => {
+              await setup.broker(this);
+              await this.broker.register();
+              await advanceTime(this.params.broker.timelock);
+            });
+
+            it("it reverts", async () => {
+              await expect(this.broker.buyout({ value: "1" })).to.be.revertedWith("Broker: insufficient value");
+            });
+          });
         });
 
-        describe("» and buyout value is sufficient [collateral only]", () => {
-          before(async () => {
-            await setup.broker(this);
-            await this.broker.register();
-            await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
-            await advanceTime(this.params.broker.timelock);
-            this.data.previousTotalSupply = await this.sERC20.totalSupply();
-            this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
-            await this.broker.buyout({ value: 0 });
-            this.data.sale = await this.broker.saleOf(this.sERC20.address);
-            this.data.lastTotalSupply = await this.sERC20.totalSupply();
-            this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+        describe("» and cap is enabled", () => {
+          describe("» and buyout value is sufficient [collateral and ETH]", () => {
+            before(async () => {
+              await setup.broker(this);
+              await this.broker.register({ cap: true });
+              await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.broker.balance });
+              await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+              await advanceTime(this.params.broker.timelock);
+              this.data.previousTotalSupply = await this.sERC20.totalSupply();
+              this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
+              this.data.previousGuardianBalance = await this.sERC20.balanceOf(this.signers.broker.guardian.address);
+              await this.broker.buyout({ cap: true });
+              this.data.sale = await this.broker.saleOf(this.sERC20.address);
+              this.data.lastTotalSupply = await this.sERC20.totalSupply();
+              this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+              this.data.lastGuardianBalance = await this.sERC20.balanceOf(this.signers.broker.guardian.address);
+            });
+
+            itBuysOutLikeExpected(this, { value: true, collateral: true, cap: true });
           });
 
-          itBuysOutLikeExpected(this, { value: false, collateral: true });
-        });
+          describe("» and buyout value is sufficient [collateral only]", () => {
+            before(async () => {
+              await setup.broker(this);
+              await this.broker.register({ cap: true });
+              await this.sERC20.mint({ to: this.signers.broker.buyer, amount: this.params.sERC20.cap });
+              await advanceTime(this.params.broker.timelock);
+              this.data.previousTotalSupply = await this.sERC20.totalSupply();
+              this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
+              this.data.previousGuardianBalance = await this.sERC20.balanceOf(this.signers.broker.guardian.address);
+              await this.broker.buyout({ value: 0, cap: true });
+              this.data.sale = await this.broker.saleOf(this.sERC20.address);
+              this.data.lastTotalSupply = await this.sERC20.totalSupply();
+              this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+              this.data.lastGuardianBalance = await this.sERC20.balanceOf(this.signers.broker.guardian.address);
+            });
 
-        describe("» and buyout value is sufficient [ETH only]", () => {
-          before(async () => {
-            await setup.broker(this);
-            await this.broker.register();
-            await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
-            await advanceTime(this.params.broker.timelock);
-            this.data.previousTotalSupply = await this.sERC20.totalSupply();
-            this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
-            await this.broker.buyout();
-            this.data.sale = await this.broker.saleOf(this.sERC20.address);
-            this.data.lastTotalSupply = await this.sERC20.totalSupply();
-            this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+            itBuysOutLikeExpected(this, { value: false, collateral: true, cap: true });
           });
 
-          itBuysOutLikeExpected(this, { value: true, collateral: false });
-        });
+          describe("» and buyout value is sufficient [ETH only]", () => {
+            before(async () => {
+              await setup.broker(this);
+              await this.broker.register({ cap: true });
+              await this.sERC20.mint({ to: this.signers.others[0], amount: this.params.broker.balance });
+              await advanceTime(this.params.broker.timelock);
+              this.data.previousTotalSupply = await this.sERC20.totalSupply();
+              this.data.previousBankBalance = await this.signers.broker.bank.getBalance();
+              this.data.previousGuardianBalance = await this.sERC20.balanceOf(this.signers.broker.guardian.address);
+              await this.broker.buyout({ cap: true });
+              this.data.sale = await this.broker.saleOf(this.sERC20.address);
+              this.data.lastTotalSupply = await this.sERC20.totalSupply();
+              this.data.lastBankBalance = await this.signers.broker.bank.getBalance();
+              this.data.lastGuardianBalance = await this.sERC20.balanceOf(this.signers.broker.guardian.address);
+            });
 
-        describe("» but buyout value is insufficient", () => {
-          before(async () => {
-            await setup.broker(this);
-            await this.broker.register();
-            await advanceTime(this.params.broker.timelock);
+            itBuysOutLikeExpected(this, { value: true, collateral: false, cap: true });
           });
 
-          it("it reverts", async () => {
-            await expect(this.broker.buyout({ value: "1" })).to.be.revertedWith("Broker: insufficient value");
+          describe("» but buyout value is insufficient", () => {
+            before(async () => {
+              await setup.broker(this);
+              await this.broker.register({ cap: true });
+              await advanceTime(this.params.broker.timelock);
+            });
+
+            it("it reverts", async () => {
+              await expect(this.broker.buyout({ value: "1", cap: true })).to.be.revertedWith("Broker: insufficient value");
+            });
           });
         });
       });

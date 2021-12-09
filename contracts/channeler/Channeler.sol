@@ -74,7 +74,7 @@ contract Channeler is Context, AccessControlEnumerable, Pausable, IChanneler {
 
         sIERC20 sERC20 = _fractionalize(collection, tokenId, data.name, data.symbol, data.cap);
         uint256 allocation = _splitter.register(sERC20, data.beneficiaries, data.shares);
-        _broker.register(sERC20, data.guardian, data.buyoutReserve, data.multiplier, data.timelock, data.buyoutFlash, true);
+        _broker.register(sERC20, data.guardian, data.buyoutReserve, data.multiplier, data.timelock, data.buyoutFlash, true, false);
         _issuer.register(
             sERC20,
             data.guardian,

@@ -118,6 +118,7 @@ describe("Channeler", () => {
         );
         expect(this.data.sale.flash).to.equal(false);
         expect(this.data.sale.escape).to.equal(true);
+        expect(this.data.sale.cap).to.equal(false);
       });
 
       it("it registers sERC20 into issuer", async () => {
@@ -186,6 +187,7 @@ describe("Channeler", () => {
           );
           expect(this.data.sale.flash).to.equal(false);
           expect(this.data.sale.escape).to.equal(true);
+          expect(this.data.sale.cap).to.equal(false);
         });
 
         it("it registers sERC20 into issuer", async () => {

@@ -3,6 +3,7 @@ const { expect } = require("chai");
 const itRegistersLikeExpected = (ctx, opts = {}) => {
   opts.flash ??= true;
   opts.escape ??= true;
+  opts.cap ??= false;
 
   it("it registers sale", async () => {
     expect(ctx.data.sale.state).to.equal(ctx.constants.broker.sales.state.Pending);
@@ -14,6 +15,7 @@ const itRegistersLikeExpected = (ctx, opts = {}) => {
     expect(ctx.data.sale.nbOfProposals).to.equal(0);
     expect(ctx.data.sale.flash).to.equal(opts.flash);
     expect(ctx.data.sale.escape).to.equal(opts.escape);
+    expect(ctx.data.sale.cap).to.equal(opts.cap);
   });
 
   it("it emits a Register event", async () => {
@@ -29,10 +31,11 @@ const itBuysOutLikeExpected = (ctx, opts = {}) => {
   });
 
   it("it updates sale stock", async () => {
-    opts.value = opts.value ? ctx.params.broker.value : ethers.BigNumber.from("0");
-    opts.collateral = opts.collateral ? ctx.params.broker.balance : 0;
+    opts.value = opts.value ? (opts.cap ? ctx.params.broker.capValue : ctx.params.broker.value) : ethers.BigNumber.from("0");
+    opts.collateral = opts.collateral ? (opts.cap && opts.value.toString() === "0" ? ctx.params.sERC20.cap : ctx.params.broker.balance) : 0;
     opts.expectedFee =
-      opts.value.toString() > "0" ? ctx.params.broker.value.mul(ctx.params.broker.protocolFee).div(ctx.constants.broker.HUNDRED) : ethers.BigNumber.from("0");
+      opts.value.toString() > "0" ? opts.value.mul(ctx.params.broker.protocolFee).div(ctx.constants.broker.HUNDRED) : ethers.BigNumber.from("0");
+
     expect(ctx.data.sale.stock).to.equal(opts.value.sub(opts.expectedFee));
   });
 
@@ -57,6 +60,12 @@ const itBuysOutLikeExpected = (ctx, opts = {}) => {
       .to.emit(ctx.broker.contract, "Buyout")
       .withArgs(ctx.sERC20.address, ctx.signers.broker.buyer.address, opts.value, opts.collateral, opts.expectedFee);
   });
+
+  if (opts.cap) {
+    it("it mints guardian's shares", async () => {
+      expect(ctx.data.lastGuardianBalance.sub(ctx.data.previousGuardianBalance)).to.equal(ctx.params.sERC20.cap.sub(ctx.data.previousTotalSupply));
+    });
+  }
 };
 
 const itCreatesProposalLikeExpected = (ctx, opts = {}) => {

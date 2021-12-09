@@ -1,6 +1,5 @@
 module.exports = {
   params: {
-    cap: ethers.utils.parseEther("1000"),
     name: "My Awesome sERC20",
     symbol: "MAS",
     cap: ethers.utils.parseEther("1000"),

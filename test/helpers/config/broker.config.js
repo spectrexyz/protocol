@@ -5,6 +5,7 @@ module.exports = {
     timelock: ethers.BigNumber.from("1209600"), // two weeks
     value: ethers.utils.parseEther("10"),
     balance: ethers.utils.parseEther("1"),
+    capValue: ethers.utils.parseEther("5000"),
     lifespan: ethers.BigNumber.from("3600"),
     protocolFee: ethers.utils.parseEther("10"),
   },

@@ -72,6 +72,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
      * @param timelock The period of time after which the sale opens [in seconds].
      * @param flash True if flash buyout is enabled, false otherwise.
      * @param escape True if spectre's multisig is allowed to escape sERC20's pegged NFT, false otherwise.
+     * @param cap True if the buyout price should be based on the sERC20 cap, false if it should be based on its supply.
      */
     function register(
         sIERC20 sERC20,
@@ -80,7 +81,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         uint256 multiplier,
         uint256 timelock,
         bool flash,
-        bool escape
+        bool escape,
+        bool cap
     ) external override {
         Sales.Sale storage sale = _sales[sERC20];
 
@@ -94,6 +96,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         sale.reserve = reserve;
         sale.multiplier = multiplier;
         sale.opening = block.timestamp + timelock;
+        sale.cap = cap;
 
         emit Register(sERC20, guardian, reserve, multiplier, block.timestamp + timelock);
 
@@ -397,7 +400,8 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
             uint256 stock,
             uint256 nbOfProposals,
             bool flash,
-            bool escape
+            bool escape,
+            bool cap
         )
     {
         Sales.Sale storage sale = _sales[sERC20];
@@ -411,6 +415,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         nbOfProposals = sale.nbOfProposals;
         flash = sale.flash;
         escape = sale.escape;
+        cap = sale.cap;
     }
 
     /**
@@ -451,6 +456,12 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         sale.stock = value - fee;
 
         _issuer.close(sERC20);
+
+        if (sale.cap) {
+            uint256 cap = sERC20.cap();
+            uint256 supply = sERC20.totalSupply();
+            if (cap > supply) sERC20.mint(sale.guardian, cap - supply);
+        }
 
         if (collateral > 0) {
             if (locked) sERC20.burn(collateral);
@@ -499,7 +510,7 @@ contract Broker is Context, AccessControlEnumerable, IBroker {
         address buyer
     ) private view returns (uint256 value, uint256 collateral) {
         collateral = sERC20.balanceOf(buyer);
-        uint256 supply = sERC20.totalSupply();
+        uint256 supply = sale.cap ? sERC20.cap() : sERC20.totalSupply();
         uint256 marketValue = (((_issuer.twapOf(sERC20, IIssuer.TwapKind.ETH) * supply) / DECIMALS) * sale.multiplier) / DECIMALS;
         uint256 reserve = sale.reserve;
         uint256 rawValue = reserve >= marketValue ? reserve : marketValue;

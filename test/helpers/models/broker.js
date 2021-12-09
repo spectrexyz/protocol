@@ -1,4 +1,3 @@
-const { ethers } = require("ethers");
 const _Broker_ = require("../../../artifacts/contracts/broker/Broker.sol/Broker.json");
 const _IssuerMock_ = require("../../../artifacts/contracts/mock/IssuerMock.sol/IssuerMock.json");
 
@@ -54,10 +53,10 @@ class Broker {
     opts.flash ??= true;
     opts.escape ??= true;
     opts.from ??= this.ctx.signers.broker.registrar;
+    opts.cap ??= false;
 
-    // grant broker DEFAULT_ADMIN_ROLE over sERC20
     await (
-      await this.ctx.contracts.sERC20.connect(this.ctx.signers.sERC20.admin).grantRole(ethers.constants.HashZero, this.ctx.contracts.broker.address)
+      await this.ctx.contracts.sERC20.connect(this.ctx.signers.sERC20.admin).grantRole(this.ctx.constants.sERC20.MINT_ROLE, this.ctx.contracts.broker.address)
     ).wait();
 
     // fake IMarket minter as in the template
@@ -69,7 +68,7 @@ class Broker {
 
     this.ctx.data.tx = await this.contract
       .connect(opts.from)
-      .register(opts.sERC20.address, opts.guardian.address, opts.reserve, opts.multiplier, opts.timelock, opts.flash, opts.escape);
+      .register(opts.sERC20.address, opts.guardian.address, opts.reserve, opts.multiplier, opts.timelock, opts.flash, opts.escape, opts.cap);
     this.ctx.data.receipt = await this.ctx.data.tx.wait();
   }
 
@@ -77,7 +76,8 @@ class Broker {
     opts.sERC20 ??= this.ctx.sERC20.contract;
     opts.from ??= this.ctx.signers.broker.buyer;
     opts.beneficiary ??= this.ctx.signers.broker.beneficiary;
-    opts.value ??= this.ctx.params.broker.value;
+    opts.cap ??= false;
+    opts.value ??= opts.cap ? this.ctx.params.broker.capValue : this.ctx.params.broker.value;
 
     await this.ctx.sERC20.approve({
       from: opts.from,
