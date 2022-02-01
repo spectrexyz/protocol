@@ -23,6 +23,7 @@ const roles = {
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
   },
   vault: {
+    FRACTIONALIZE_ROLE: ethers.BigNumber.from("0xa541cf2e8e137aa2a6ee62088e1847ecf1f039943f142d77fcf83c401b25d3cf"),
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
   },
 };
@@ -121,6 +122,12 @@ const grant = {
     await tx.wait();
     terminal.success("OK");
   },
+  vault: async () => {
+    terminal.print("» Granting FRACTIONALIZE_ROLE over vault to channeler ... ");
+    const tx = await this.vault.grantRole(roles.vault.FRACTIONALIZE_ROLE, this.channeler.address);
+    await tx.wait();
+    terminal.success("OK");
+  },
 };
 
 const main = async () => {
@@ -129,6 +136,7 @@ const main = async () => {
   await grant.broker();
   await grant.issuer();
   await grant.splitter();
+  await grant.vault();
 };
 
 main()
