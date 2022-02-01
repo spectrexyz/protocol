@@ -10,7 +10,7 @@ const func = async (hre) => {
   await deploy("PoolFactory", {
     contract: "FractionalizationBootstrappingPoolFactory",
     from: deployer,
-    args: [config.balancer.rinkeby.vault],
+    args: [config.balancer.rinkeby.vault, deployer],
     log: true,
     libraries: {
       QueryProcessor: queryProcessor.address,
