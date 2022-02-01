@@ -23,6 +23,7 @@ const roles = {
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
   },
   vault: {
+    FRACTIONALIZE_ROLE: ethers.BigNumber.from("0xa541cf2e8e137aa2a6ee62088e1847ecf1f039943f142d77fcf83c401b25d3cf"),
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
   },
 };
