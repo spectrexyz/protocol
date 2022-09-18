@@ -65,6 +65,11 @@ const properties = {
 };
 
 const print = {
+  addresses: async () => {
+    Object.entries(this).forEach(([name, contract]) => {
+      console.log(`${name.toUpperCase()}=${contract.address}`);
+    });
+  },
   all: async () => {
     for (const contract in this) {
       const _contract = this[contract];
@@ -150,14 +155,17 @@ const terminal = {
 
 const fetch = {
   all: async () => {
-    this.sERC20 = await ethers.getContract("sERC20");
-    this.sERC721 = await ethers.getContract("sERC721");
-    this.vault = await ethers.getContract("Vault");
-    this.broker = await ethers.getContract("Broker");
-    this.issuer = await ethers.getContract("Issuer");
-    this.splitter = await ethers.getContract("Splitter");
-    this.poolFactory = await ethers.getContract("PoolFactory");
-    this.channeler = await ethers.getContract("Channeler");
+    const contracts = await Promise.all(
+      ["sERC20", "sERC721", "Vault", "Broker", "Issuer", "Splitter", "PoolFactory", "Channeler"].map((name) => ethers.getContract(name))
+    );
+    this.sERC20 = contracts[0];
+    this.sERC721 = contracts[1];
+    this.vault = contracts[2];
+    this.broker = contracts[3];
+    this.issuer = contracts[4];
+    this.splitter = contracts[5];
+    this.poolFactory = contracts[6];
+    this.channeler = contracts[7];
   },
 };
 
