@@ -23,10 +23,17 @@
     "test:gas": "REPORT_GAS=true npx hardhat test",
     "test:coverage": "npx hardhat coverage",
     "deploy:rinkeby": "npx hardhat deploy --network rinkeby",
+    "deploy:goerli": "npx hardhat deploy --network goerli",
     "verify:rinkeby": "npx hardhat --network rinkeby etherscan-verify --api-key $API_KEY",
+    "verify:goerli": "npx hardhat --network goerli etherscan-verify --api-key $API_KEY",
     "roles:rinkeby": "npx hardhat run scripts/roles.js  --network rinkeby",
+    "roles:goerli": "npx hardhat run scripts/roles.js  --network goerli",
     "fractionalize:rinkeby": "npx hardhat run scripts/fractionalize.js --network rinkeby",
-    "dashboard:rinkeby": "npx hardhat run scripts/dashboard.js --network rinkeby"
+    "fractionalize:goerli": "npx hardhat run scripts/fractionalize.js --network goerli",
+    "dashboard:rinkeby": "npx hardhat run scripts/dashboard.js --network rinkeby",
+    "dashboard:goerli": "npx hardhat run scripts/dashboard.js --network goerli",
+    "addresses:rinkeby": "ADDRESSES_ONLY=1 npx hardhat run scripts/dashboard.js --network rinkeby",
+    "addresses:goerli": "ADDRESSES_ONLY=1 npx hardhat run scripts/dashboard.js --network goerli"
   },
   "dependencies": {
     "@balancer-labs/v2-pool-utils": "2.0.1",

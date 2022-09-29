@@ -38,6 +38,11 @@ module.exports = {
       url: "http://localhost:1248",
       timeout: 2000000,
     },
+    goerli: {
+      url: "http://localhost:1248",
+      timeout: 2000000,
+    },
+
   },
   namedAccounts: {
     deployer: {

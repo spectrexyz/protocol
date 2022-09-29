@@ -172,7 +172,11 @@ const fetch = {
 const main = async () => {
   process.stdout.write("\x1Bc");
   await fetch.all();
-  await print.all();
+  if (process.env.ADDRESSES_ONLY) {
+    await print.addresses();
+  } else {
+    await print.all();
+  }
 };
 
 main()
