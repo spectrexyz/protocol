@@ -31,7 +31,9 @@
     "fractionalize:rinkeby": "npx hardhat run scripts/fractionalize.js --network rinkeby",
     "fractionalize:goerli": "npx hardhat run scripts/fractionalize.js --network goerli",
     "dashboard:rinkeby": "npx hardhat run scripts/dashboard.js --network rinkeby",
-    "dashboard:goerli": "npx hardhat run scripts/dashboard.js --network goerli"
+    "dashboard:goerli": "npx hardhat run scripts/dashboard.js --network goerli",
+    "addresses:rinkeby": "ADDRESSES_ONLY=1 npx hardhat run scripts/dashboard.js --network rinkeby",
+    "addresses:goerli": "ADDRESSES_ONLY=1 npx hardhat run scripts/dashboard.js --network goerli"
   },
   "dependencies": {
     "@balancer-labs/v2-pool-utils": "2.0.1",
