@@ -1,4 +1,5 @@
 const chalk = require("chalk");
+const hre = require("hardhat");
 
 const terminal = {
   address: (address) => {
@@ -86,6 +87,10 @@ const fractionalize = async () => {
   const channeler = await ethers.getContract("Channeler");
   const vault = await ethers.getContract("Vault");
 
+  if (!process.env.TOKEN_URI) {
+    throw new Error("The TOKEN_URI environment variable is missing.");
+  }
+
   terminal.print(`» Fractionalizing NFT with URI ${process.env.TOKEN_URI} ... `);
   const tx = await channeler.mintAndFractionalize(process.env.TOKEN_URI, data);
   await tx.wait();
@@ -100,7 +105,7 @@ const fractionalize = async () => {
 
   terminal.info(`»» ERC721: https://testnets.opensea.io/assets/${sERC721.address}/${tokenId.toString()}`);
   terminal.info(`»» ERC1155: https://testnets.opensea.io/assets/${vault.address}/${id.toString()}`);
-  terminal.info(`»» sERC20: https://rinkeby.etherscan.io/token/${sERC20Address}`);
+  terminal.info(`»» sERC20: https://${hre.network.name}.etherscan.io/token/${sERC20Address}`);
 
   return sERC20Address;
 };
