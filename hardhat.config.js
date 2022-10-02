@@ -50,6 +50,6 @@ module.exports = {
     },
   },
   gasReporter: {
-    enabled: process.env.REPORT_GAS ? true : false,
+    enabled: Boolean(process.env.REPORT_GAS),
   },
 };
