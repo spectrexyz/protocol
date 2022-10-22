@@ -9,3 +9,5 @@ coverage.json
 
 # macOS
 .DS_Store
+
+.env.local
