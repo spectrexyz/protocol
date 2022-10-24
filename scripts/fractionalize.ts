@@ -41,9 +41,9 @@ const terminal = {
 const data = (guardian: string) => ({
   guardian,
   name: "NFT Fraction",
-  symbol: "FRAC",
-  cap: ethers.utils.parseEther("1000000"),
-  buyoutReserve: ethers.utils.parseEther("100"),
+  symbol: "FRCT",
+  cap: ethers.utils.parseEther(String(1_000_000n)),
+  buyoutReserve: ethers.utils.parseEther("10"),
   multiplier: ethers.utils.parseEther("1.5"),
   timelock: ethers.BigNumber.from("864000"), // 10 days
   sMaxNormalizedWeight: ethers.BigNumber.from("800000000000000000"),
@@ -51,8 +51,8 @@ const data = (guardian: string) => ({
   beneficiaries: [guardian],
   shares: [ethers.utils.parseEther("15")],
   swapFeePercentage: ethers.BigNumber.from("10000000000000000"),
-  issuanceReserve: ethers.utils.parseEther("100"),
-  fee: ethers.utils.parseEther("5"),
+  issuanceReserve: ethers.utils.parseEther(String(100_000n)), // issuance reserve = cap ÷ buyout reserve
+  fee: ethers.utils.parseEther("5"), // percentage
   buyoutFlash: true,
   issuanceFlash: true,
 });
