@@ -42,7 +42,7 @@ const data = (guardian: string) => ({
   guardian,
   name: "NFT Fraction",
   symbol: "FRCT",
-  cap: ethers.utils.parseEther(String(1_000_000n)),
+  cap: ethers.utils.parseEther(String(100_000n)),
   buyoutReserve: ethers.utils.parseEther("10"),
   multiplier: ethers.utils.parseEther("1.5"),
   timelock: ethers.BigNumber.from("864000"), // 10 days
