@@ -62,6 +62,18 @@ const approve = async () => {
   const vault = await getContract("Vault");
 
   terminal.print("» Approving vault to transfer NFTs… ");
+
+  const [account] = await ethers.getSigners();
+  const accountAddress = await account.getAddress();
+  const isApproved = await sERC721.isApprovedForAll(
+    accountAddress,
+    vault.address,
+  );
+  if (isApproved) {
+    terminal.success("N/A (already approved)");
+    return;
+  }
+
   const tx = await sERC721.setApprovalForAll(vault.address, true);
   await tx.wait();
   terminal.success("OK");
