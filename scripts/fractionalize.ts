@@ -136,9 +136,11 @@ const issue = async (
     } ETH worth of sERC20 from ${await from.getAddress()}… `,
   );
 
-  const tx = await issuer.connect(from).issue(sERC20, expected, {
-    value: amount,
-  });
+  const tx = await issuer.connect(from).issue(
+    sERC20,
+    expected,
+    { value: amount },
+  );
   await tx.wait();
 
   terminal.success("OK");

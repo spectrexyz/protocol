@@ -10,14 +10,25 @@ const func = async (hre) => {
 
   const balancerVaultAddress = config.balancer[network.name]?.vault;
   if (!balancerVaultAddress) {
-    throw new Error(`Couldn’t find the Balancer vault address in the .deployrc file for network ${network.name}`);
+    throw new Error(
+      `Couldn’t find the Balancer vault address in the .deployrc file for network ${network.name}`,
+    );
   }
 
-  await deploy("Issuer", {
+  const issuer = await deploy("Issuer", {
     from: deployer,
-    args: [balancerVaultAddress, poolFactory.address, splitter.address, config.bank, config.issuer.protocolFee],
+    args: [
+      balancerVaultAddress,
+      poolFactory.address,
+      splitter.address,
+      config.bank,
+      config.issuer.protocolFee,
+    ],
     log: true,
   });
+
+  // Set issuer on the pool factory
+  await poolFactory.setIssuer(issuer.address);
 };
 
 module.exports = func;
