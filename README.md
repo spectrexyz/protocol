@@ -45,21 +45,15 @@ pnpm test:gas
 #### Network specific
 
 ```
-pnpm deploy:rinkeby
 pnpm deploy:goerli
 
-ETHERSCAN_KEY=<key> pnpm verify:rinkeby
 ETHERSCAN_KEY=<key> pnpm verify:goerli
 
-pnpm roles:rinkeby
 pnpm roles:goerli
 
-pnpm fractionalize:rinkeby
 pnpm fractionalize:goerli
 
-pnpm dashboard:rinkeby
 pnpm dashboard:goerli
 
-pnpm addresses:rinkeby
 pnpm addresses:goerli
 ```

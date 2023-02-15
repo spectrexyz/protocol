@@ -53,11 +53,6 @@ const config: HardhatUserConfig = {
       },
       allowUnlimitedContractSize: true,
     },
-    rinkeby: {
-      accounts: testnetAccounts,
-      allowUnlimitedContractSize: true,
-      url: process.env.RPC_RINKEBY,
-    },
     goerli: {
       accounts: testnetAccounts,
       allowUnlimitedContractSize: true,
