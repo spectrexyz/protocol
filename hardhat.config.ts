@@ -18,7 +18,7 @@ const testnetAccounts = [
 
 if (testnetAccounts.length === 0) {
   throw new Error(
-    "The env vars ACCOUNT_PK{1,2,3} are missing. Please specify at least one of them.",
+    "The env vars ACCOUNT_PK{1,2,3} are missing. Please specify at least one of them."
   );
 }
 

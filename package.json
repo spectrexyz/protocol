@@ -22,7 +22,7 @@
     "test": "npx hardhat test",
     "test:gas": "REPORT_GAS=true npx hardhat test",
     "test:coverage": "npx hardhat coverage",
-    "deploy:goerli": "npx hardhat deploy --network goerli --reset --gasprice 1000000000",
+    "deploy:goerli": "npx hardhat deploy --network goerli --reset --gasprice 180000000000",
     "verify:goerli": "npx hardhat --network goerli etherscan-verify --api-key $ETHERSCAN_KEY",
     "roles:goerli": "npx hardhat run scripts/roles.js  --network goerli",
     "fractionalize:goerli": "npx hardhat run scripts/fractionalize.ts --network goerli",
